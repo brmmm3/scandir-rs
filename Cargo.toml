@@ -1,0 +1,23 @@
+[package]
+name = "pyext-scandir-rs"
+version = "0.1.0"
+authors = ["Martin Bammer <mrbm74@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "pyjwalk"
+crate-type = ["cdylib"]
+
+[dependencies]
+#jwalk = "0.4"
+jwalk = { path = "../jwalk" }
+rayon = "1.0"
+crossbeam = "0.7"
+crossbeam-channel = "0.3"
+
+[dependencies.pyo3]
+version = "0.8"
+features = ["extension-module"]
+

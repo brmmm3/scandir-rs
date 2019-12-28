@@ -2,9 +2,11 @@ use std::time::UNIX_EPOCH;
 use std::cmp;
 
 use jwalk::WalkDir;
+#[cfg(unix)]
+use expanduser::expanduser;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::types::{PyDict, PyList};
 use pyo3::wrap_pyfunction;
 use pyo3::PyIterProtocol;
 use pyo3::PyObjectProtocol;
@@ -96,56 +98,6 @@ impl PyIterProtocol for ScanDirIterator {
     }
 }
 
-#[pyclass]
-#[derive(Debug)]
-struct Count {
-    dirs: u32,
-    files: u32,
-    slinks: u32,
-    hlinks: u32,
-    devices: u32,
-    pipes: u32,
-    size: u64,
-    usage: u64,
-    errors: u32,
-}
-
-#[pymethods]
-impl Count {
-    #[new]
-    fn __new__(
-        obj: &PyRawObject,
-        dirs: u32,
-        files: u32,
-        slinks: u32,
-        hlinks: u32,
-        devices: u32,
-        pipes: u32,
-        size: u64,
-        usage: u64,
-        errors: u32,
-    ) {
-        obj.init(Count {
-            dirs: dirs,
-            files: files,
-            slinks: slinks,
-            hlinks: hlinks,
-            devices: devices,
-            pipes: pipes,
-            size: size,
-            usage: usage,
-            errors: errors,
-        });
-    }
-}
-
-#[pyproto]
-impl<'p> PyObjectProtocol<'p> for Count {
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("{:#?}", self))
-    }
-}
-
 #[pyfunction]
 pub fn count(
     py: Python,
@@ -164,6 +116,8 @@ pub fn count(
     let mut usage: u64 = 0;
     let mut errors: u32 = 0;
 
+    #[cfg(unix)]
+    let root_path = expanduser(root_path)?;
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden.unwrap_or(false))
         .sort(false)
@@ -217,24 +171,31 @@ pub fn count(
             }
         };
     }
-    let obj = PyRef::new(
-        py,
-        Count {
-            dirs: dirs,
-            files: files,
-            slinks: slinks,
-            hlinks: hlinks,
-            devices: devices,
-            pipes: pipes,
-            size: size,
-            usage: usage,
-            errors: errors,
-        },
-    )
-    .unwrap();
 
     let result = PyDict::new(py);
-    result.set_item(root_path, obj).unwrap();
+    if dirs > 0 {
+        result.set_item("dirs", dirs).unwrap();
+    }
+    if files > 0 {
+        result.set_item("files", files).unwrap();
+    }
+    if slinks > 0 {
+        result.set_item("slinks", slinks).unwrap();
+    }
+    if hlinks > 0 {
+        result.set_item("hlinks", hlinks).unwrap();
+    }
+    if devices > 0 {
+        result.set_item("devices", devices).unwrap();
+    }
+    if pipes > 0 {
+        result.set_item("pipes", pipes).unwrap();
+    }
+    result.set_item("size", size).unwrap();
+    result.set_item("usage", usage).unwrap();
+    if errors > 0 {
+        result.set_item("errors", errors).unwrap();
+    }
     Ok(result.into())
 }
 
@@ -251,6 +212,8 @@ pub fn toc(
     let unknown = PyList::empty(py);
     let errors = PyDict::new(py);
 
+    #[cfg(unix)]
+    let root_path = expanduser(root_path)?;
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden.unwrap_or(false))
         .sort(sorted.unwrap_or(false))
@@ -280,17 +243,23 @@ pub fn toc(
         };
     }
 
-    Ok(PyTuple::new(
-        py,
-        &[
-            dirs.to_object(py),
-            files.to_object(py),
-            symlinks.to_object(py),
-            unknown.to_object(py),
-            errors.to_object(py),
-        ],
-    )
-    .into())
+    let result = PyDict::new(py);
+    if !dirs.is_empty() {
+        result.set_item("dirs", dirs).unwrap();
+    }
+    if !files.is_empty() {
+        result.set_item("files", files).unwrap();
+    }
+    if !symlinks.is_empty() {
+        result.set_item("symlinks", symlinks).unwrap();
+    }
+    if !unknown.is_empty() {
+        result.set_item("unknown", unknown).unwrap();
+    }
+    if !errors.is_empty() {
+        result.set_item("errors", errors).unwrap();
+    }
+    Ok(result.into())
 }
 
 #[pyfunction]
@@ -305,6 +274,8 @@ pub fn list(
     let mut entries: Vec<_> = Vec::new();
     let result = PyDict::new(py);
 
+    #[cfg(unix)]
+    let root_path = expanduser(root_path)?;
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden.unwrap_or(false))
         .sort(sorted.unwrap_or(false))

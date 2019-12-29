@@ -1,4 +1,6 @@
+/build
 /target
+/scandir_rs/target
 **/*.rs.bk
 
 .vscode/

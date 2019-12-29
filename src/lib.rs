@@ -271,7 +271,7 @@ pub fn list(
     metadata: Option<bool>,
     metadata_ext: Option<bool>,
 ) -> PyResult<PyObject> {
-    let mut entries: Vec<_> = Vec::new();
+    //let mut entries: Vec<_> = Vec::new();
     let result = PyDict::new(py);
 
     #[cfg(unix)]
@@ -377,12 +377,12 @@ pub fn list(
                 result.set_item(key.to_str(), e.to_string()).unwrap();
             }
         };
-        entries.push(entry);
+        //entries.push(entry);
     }
 
-    for i in 0..cmp::min(entries.len(), 3) {
-        println!("{:#?}", entries[i]);
-    }
+    //for i in 0..cmp::min(entries.len(), 3) {
+    //    println!("{:#?}", entries[i]);
+    //}
     Ok(result.into())
 }
 

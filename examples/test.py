@@ -32,5 +32,11 @@ if __name__ == "__main__":
     lst = r.list(root)
     dt = time.time() - t1
     print(len(lst))
-    print(lst[:3], "...")
+    itr = lst.items()
+    for _ in range(3):
+        item = itr.next()
+        if item is None:
+            break
+        key, value = item
+        print(f"{key}: {value}")
     print("dt =", dt)

@@ -1,1 +1,4 @@
-pyext-scandir-rs
+`scandir-rs`
+============
+
+A fast directory scanner.

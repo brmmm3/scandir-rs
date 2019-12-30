@@ -18,22 +18,22 @@ if __name__ == "__main__":
     print(c)
     print("dt =", dt)
 
-    print("Get TOC...")
+    print("\nGet TOC...")
     t1 = time.time()
     toc = r.toc(root)
     dt = time.time() - t1
-    print([(key, len(value)) for key, value in toc.items()])
+    print("KEY -> CNT:", [(key, len(value)) for key, value in toc.items()])
     for key, value in sorted(toc.items()):
-        print(key, value[:3])
+        print("KEY -> 3 VALUES:", key, value[:3])
     print("dt =", dt)
 
-    print("Get detailed list...")
+    print("\nGet detailed list...")
     t1 = time.time()
     lst = r.list(root, metadata_ext=True)
     dt = time.time() - t1
-    print(len(lst))
+    print("CNT:", len(lst))
     for nr, (key, value) in enumerate(lst.items()):
-        print(f"{key}: {value}")
+        print(f"KEY -> VALUE: {key}: {value}")
         if nr > 2:
             break
     print("dt =", dt)

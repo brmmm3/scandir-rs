@@ -1,12 +1,12 @@
 use std::time::UNIX_EPOCH;
-use std::cmp;
+use std::collections::HashMap;
 
 use jwalk::WalkDir;
 #[cfg(unix)]
 use expanduser::expanduser;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 use pyo3::wrap_pyfunction;
 use pyo3::PyIterProtocol;
 use pyo3::PyObjectProtocol;
@@ -114,89 +114,94 @@ pub fn count(
     let mut pipes: u32 = 0;
     let mut size: u64 = 0;
     let mut usage: u64 = 0;
-    let mut errors: u32 = 0;
+    let mut errors = Vec::new();
 
-    #[cfg(unix)]
-    let root_path = expanduser(root_path)?;
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden.unwrap_or(false))
-        .sort(false)
-        .preload_metadata(metadata.unwrap_or(false))
-        .preload_metadata_ext(metadata_ext.unwrap_or(false))
-    {
-        match &entry {
-            Ok(v) => {
-                let file_type = v.file_type_result.as_ref().unwrap();
-                if file_type.is_dir() {
-                    dirs += 1;
-                }
-                if file_type.is_file() {
-                    files += 1;
-                }
-                if file_type.is_symlink() {
-                    slinks += 1;
-                }
-                if v.metadata_result.is_some() {
-                    let metadata_ext = v.ext.as_ref();
-                    if metadata_ext.is_some() {
-                        let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
-                        if metadata_ext.nlink > 1 {
-                            hlinks += 1;
-                        }
-                        size += metadata_ext.size;
-                        #[cfg(unix)]
-                        {
-                            if metadata_ext.rdev > 0 {
-                                devices += 1;
+    let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
+        #[cfg(unix)]
+        let root_path = expanduser(root_path)?;
+        for entry in WalkDir::new(root_path)
+            .skip_hidden(skip_hidden.unwrap_or(false))
+            .sort(false)
+            .preload_metadata(metadata.unwrap_or(false))
+            .preload_metadata_ext(metadata_ext.unwrap_or(false))
+        {
+            match &entry {
+                Ok(v) => {
+                    let file_type = v.file_type_result.as_ref().unwrap();
+                    if file_type.is_dir() {
+                        dirs += 1;
+                    }
+                    if file_type.is_file() {
+                        files += 1;
+                    }
+                    if file_type.is_symlink() {
+                        slinks += 1;
+                    }
+                    if v.metadata_result.is_some() {
+                        let metadata_ext = v.ext.as_ref();
+                        if metadata_ext.is_some() {
+                            let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
+                            if metadata_ext.nlink > 1 {
+                                hlinks += 1;
                             }
-                            if (metadata_ext.mode & 4096) != 0 {
-                                pipes += 1;
+                            size += metadata_ext.size;
+                            #[cfg(unix)]
+                            {
+                                if metadata_ext.rdev > 0 {
+                                    devices += 1;
+                                }
+                                if (metadata_ext.mode & 4096) != 0 {
+                                    pipes += 1;
+                                }
+                                usage += metadata_ext.blocks * 512;
                             }
-                            usage += metadata_ext.blocks * 512;
-                        }
-                        #[cfg(windows)]
-                        {
-                            let mut blocks = metadata_ext.size >> 12;
-                            if blocks << 12 < metadata_ext.size {
-                                blocks += 1;
+                            #[cfg(windows)]
+                            {
+                                let mut blocks = metadata_ext.size >> 12;
+                                if blocks << 12 < metadata_ext.size {
+                                    blocks += 1;
+                                }
+                                usage += blocks << 12;
                             }
-                            usage += blocks << 12;
                         }
                     }
                 }
-            }
-            Err(e) => {
-                println!("encountered an error: {}", e);
-                errors += 1;
-            }
-        };
+                Err(e) => errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+            };
+        }
+        Ok(())
+    });
+    let pyresult = PyDict::new(py);
+    match rc {
+        Err(e) => { pyresult.set_item("error", e.to_string()).unwrap();
+                    return Ok(pyresult.into())
+                  },
+        _ => ()
     }
-
-    let result = PyDict::new(py);
     if dirs > 0 {
-        result.set_item("dirs", dirs).unwrap();
+        pyresult.set_item("dirs", dirs).unwrap();
     }
     if files > 0 {
-        result.set_item("files", files).unwrap();
+        pyresult.set_item("files", files).unwrap();
     }
     if slinks > 0 {
-        result.set_item("slinks", slinks).unwrap();
+        pyresult.set_item("slinks", slinks).unwrap();
     }
     if hlinks > 0 {
-        result.set_item("hlinks", hlinks).unwrap();
+        pyresult.set_item("hlinks", hlinks).unwrap();
     }
     if devices > 0 {
-        result.set_item("devices", devices).unwrap();
+        pyresult.set_item("devices", devices).unwrap();
     }
     if pipes > 0 {
-        result.set_item("pipes", pipes).unwrap();
+        pyresult.set_item("pipes", pipes).unwrap();
     }
-    result.set_item("size", size).unwrap();
-    result.set_item("usage", usage).unwrap();
-    if errors > 0 {
-        result.set_item("errors", errors).unwrap();
+    pyresult.set_item("size", size).unwrap();
+    pyresult.set_item("usage", usage).unwrap();
+    if !errors.is_empty() {
+        pyresult.set_item("errors", errors).unwrap();
     }
-    Ok(result.into())
+    Ok(pyresult.into())
 }
 
 #[pyfunction]
@@ -206,60 +211,62 @@ pub fn toc(
     sorted: Option<bool>,
     skip_hidden: Option<bool>,
 ) -> PyResult<PyObject> {
-    let dirs = PyList::empty(py);
-    let files = PyList::empty(py);
-    let symlinks = PyList::empty(py);
-    let unknown = PyList::empty(py);
-    let errors = PyDict::new(py);
+    let mut dirs = Vec::new();
+    let mut files = Vec::new();
+    let mut symlinks = Vec::new();
+    let mut unknown = Vec::new();
+    let mut errors = Vec::new();
 
-    #[cfg(unix)]
-    let root_path = expanduser(root_path)?;
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden.unwrap_or(false))
-        .sort(sorted.unwrap_or(false))
-    {
-        match &entry {
-            Ok(v) => {
-                let file_type = v.file_type_result.as_ref().unwrap();
-                let mut key = v.parent_path.to_path_buf();
-                key.push(v.file_name.clone().into_string().unwrap());
-                if file_type.is_symlink() {
-                    symlinks.append(key.to_str()).unwrap();
-                } else if file_type.is_dir() {
-                    dirs.append(key.to_str()).unwrap();
-                } else if file_type.is_file() {
-                    files.append(key.to_str()).unwrap();
-                } else {
-                    unknown.append(key.to_str()).unwrap();
+    let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
+        #[cfg(unix)]
+        let root_path = expanduser(root_path)?;
+        for entry in WalkDir::new(root_path)
+            .skip_hidden(skip_hidden.unwrap_or(false))
+            .sort(sorted.unwrap_or(false))
+        {
+            match &entry {
+                Ok(v) => {
+                    let file_type = v.file_type_result.as_ref().unwrap();
+                    let mut key = v.parent_path.to_path_buf();
+                    key.push(v.file_name.clone().into_string().unwrap());
+                    if file_type.is_symlink() {
+                        symlinks.push(key.to_str().unwrap().to_string());
+                    } else if file_type.is_dir() {
+                        dirs.push(key.to_str().unwrap().to_string());
+                    } else if file_type.is_file() {
+                        files.push(key.to_str().unwrap().to_string());
+                    } else {
+                        unknown.push(key.to_str().unwrap().to_string());
+                    }
                 }
-            }
-            Err(e) => {
-                println!("encountered an error: {}", e);
-                let v = entry.as_ref().unwrap();
-                let mut key = v.parent_path.to_path_buf();
-                key.push(v.file_name.clone().into_string().unwrap());
-                errors.set_item(key.to_str(), e.to_string()).unwrap();
-            }
-        };
+                Err(e) => errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+            };
+        }
+        Ok(())
+    });
+    let pyresult = PyDict::new(py);
+    match rc {
+        Err(e) => { pyresult.set_item("error", e.to_string()).unwrap();
+                    return Ok(pyresult.into())
+                  },
+        _ => ()
     }
-
-    let result = PyDict::new(py);
     if !dirs.is_empty() {
-        result.set_item("dirs", dirs).unwrap();
+        pyresult.set_item("dirs", dirs).unwrap();
     }
     if !files.is_empty() {
-        result.set_item("files", files).unwrap();
+        pyresult.set_item("files", files).unwrap();
     }
     if !symlinks.is_empty() {
-        result.set_item("symlinks", symlinks).unwrap();
+        pyresult.set_item("symlinks", symlinks).unwrap();
     }
     if !unknown.is_empty() {
-        result.set_item("unknown", unknown).unwrap();
+        pyresult.set_item("unknown", unknown).unwrap();
     }
     if !errors.is_empty() {
-        result.set_item("errors", errors).unwrap();
+        pyresult.set_item("errors", errors).unwrap();
     }
-    Ok(result.into())
+    Ok(pyresult.into())
 }
 
 #[pyfunction]
@@ -272,118 +279,118 @@ pub fn list(
     metadata_ext: Option<bool>,
 ) -> PyResult<PyObject> {
     //let mut entries: Vec<_> = Vec::new();
-    let result = PyDict::new(py);
+    let mut result = HashMap::new();
+    let mut errors = Vec::new();
 
-    #[cfg(unix)]
-    let root_path = expanduser(root_path)?;
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden.unwrap_or(false))
-        .sort(sorted.unwrap_or(false))
-        .preload_metadata(metadata.unwrap_or(false))
-        .preload_metadata_ext(metadata_ext.unwrap_or(false))
-    {
-        match &entry {
-            Ok(v) => {
-                let file_type = v.file_type_result.as_ref().unwrap();
-                let mut ctime: f64 = 0.0;
-                let mut mtime: f64 = 0.0;
-                let mut atime: f64 = 0.0;
-                let mut mode: u32 = 0;
-                let mut ino: u64 = 0;
-                let mut dev: u64 = 0;
-                let mut nlink: u64 = 0;
-                let mut uid: u32 = 0;
-                let mut gid: u32 = 0;
-                let mut size: u64 = 0;
-                let mut rdev: u64 = 0;
-                let mut blksize: u64 = 4096;
-                let mut blocks: u64 = 0;
-                if v.metadata_result.is_some() {
-                    let metadata = v.metadata_result.as_ref().unwrap().as_ref().unwrap();
-                    let duration = metadata
-                        .created()
-                        .unwrap()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap();
-                    ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-                    let duration = metadata
-                        .modified()
-                        .unwrap()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap();
-                    mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-                    let duration = metadata
-                        .accessed()
-                        .unwrap()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap();
-                    atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-                    let metadata_ext = v.ext.as_ref();
-                    if metadata_ext.is_some() {
-                        let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
-                        mode = metadata_ext.mode;
-                        ino = metadata_ext.ino;
-                        dev = metadata_ext.dev as u64;
-                        nlink = metadata_ext.nlink as u64;
-                        size = metadata_ext.size;
-                        #[cfg(unix)]
-                        {
-                            uid = metadata_ext.uid;
-                            gid = metadata_ext.gid;
-                            rdev = metadata_ext.rdev;
-                            blksize = metadata_ext.blksize;
-                            blocks = metadata_ext.blocks;
-                        }
-                        #[cfg(windows)]
-                        {
-                            blocks = size >> 12;
-                            if blocks << 12 < size {
-                                blocks += 1;
+    let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
+        #[cfg(unix)]
+        let root_path = expanduser(root_path)?;
+        for entry in WalkDir::new(root_path)
+            .skip_hidden(skip_hidden.unwrap_or(false))
+            .sort(sorted.unwrap_or(false))
+            .preload_metadata(metadata.unwrap_or(false))
+            .preload_metadata_ext(metadata_ext.unwrap_or(false))
+        {
+            match &entry {
+                Ok(v) => {
+                    let file_type = v.file_type_result.as_ref().unwrap();
+                    let mut ctime: f64 = 0.0;
+                    let mut mtime: f64 = 0.0;
+                    let mut atime: f64 = 0.0;
+                    let mut mode: u32 = 0;
+                    let mut ino: u64 = 0;
+                    let mut dev: u64 = 0;
+                    let mut nlink: u64 = 0;
+                    let mut uid: u32 = 0;
+                    let mut gid: u32 = 0;
+                    let mut size: u64 = 0;
+                    let mut rdev: u64 = 0;
+                    let mut blksize: u64 = 4096;
+                    let mut blocks: u64 = 0;
+                    if v.metadata_result.is_some() {
+                        let metadata = v.metadata_result.as_ref().unwrap().as_ref().unwrap();
+                        let duration = metadata
+                            .created()
+                            .unwrap()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap();
+                        ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+                        let duration = metadata
+                            .modified()
+                            .unwrap()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap();
+                        mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+                        let duration = metadata
+                            .accessed()
+                            .unwrap()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap();
+                        atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+                        let metadata_ext = v.ext.as_ref();
+                        if metadata_ext.is_some() {
+                            let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
+                            mode = metadata_ext.mode;
+                            ino = metadata_ext.ino;
+                            dev = metadata_ext.dev as u64;
+                            nlink = metadata_ext.nlink as u64;
+                            size = metadata_ext.size;
+                            #[cfg(unix)]
+                            {
+                                uid = metadata_ext.uid;
+                                gid = metadata_ext.gid;
+                                rdev = metadata_ext.rdev;
+                                blksize = metadata_ext.blksize;
+                                blocks = metadata_ext.blocks;
+                            }
+                            #[cfg(windows)]
+                            {
+                                blocks = size >> 12;
+                                if blocks << 12 < size {
+                                    blocks += 1;
+                                }
                             }
                         }
                     }
+                    let mut key = v.parent_path.to_path_buf();
+                    key.push(v.file_name.clone().into_string().unwrap());
+                    let entry = DirEntry {
+                            is_symlink: file_type.is_symlink(),
+                            is_dir: file_type.is_dir(),
+                            is_file: file_type.is_file(),
+                            ctime: ctime,
+                            mtime: mtime,
+                            atime: atime,
+                            mode: mode,
+                            ino: ino,
+                            dev: dev,
+                            nlink: nlink,
+                            uid: uid,
+                            gid: gid,
+                            size: size,
+                            rdev: rdev,
+                            blksize: blksize,
+                            blocks: blocks,
+                        };
+                    result.insert(key.to_str().unwrap().to_string(), entry);
                 }
-                let mut key = v.parent_path.to_path_buf();
-                key.push(v.file_name.clone().into_string().unwrap());
-                let entry = PyRef::new(
-                    py,
-                    DirEntry {
-                        is_symlink: file_type.is_symlink(),
-                        is_dir: file_type.is_dir(),
-                        is_file: file_type.is_file(),
-                        ctime: ctime,
-                        mtime: mtime,
-                        atime: atime,
-                        mode: mode,
-                        ino: ino,
-                        dev: dev,
-                        nlink: nlink,
-                        uid: uid,
-                        gid: gid,
-                        size: size,
-                        rdev: rdev,
-                        blksize: blksize,
-                        blocks: blocks,
-                    },
-                )
-                .unwrap();
-                result.set_item(key.to_str(), entry).unwrap();
-            }
-            Err(e) => {
-                println!("encountered an error: {}", e);
-                let v = entry.as_ref().unwrap();
-                let mut key = v.parent_path.to_path_buf();
-                key.push(v.file_name.clone().into_string().unwrap());
-                result.set_item(key.to_str(), e.to_string()).unwrap();
-            }
-        };
-        //entries.push(entry);
+                Err(e) => errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+            };
+        }
+        Ok(())
+    });
+    let pyresult = PyDict::new(py);
+    match rc {
+        Err(e) => { pyresult.set_item("error", e.to_string()).unwrap();
+                    return Ok(pyresult.into())
+                  },
+        _ => ()
     }
-
-    //for i in 0..cmp::min(entries.len(), 3) {
-    //    println!("{:#?}", entries[i]);
-    //}
-    Ok(result.into())
+    for (k, v) in result.drain() {
+        pyresult.set_item(k, PyRef::new(py, v).unwrap())?;
+    }
+    pyresult.set_item(py.None(), errors)?;
+    Ok(pyresult.into())
 }
 
 #[pymodule]

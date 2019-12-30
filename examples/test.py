@@ -29,14 +29,11 @@ if __name__ == "__main__":
 
     print("Get detailed list...")
     t1 = time.time()
-    lst = r.list(root)
+    lst = r.list(root, metadata_ext=True)
     dt = time.time() - t1
     print(len(lst))
-    itr = lst.items()
-    for _ in range(3):
-        item = itr.next()
-        if item is None:
-            break
-        key, value = item
+    for nr, (key, value) in enumerate(lst.items()):
         print(f"{key}: {value}")
+        if nr > 2:
+            break
     print("dt =", dt)

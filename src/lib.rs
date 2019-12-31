@@ -24,12 +24,15 @@ struct DirEntry {
     ino: u64,
     dev: u64,
     nlink: u64,
-    uid: u32,
-    gid: u32,
     size: u64,
-    rdev: u64,
     blksize: u64,
     blocks: u64,
+    #[cfg(unix)]
+    uid: u32,
+    #[cfg(unix)]
+    gid: u32,
+    #[cfg(unix)]
+    rdev: u64,
 }
 
 #[pymethods]
@@ -47,12 +50,15 @@ impl DirEntry {
         ino: u64,
         dev: u64,
         nlink: u64,
-        uid: u32,
-        gid: u32,
         size: u64,
-        rdev: u64,
         blksize: u64,
         blocks: u64,
+        #[cfg(unix)]
+        uid: u32,
+        #[cfg(unix)]
+        gid: u32,
+        #[cfg(unix)]
+        rdev: u64,
     ) {
         obj.init(DirEntry {
             is_symlink: is_symlink,
@@ -65,12 +71,15 @@ impl DirEntry {
             ino: ino,
             dev: dev,
             nlink: nlink,
-            uid: uid,
-            gid: gid,
             size: size,
-            rdev: rdev,
             blksize: blksize,
             blocks: blocks,
+            #[cfg(unix)]
+            uid: uid,
+            #[cfg(unix)]
+            gid: gid,
+            #[cfg(unix)]
+            rdev: rdev,
         });
     }
 }
@@ -278,7 +287,6 @@ pub fn list(
     metadata: Option<bool>,
     metadata_ext: Option<bool>,
 ) -> PyResult<PyObject> {
-    //let mut entries: Vec<_> = Vec::new();
     let mut result = HashMap::new();
     let mut errors = Vec::new();
 
@@ -301,12 +309,15 @@ pub fn list(
                     let mut ino: u64 = 0;
                     let mut dev: u64 = 0;
                     let mut nlink: u64 = 0;
-                    let mut uid: u32 = 0;
-                    let mut gid: u32 = 0;
                     let mut size: u64 = 0;
-                    let mut rdev: u64 = 0;
                     let mut blksize: u64 = 4096;
                     let mut blocks: u64 = 0;
+                    #[cfg(unix)]
+                    let mut uid: u32 = 0;
+                    #[cfg(unix)]
+                    let mut gid: u32 = 0;
+                    #[cfg(unix)]
+                    let mut rdev: u64 = 0;
                     if v.metadata_result.is_some() {
                         let metadata = v.metadata_result.as_ref().unwrap().as_ref().unwrap();
                         let duration = metadata
@@ -337,14 +348,15 @@ pub fn list(
                             size = metadata_ext.size;
                             #[cfg(unix)]
                             {
+                                blksize = metadata_ext.blksize;
+                                blocks = metadata_ext.blocks;
                                 uid = metadata_ext.uid;
                                 gid = metadata_ext.gid;
                                 rdev = metadata_ext.rdev;
-                                blksize = metadata_ext.blksize;
-                                blocks = metadata_ext.blocks;
                             }
                             #[cfg(windows)]
                             {
+                                blksize = 4096;
                                 blocks = size >> 12;
                                 if blocks << 12 < size {
                                     blocks += 1;
@@ -365,12 +377,15 @@ pub fn list(
                             ino: ino,
                             dev: dev,
                             nlink: nlink,
-                            uid: uid,
-                            gid: gid,
                             size: size,
-                            rdev: rdev,
                             blksize: blksize,
                             blocks: blocks,
+                            #[cfg(unix)]
+                            uid: uid,
+                            #[cfg(unix)]
+                            gid: gid,
+                            #[cfg(unix)]
+                            rdev: rdev,
                         };
                     result.insert(key.to_str().unwrap().to_string(), entry);
                 }

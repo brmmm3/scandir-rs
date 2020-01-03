@@ -58,7 +58,7 @@ if __name__ == "__main__":
     t1 = time.time()
     thr = Counter()
     thr.start()
-    lst = r.list(root, metadata_ext=True)
+    lst = r.entries(root, metadata_ext=True)
     thr.stop()
     dt = time.time() - t1
     print("CNT:", len(lst))

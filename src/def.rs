@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::PyObjectProtocol;
 
 #[pyclass]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DirEntry {
     pub is_symlink: bool,
     pub is_dir: bool,

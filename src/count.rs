@@ -187,7 +187,8 @@ pub fn count(
         Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
         _ => ()
     }
-    Ok(statistics.lock().unwrap().clone().into())
+    let stats_cloned = statistics.lock().unwrap().clone();
+    Ok(stats_cloned.into())
 }
 
 #[pyclass]
@@ -317,9 +318,9 @@ impl Count {
     }
 
     fn as_dict(&self) -> PyResult<PyObject> {
-        let py = GILGuard::acquire().python();
-        let pyresult = PyDict::new(py);
+        let gil = GILGuard::acquire();
         let stats_locked = self.statistics.lock().unwrap();
+        let pyresult = PyDict::new(gil.python());
         if stats_locked.dirs > 0 {
             pyresult.set_item("dirs", stats_locked.dirs).unwrap();
         }
@@ -347,7 +348,7 @@ impl Count {
         if !stats_locked.errors.is_empty() {
             pyresult.set_item("errors", stats_locked.errors.to_vec()).unwrap();
         }
-        Ok(pyresult.to_object(py))
+        Ok(pyresult.to_object(gil.python()))
     }
 
     fn collect(&mut self) -> PyResult<Statistics> {

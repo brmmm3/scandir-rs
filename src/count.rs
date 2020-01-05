@@ -232,7 +232,58 @@ pub struct Count {
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
-    exit_called: bool,
+    has_results: bool,
+}
+
+impl Count {
+    fn rs_init(&self) {
+        let mut stats = self.statistics.lock().unwrap();
+        stats.dirs = 0;
+        stats.files = 0;
+        stats.slinks = 0;
+        stats.hlinks = 0;
+        stats.devices = 0;
+        stats.pipes = 0;
+        stats.size = 0;
+        stats.usage = 0;
+        stats.errors.clear();
+    }
+
+    fn rs_start(&mut self) -> bool {
+        if self.thr.is_some() {
+            return false
+        }
+        if self.has_results {
+            self.rs_init();
+        }
+        let root_path = String::from(&self.root_path);
+        let skip_hidden = self.skip_hidden;
+        let metadata = self.metadata;
+        let metadata_ext = self.metadata_ext;
+        let max_depth = self.max_depth;
+        let statistics = self.statistics.clone();
+        let alive = Arc::new(AtomicBool::new(true));
+        self.alive = Some(Arc::downgrade(&alive));
+        self.thr = Some(thread::spawn(move || {
+            counter(root_path,
+                    skip_hidden, metadata, metadata_ext, max_depth,
+                    statistics, Some(alive))
+        }));
+        true
+    }
+
+    fn rs_stop(&mut self) -> bool {
+        match &self.alive {
+            Some(alive) => match alive.upgrade() {
+                Some(alive) => (*alive).store(false, Ordering::Relaxed),
+                None => return false,
+            },
+            None => {},
+        }
+        self.thr.take().map(thread::JoinHandle::join);
+        self.has_results = true;
+        true
+    }
 }
 
 #[pymethods]
@@ -265,7 +316,7 @@ impl Count {
             })),
             thr: None,
             alive: None,
-            exit_called: false,
+            has_results: false,
         });
     }
 
@@ -274,45 +325,30 @@ impl Count {
        Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
     }
 
-    fn collect(&self) -> PyResult<Statistics> {
+    #[getter]
+    fn has_results(&self) -> PyResult<bool> {
+       Ok(self.has_results)
+    }
+
+    fn collect(&mut self) -> PyResult<Statistics> {
         counter(self.root_path.clone(),
                 self.skip_hidden, self.metadata, self.metadata_ext, self.max_depth,
                 self.statistics.clone(), None);
+        self.has_results = true;
         Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
     }
 
     fn start(&mut self) -> PyResult<bool> {
-        if self.thr.is_some() {
+        if !self.rs_start() {
             return Err(exceptions::RuntimeError::py_err("Thread already running"))
         }
-        let root_path = String::from(&self.root_path);
-        let skip_hidden = self.skip_hidden;
-        let metadata = self.metadata;
-        let metadata_ext = self.metadata_ext;
-        let max_depth = self.max_depth;
-        let statistics = self.statistics.clone();
-        let alive = Arc::new(AtomicBool::new(true));
-        self.alive = Some(Arc::downgrade(&alive));
-        self.thr = Some(thread::spawn(move || {
-            counter(root_path,
-                    skip_hidden, metadata, metadata_ext, max_depth,
-                    statistics, Some(alive))
-        }));
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
-        if self.thr.is_none() {
+        if !self.rs_stop() {
             return Err(exceptions::RuntimeError::py_err("Thread not running"))
         }
-        match &self.alive {
-            Some(alive) => match alive.upgrade() {
-                Some(alive) => (*alive).store(false, Ordering::Relaxed),
-                None => return Ok(false),
-            },
-            None => {},
-        }
-        self.thr.take().map(thread::JoinHandle::join);
         Ok(true)
     }
 
@@ -337,19 +373,7 @@ impl pyo3::class::PyObjectProtocol for Count {
 #[pyproto]
 impl<'p> PyContextProtocol<'p> for Count {
     fn __enter__(&'p mut self) -> PyResult<()> {
-        let root_path = String::from(&self.root_path);
-        let skip_hidden = self.skip_hidden;
-        let metadata = self.metadata;
-        let metadata_ext = self.metadata_ext;
-        let max_depth = self.max_depth;
-        let statistics = self.statistics.clone();
-        let alive = Arc::new(AtomicBool::new(true));
-        self.alive = Some(Arc::downgrade(&alive));
-        self.thr = Some(thread::spawn(move || {
-            counter(root_path,
-                    skip_hidden, metadata, metadata_ext, max_depth,
-                    statistics, Some(alive))
-        }));
+        self.rs_start();
         Ok(())
     }
 
@@ -359,17 +383,10 @@ impl<'p> PyContextProtocol<'p> for Count {
         _value: Option<&'p PyAny>,
         _traceback: Option<&'p PyAny>,
     ) -> PyResult<bool> {
-        match &self.alive {
-            Some(alive) => match alive.upgrade() {
-                Some(alive) => (*alive).store(false, Ordering::Relaxed),
-                None => return Ok(false),
-            },
-            None => {},
+        if !self.rs_stop() {
+            return Ok(false)
         }
-        self.thr.take().map(thread::JoinHandle::join);
-        let gil = GILGuard::acquire();
-        self.exit_called = true;
-        if ty == Some(gil.python().get_type::<ValueError>()) {
+        if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
             Ok(true)
         } else {
             Ok(false)

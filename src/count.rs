@@ -8,9 +8,8 @@ use expanduser::expanduser;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyType, PyAny, PyDict};
+use pyo3::{Python, wrap_pyfunction, PyContextProtocol};
 use pyo3::exceptions::{self, ValueError};
-use pyo3::PyContextProtocol;
-use pyo3::{Python, PyErr, wrap_pyfunction};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -183,29 +182,29 @@ pub fn count(
         _ => ()
     }
     {
-        let stat = statistics.lock().unwrap();
-        if stat.dirs > 0 {
-            pyresult.set_item("dirs", stat.dirs).unwrap();
+        let stats = statistics.lock().unwrap();
+        if stats.dirs > 0 {
+            pyresult.set_item("dirs", stats.dirs).unwrap();
         }
-        if stat.files > 0 {
-            pyresult.set_item("files", stat.files).unwrap();
+        if stats.files > 0 {
+            pyresult.set_item("files", stats.files).unwrap();
         }
-        if stat.slinks > 0 {
-            pyresult.set_item("slinks", stat.slinks).unwrap();
+        if stats.slinks > 0 {
+            pyresult.set_item("slinks", stats.slinks).unwrap();
         }
-        if stat.hlinks > 0 {
-            pyresult.set_item("hlinks", stat.hlinks).unwrap();
+        if stats.hlinks > 0 {
+            pyresult.set_item("hlinks", stats.hlinks).unwrap();
         }
-        if stat.devices > 0 {
-            pyresult.set_item("devices", stat.devices).unwrap();
+        if stats.devices > 0 {
+            pyresult.set_item("devices", stats.devices).unwrap();
         }
-        if stat.pipes > 0 {
-            pyresult.set_item("pipes", stat.pipes).unwrap();
+        if stats.pipes > 0 {
+            pyresult.set_item("pipes", stats.pipes).unwrap();
         }
-        pyresult.set_item("size", stat.size).unwrap();
-        pyresult.set_item("usage", stat.usage).unwrap();
-        if !stat.errors.is_empty() {
-            pyresult.set_item("errors", stat.errors.to_vec()).unwrap();
+        pyresult.set_item("size", stats.size).unwrap();
+        pyresult.set_item("usage", stats.usage).unwrap();
+        if !stats.errors.is_empty() {
+            pyresult.set_item("errors", stats.errors.to_vec()).unwrap();
         }
     }
     Ok(pyresult.into())
@@ -272,10 +271,7 @@ impl Count {
 
     fn start(&mut self) -> PyResult<bool> {
         if self.thr.is_some() {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            PyErr::new::<exceptions::RuntimeError, _>("Thread already running").restore(py);
-            return Ok(false)
+            return Err(exceptions::RuntimeError::py_err("Thread already running"))
         }
         let root_path = String::from(&self.root_path);
         let skip_hidden = self.skip_hidden;
@@ -292,10 +288,7 @@ impl Count {
 
     fn stop(&mut self) -> PyResult<bool> {
         if self.thr.is_none() {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            PyErr::new::<exceptions::RuntimeError, _>("Thread not running").restore(py);
-            return Ok(false)
+            return Err(exceptions::RuntimeError::py_err("Thread not running"))
         }
         match &self.alive {
             Some(alive) => match alive.upgrade() {

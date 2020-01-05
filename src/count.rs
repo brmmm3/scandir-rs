@@ -1,3 +1,4 @@
+use std::time::{Instant, Duration};
 use std::thread;
 use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -233,6 +234,8 @@ pub struct Count {
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
     has_results: bool,
+    start_time: Instant,
+    duration: Duration,
 }
 
 impl Count {
@@ -242,17 +245,21 @@ impl Count {
         stats.files = 0;
         stats.slinks = 0;
         stats.hlinks = 0;
-        stats.devices = 0;
-        stats.pipes = 0;
         stats.size = 0;
         stats.usage = 0;
         stats.errors.clear();
+        #[cfg(unix)]
+        {
+            stats.devices = 0;
+            stats.pipes = 0;
+        }
     }
 
     fn rs_start(&mut self) -> bool {
         if self.thr.is_some() {
             return false
         }
+        self.start_time = Instant::now();
         if self.has_results {
             self.rs_init();
         }
@@ -281,6 +288,7 @@ impl Count {
             None => {},
         }
         self.thr.take().map(thread::JoinHandle::join);
+        self.duration = self.start_time.elapsed();
         self.has_results = true;
         true
     }
@@ -317,6 +325,8 @@ impl Count {
             thr: None,
             alive: None,
             has_results: false,
+            start_time: Instant::now(),
+            duration: Duration::new(0, 0),
         });
     }
 
@@ -330,10 +340,17 @@ impl Count {
        Ok(self.has_results)
     }
 
+    #[getter]
+    fn duration(&self) -> PyResult<f64> {
+       Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
+    }
+
     fn collect(&mut self) -> PyResult<Statistics> {
+        self.start_time = Instant::now();
         counter(self.root_path.clone(),
                 self.skip_hidden, self.metadata, self.metadata_ext, self.max_depth,
                 self.statistics.clone(), None);
+        self.duration = self.start_time.elapsed();
         self.has_results = true;
         Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
     }

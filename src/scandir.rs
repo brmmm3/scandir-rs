@@ -1,6 +1,6 @@
-use std::iter;
 use std::time::UNIX_EPOCH;
 use std::collections::HashMap;
+use std::time::{Instant, Duration};
 use std::thread;
 use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -30,25 +30,24 @@ impl pyo3::class::PyObjectProtocol for Entries {
     }
 }
 
-fn walk(
+fn rs_entries(
     root_path: String,
-    sorted: Option<bool>,
-    skip_hidden: Option<bool>,
-    metadata: Option<bool>,
-    metadata_ext: Option<bool>,
+    sorted: bool,
+    skip_hidden: bool,
+    metadata: bool,
+    metadata_ext: bool,
+    max_depth: usize,
     result: Arc<Mutex<Entries>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
-    let mut entries = HashMap::new();
-    let mut errors = Vec::new();
-    let mut cnt = 0;
     for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden.unwrap_or(false))
-        .sort(sorted.unwrap_or(false))
-        .preload_metadata(metadata.unwrap_or(false))
-        .preload_metadata_ext(metadata_ext.unwrap_or(false))
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .preload_metadata(metadata)
+        .preload_metadata_ext(metadata_ext)
+        .max_depth(max_depth)
     {
         match &entry {
             Ok(v) => {
@@ -138,23 +137,11 @@ fn walk(
                         #[cfg(unix)]
                         rdev: rdev,
                     };
-                entries.insert(key.to_str().unwrap().to_string(), entry);
+                let mut result_locked = result.lock().unwrap();
+                result_locked.entries.insert(key.to_str().unwrap().to_string(), entry);
             }
-            Err(e) => errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+            Err(e) => result.lock().unwrap().errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
         };
-        cnt += 1;
-        if cnt >= 1000 {
-            let mut results = result.lock().unwrap();
-            if !entries.is_empty() {
-                for (k, v) in entries.drain() {
-                    results.entries.insert(k, v);
-                }            }
-            if results.errors.len() < errors.len() {
-                results.errors.extend_from_slice(&errors);
-                errors.clear();
-            }
-            cnt = 0;
-        }
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
                 break;
@@ -172,33 +159,29 @@ pub fn entries(
     skip_hidden: Option<bool>,
     metadata: Option<bool>,
     metadata_ext: Option<bool>,
-) -> PyResult<PyObject> {
+    max_depth: Option<usize>,
+) -> PyResult<Entries> {
     let result = Arc::new(Mutex::new(Entries {
         entries: HashMap::new(),
         errors: Vec::new(),
     }));
-    let result_clone = result.clone();
+    let result_cloned = result.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
-        walk(root_path, sorted, skip_hidden, metadata, metadata_ext, result_clone, None);
+        rs_entries(root_path,
+                   sorted.unwrap_or(false),
+                   skip_hidden.unwrap_or(false),
+                   metadata.unwrap_or(false),
+                   metadata_ext.unwrap_or(false),
+                   max_depth.unwrap_or(::std::usize::MAX),
+                   result_cloned, None);
         Ok(())
     });
-    let pyresult = PyDict::new(py);
     match rc {
-        Err(e) => { pyresult.set_item("error", e.to_string()).unwrap();
-                    return Ok(pyresult.into())
-                  },
+        Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
         _ => ()
     }
-    {
-        let mut results = result.lock().unwrap();
-        for (k, v) in results.entries.drain() {
-            pyresult.set_item(k, PyRef::new(py, v).unwrap())?;
-        }
-        if !results.errors.is_empty() {
-            pyresult.set_item(py.None(), results.errors.to_vec())?;
-        }
-    }
-    Ok(pyresult.into())
+    let result_cloned = result.lock().unwrap().clone();
+    Ok(result_cloned.into())
 }
 
 #[pyclass]
@@ -206,16 +189,66 @@ pub fn entries(
 pub struct Scandir {
     // Options
     root_path: String,
-    sorted: Option<bool>,
-    skip_hidden: Option<bool>,
-    metadata: Option<bool>,
-    metadata_ext: Option<bool>,
+    sorted: bool,
+    skip_hidden: bool,
+    metadata: bool,
+    metadata_ext: bool,
+    max_depth: usize,
     // Results
     entries: Arc<Mutex<Entries>>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
-    exit_called: bool,
+    has_results: bool,
+    start_time: Instant,
+    duration: Duration,
+}
+
+impl Scandir {
+    fn rs_init(&self) {
+        let mut entries_locked = self.entries.lock().unwrap();
+        entries_locked.entries.clear();
+        entries_locked.errors.clear();
+    }
+
+    fn rs_start(&mut self) -> bool {
+        if self.thr.is_some() {
+            return false
+        }
+        self.start_time = Instant::now();
+        if self.has_results {
+            self.rs_init();
+        }
+        let root_path = String::from(&self.root_path);
+        let sorted = self.sorted;
+        let skip_hidden = self.skip_hidden;
+        let metadata = self.metadata;
+        let metadata_ext = self.metadata_ext;
+        let max_depth = self.max_depth;
+        let entries = self.entries.clone();
+        let alive = Arc::new(AtomicBool::new(true));
+        self.alive = Some(Arc::downgrade(&alive));
+        self.thr = Some(thread::spawn(move || {
+            rs_entries(root_path,
+                       sorted, skip_hidden, metadata, metadata_ext, max_depth,
+                       entries, Some(alive))
+        }));
+        true
+    }
+
+    fn rs_stop(&mut self) -> bool {
+        match &self.alive {
+            Some(alive) => match alive.upgrade() {
+                Some(alive) => (*alive).store(false, Ordering::Relaxed),
+                None => return false,
+            },
+            None => {},
+        }
+        self.thr.take().map(thread::JoinHandle::join);
+        self.duration = self.start_time.elapsed();
+        self.has_results = true;
+        true
+    }
 }
 
 #[pymethods]
@@ -228,20 +261,24 @@ impl Scandir {
         skip_hidden: Option<bool>,
         metadata: Option<bool>,
         metadata_ext: Option<bool>,
+        max_depth: Option<usize>,
     ) {
         obj.init(Scandir {
             root_path: String::from(root_path),
-            sorted: sorted,
-            skip_hidden: skip_hidden,
-            metadata: metadata,
-            metadata_ext: metadata_ext,
+            sorted: sorted.unwrap_or(false),
+            skip_hidden: skip_hidden.unwrap_or(false),
+            metadata: metadata.unwrap_or(false),
+            metadata_ext: metadata_ext.unwrap_or(false),
+            max_depth: max_depth.unwrap_or(::std::usize::MAX),
             entries: Arc::new(Mutex::new(Entries { 
                 entries: HashMap::new(),
                 errors: Vec::new(),
             })),
             thr: None,
             alive: None,
-            exit_called: false,
+            has_results: false,
+            start_time: Instant::now(),
+            duration: Duration::new(0, 0),
         });
     }
 
@@ -250,43 +287,48 @@ impl Scandir {
        Ok(Arc::clone(&self.entries).lock().unwrap().clone())
     }
 
+    #[getter]
+    fn has_results(&self) -> PyResult<bool> {
+       Ok(self.has_results)
+    }
+
+    #[getter]
+    fn duration(&self) -> PyResult<f64> {
+       Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
+    }
+
+    fn as_dict(&self) -> PyResult<PyObject> {
+        let gil = GILGuard::acquire();
+        let py = gil.python();
+        let mut entries_locked = self.entries.lock().unwrap();
+        let pyresult = PyDict::new(gil.python());
+        for (k, v) in entries_locked.entries.drain() {
+            pyresult.set_item(k, PyRef::new(py, v).unwrap())?;
+        }
+        if !entries_locked.errors.is_empty() {
+            pyresult.set_item(py.None(), entries_locked.errors.to_vec())?;
+        }
+        Ok(pyresult.into())
+    }
+
     fn collect(&self) -> PyResult<Entries> {
-        walk(self.root_path.clone(),
-             self.sorted, self.skip_hidden, self.metadata, self.metadata_ext,
-             self.entries.clone(), None);
+        rs_entries(self.root_path.clone(),
+                   self.sorted, self.skip_hidden, self.metadata, self.metadata_ext, self.max_depth,
+                   self.entries.clone(), None);
         Ok(Arc::clone(&self.entries).lock().unwrap().clone())
     }
 
     fn start(&mut self) -> PyResult<bool> {
-        if self.thr.is_some() {
+        if !self.rs_start() {
             return Err(exceptions::RuntimeError::py_err("Thread already running"))
         }
-        let root_path = String::from(&self.root_path);
-        let sorted = self.sorted;
-        let skip_hidden = self.skip_hidden;
-        let metadata = self.metadata;
-        let metadata_ext = self.metadata_ext;
-        let entries = self.entries.clone();
-        let alive = Arc::new(AtomicBool::new(true));
-        self.alive = Some(Arc::downgrade(&alive));
-        self.thr = Some(thread::spawn(move || {
-            walk(root_path, sorted, skip_hidden, metadata, metadata_ext, entries, Some(alive))
-        }));
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
-        if self.thr.is_none() {
+        if !self.rs_stop() {
             return Err(exceptions::RuntimeError::py_err("Thread not running"))
         }
-        match &self.alive {
-            Some(alive) => match alive.upgrade() {
-                Some(alive) => (*alive).store(false, Ordering::Relaxed),
-                None => return Ok(false),
-            },
-            None => {},
-        }
-        self.thr.take().map(thread::JoinHandle::join);
         Ok(true)
     }
 
@@ -311,18 +353,7 @@ impl pyo3::class::PyObjectProtocol for Scandir {
 #[pyproto]
 impl<'p> PyContextProtocol<'p> for Scandir {
     fn __enter__(&'p mut self) -> PyResult<()> {
-        let root_path = String::from(&self.root_path);
-        let sorted = self.sorted;
-        let skip_hidden = self.skip_hidden;
-        let metadata = self.metadata;
-        let metadata_ext = self.metadata_ext;
-        let entries = self.entries.clone();
-        let alive = Arc::new(AtomicBool::new(true));
-        self.alive = Some(Arc::downgrade(&alive));
-        self.thr = Some(thread::spawn(move || {
-            walk(root_path, sorted, skip_hidden, metadata, metadata_ext,
-                 entries, Some(alive))
-        }));
+        self.rs_start();
         Ok(())
     }
 
@@ -332,17 +363,10 @@ impl<'p> PyContextProtocol<'p> for Scandir {
         _value: Option<&'p PyAny>,
         _traceback: Option<&'p PyAny>,
     ) -> PyResult<bool> {
-        match &self.alive {
-            Some(alive) => match alive.upgrade() {
-                Some(alive) => (*alive).store(false, Ordering::Relaxed),
-                None => return Ok(false),
-            },
-            None => {},
+        if !self.rs_stop() {
+            return Ok(false)
         }
-        self.thr.take().map(thread::JoinHandle::join);
-        let gil = GILGuard::acquire();
-        self.exit_called = true;
-        if ty == Some(gil.python().get_type::<ValueError>()) {
+        if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
             Ok(true)
         } else {
             Ok(false)
@@ -350,30 +374,19 @@ impl<'p> PyContextProtocol<'p> for Scandir {
     }
 }
 
-#[pyclass]
-pub struct ScandirIter {
-    iter: Box<dyn iter::Iterator<Item = i32> + Send>,
-}
-
-#[pymethods]
-impl ScandirIter {
-    #[new]
-    fn __new__(
-        obj: &PyRawObject,
-    ) {
-        obj.init(ScandirIter { iter: Box::new(5..8),
-        });
-    }
-}
-
 #[pyproto]
-impl<'p> PyIterProtocol for ScandirIter {
-    fn __iter__(slf: PyRefMut<Self>) -> PyResult<Py<ScandirIter>> {
+impl<'p> PyIterProtocol for Scandir {
+    fn __iter__(slf: PyRefMut<Self>) -> PyResult<Py<Scandir>> {
         Ok(slf.into())
     }
 
-    fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<i32>> {
-        Ok(slf.iter.next())
+    fn __next__(slf: PyRefMut<Self>) -> PyResult<Option<Entries>> {
+        let entries_locked = slf.entries.lock().unwrap();
+        if entries_locked.entries.is_empty()
+                && entries_locked.errors.is_empty() {
+            return Ok(None)
+        }
+        Ok(Some(entries_locked.clone()))
     }
 }
 

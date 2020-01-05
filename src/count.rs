@@ -33,7 +33,7 @@ impl pyo3::class::PyObjectProtocol for Statistics {
     }
 }
 
-fn counter(
+fn rs_count(
     root_path: String,
     skip_hidden: bool,
     metadata: bool,
@@ -105,24 +105,24 @@ fn counter(
                 }
             }
             Err(e) => errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
-        };
+        }
         cnt += 1;
         if cnt >= 1000 {
-            let mut stats = statistics.lock().unwrap();
-            stats.dirs = dirs;
-            stats.files = files;
-            stats.slinks = slinks;
-            stats.hlinks = hlinks;
-            stats.size = size;
-            stats.usage = usage;
-            if stats.errors.len() < errors.len() {
-                stats.errors.extend_from_slice(&errors);
+            let mut stats_locked = statistics.lock().unwrap();
+            stats_locked.dirs = dirs;
+            stats_locked.files = files;
+            stats_locked.slinks = slinks;
+            stats_locked.hlinks = hlinks;
+            stats_locked.size = size;
+            stats_locked.usage = usage;
+            if stats_locked.errors.len() < errors.len() {
+                stats_locked.errors.extend_from_slice(&errors);
                 errors.clear();
             }
             #[cfg(unix)]
             {
-                stats.devices = devices;
-                stats.pipes = pipes;
+                stats_locked.devices = devices;
+                stats_locked.pipes = pipes;
             }
             cnt = 0;
         }
@@ -134,21 +134,21 @@ fn counter(
         }
     }
     {
-        let mut stats = statistics.lock().unwrap();
-        stats.dirs = dirs;
-        stats.files = files;
-        stats.slinks = slinks;
-        stats.hlinks = hlinks;
-        stats.size = size;
-        stats.usage = usage;
-        if stats.errors.len() < errors.len() {
-            stats.errors.extend_from_slice(&errors);
+        let mut stats_locked = statistics.lock().unwrap();
+        stats_locked.dirs = dirs;
+        stats_locked.files = files;
+        stats_locked.slinks = slinks;
+        stats_locked.hlinks = hlinks;
+        stats_locked.size = size;
+        stats_locked.usage = usage;
+        if stats_locked.errors.len() < errors.len() {
+            stats_locked.errors.extend_from_slice(&errors);
             errors.clear();
         }
         #[cfg(unix)]
         {
-            stats.devices = devices;
-            stats.pipes = pipes;
+            stats_locked.devices = devices;
+            stats_locked.pipes = pipes;
         }
     }
 }
@@ -161,7 +161,7 @@ pub fn count(
     metadata: Option<bool>,
     metadata_ext: Option<bool>,
     max_depth: Option<usize>,
-) -> PyResult<PyObject> {
+) -> PyResult<Statistics> {
     let statistics = Arc::new(Mutex::new(Statistics { 
         dirs: 0,
         files: 0,
@@ -173,50 +173,21 @@ pub fn count(
         usage: 0,
         errors: Vec::new(),
     }));
-    let stats = statistics.clone();
+    let stats_cloned = statistics.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
-        counter(root_path,
-                skip_hidden.unwrap_or(false),
-                metadata.unwrap_or(false),
-                metadata_ext.unwrap_or(false),
-                max_depth.unwrap_or(::std::usize::MAX),
-                stats, None);
+        rs_count(root_path,
+                 skip_hidden.unwrap_or(false),
+                 metadata.unwrap_or(false),
+                 metadata_ext.unwrap_or(false),
+                 max_depth.unwrap_or(::std::usize::MAX),
+                 stats_cloned, None);
         Ok(())
     });
-    let pyresult = PyDict::new(py);
     match rc {
-        Err(e) => { pyresult.set_item("error", e.to_string()).unwrap();
-                    return Ok(pyresult.into())
-                  },
+        Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
         _ => ()
     }
-    {
-        let stats = statistics.lock().unwrap();
-        if stats.dirs > 0 {
-            pyresult.set_item("dirs", stats.dirs).unwrap();
-        }
-        if stats.files > 0 {
-            pyresult.set_item("files", stats.files).unwrap();
-        }
-        if stats.slinks > 0 {
-            pyresult.set_item("slinks", stats.slinks).unwrap();
-        }
-        if stats.hlinks > 0 {
-            pyresult.set_item("hlinks", stats.hlinks).unwrap();
-        }
-        if stats.devices > 0 {
-            pyresult.set_item("devices", stats.devices).unwrap();
-        }
-        if stats.pipes > 0 {
-            pyresult.set_item("pipes", stats.pipes).unwrap();
-        }
-        pyresult.set_item("size", stats.size).unwrap();
-        pyresult.set_item("usage", stats.usage).unwrap();
-        if !stats.errors.is_empty() {
-            pyresult.set_item("errors", stats.errors.to_vec()).unwrap();
-        }
-    }
-    Ok(pyresult.into())
+    Ok(statistics.lock().unwrap().clone().into())
 }
 
 #[pyclass]
@@ -240,18 +211,18 @@ pub struct Count {
 
 impl Count {
     fn rs_init(&self) {
-        let mut stats = self.statistics.lock().unwrap();
-        stats.dirs = 0;
-        stats.files = 0;
-        stats.slinks = 0;
-        stats.hlinks = 0;
-        stats.size = 0;
-        stats.usage = 0;
-        stats.errors.clear();
+        let mut stats_locked = self.statistics.lock().unwrap();
+        stats_locked.dirs = 0;
+        stats_locked.files = 0;
+        stats_locked.slinks = 0;
+        stats_locked.hlinks = 0;
+        stats_locked.size = 0;
+        stats_locked.usage = 0;
+        stats_locked.errors.clear();
         #[cfg(unix)]
         {
-            stats.devices = 0;
-            stats.pipes = 0;
+            stats_locked.devices = 0;
+            stats_locked.pipes = 0;
         }
     }
 
@@ -272,9 +243,9 @@ impl Count {
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
         self.thr = Some(thread::spawn(move || {
-            counter(root_path,
-                    skip_hidden, metadata, metadata_ext, max_depth,
-                    statistics, Some(alive))
+            rs_count(root_path,
+                     skip_hidden, metadata, metadata_ext, max_depth,
+                     statistics, Some(alive))
         }));
         true
     }
@@ -345,11 +316,45 @@ impl Count {
        Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
     }
 
+    fn as_dict(&self) -> PyResult<PyObject> {
+        let py = GILGuard::acquire().python();
+        let pyresult = PyDict::new(py);
+        let stats_locked = self.statistics.lock().unwrap();
+        if stats_locked.dirs > 0 {
+            pyresult.set_item("dirs", stats_locked.dirs).unwrap();
+        }
+        if stats_locked.files > 0 {
+            pyresult.set_item("files", stats_locked.files).unwrap();
+        }
+        if stats_locked.slinks > 0 {
+            pyresult.set_item("slinks", stats_locked.slinks).unwrap();
+        }
+        if stats_locked.hlinks > 0 {
+            pyresult.set_item("hlinks", stats_locked.hlinks).unwrap();
+        }
+        if stats_locked.devices > 0 {
+            pyresult.set_item("devices", stats_locked.devices).unwrap();
+        }
+        if stats_locked.pipes > 0 {
+            pyresult.set_item("pipes", stats_locked.pipes).unwrap();
+        }
+        if stats_locked.size > 0 {
+            pyresult.set_item("size", stats_locked.size).unwrap();
+        }
+        if stats_locked.usage > 0 {
+            pyresult.set_item("usage", stats_locked.usage).unwrap();
+        }
+        if !stats_locked.errors.is_empty() {
+            pyresult.set_item("errors", stats_locked.errors.to_vec()).unwrap();
+        }
+        Ok(pyresult.to_object(py))
+    }
+
     fn collect(&mut self) -> PyResult<Statistics> {
         self.start_time = Instant::now();
-        counter(self.root_path.clone(),
-                self.skip_hidden, self.metadata, self.metadata_ext, self.max_depth,
-                self.statistics.clone(), None);
+        rs_count(self.root_path.clone(),
+                 self.skip_hidden, self.metadata, self.metadata_ext, self.max_depth,
+                 self.statistics.clone(), None);
         self.duration = self.start_time.elapsed();
         self.has_results = true;
         Ok(Arc::clone(&self.statistics).lock().unwrap().clone())

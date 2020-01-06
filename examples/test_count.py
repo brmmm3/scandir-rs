@@ -1,6 +1,23 @@
 import time
+import sys
 
 import scandir_rs as r
+
+"""
+GC support currently NOT working!
+
+import gc
+
+def test():
+    C = r.count.Count("~/workspace", metadata_ext=True)
+    C.start()
+    del C
+
+test()
+
+gc.collect()
+sys.exit()
+"""
 
 C = r.count.Count("~/workspace", metadata_ext=True)
 
@@ -23,3 +40,6 @@ print(C.statistics)
 C.stop()
 print(C.busy())
 print(C.statistics)
+print(C.duration)
+print(C.has_results())
+print(C.as_dict())

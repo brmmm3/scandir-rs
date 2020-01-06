@@ -308,16 +308,15 @@ impl Count {
     }
 
     #[getter]
-    fn has_results(&self) -> PyResult<bool> {
-       Ok(self.has_results)
-    }
-
-    #[getter]
     fn duration(&self) -> PyResult<f64> {
        Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
     }
 
-    fn as_dict(&self) -> PyResult<PyObject> {
+    fn has_results(&self) -> PyResult<bool> {
+        Ok(self.has_results)
+     }
+ 
+     fn as_dict(&self) -> PyResult<PyObject> {
         let gil = GILGuard::acquire();
         let stats_locked = self.statistics.lock().unwrap();
         let pyresult = PyDict::new(gil.python());

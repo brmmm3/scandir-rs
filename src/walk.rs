@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use jwalk::WalkDir;
 #[cfg(unix)]
 use expanduser::expanduser;
+use crossbeam_channel as channel;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyType, PyAny, PyDict};
@@ -49,7 +50,6 @@ pub fn rs_toc(
                 let file_type = v.file_type_result.as_ref().unwrap();
                 let mut key = v.parent_path.to_path_buf();
                 key.push(v.file_name.clone().into_string().unwrap());
-                println!("{} {:?}", v.depth, key);
                 let mut toc_locked = toc.lock().unwrap();
                 if file_type.is_symlink() {
                     toc_locked.symlinks.push(key.to_str().unwrap().to_string());
@@ -62,6 +62,58 @@ pub fn rs_toc(
                 }
             }
             Err(e) => toc.lock().unwrap().errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+        }
+        match &alive {
+            Some(a) => if !a.load(Ordering::Relaxed) {
+                break;
+            },
+            None => {},
+        }
+    }
+}
+
+pub fn rs_toc_iter(
+    root_path: String,
+    sorted: bool,
+    skip_hidden: bool,
+    max_depth: usize,
+    alive: Option<Arc<AtomicBool>>,
+    tx: Option<channel::Sender<Toc>>
+) {
+    #[cfg(unix)]
+    let root_path = expanduser(root_path).unwrap();
+    for entry in WalkDir::new(root_path)
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .max_depth(max_depth)
+    {
+        let mut toc = Toc { 
+            dirs: Vec::new(),
+            files: Vec::new(),
+            symlinks: Vec::new(),
+            unknown: Vec::new(),
+            errors: Vec::new(),
+        };
+        match &entry {
+            Ok(v) => {
+                let file_type = v.file_type_result.as_ref().unwrap();
+                let mut key = v.parent_path.to_path_buf();
+                key.push(v.file_name.clone().into_string().unwrap());
+                if file_type.is_symlink() {
+                    toc.symlinks.push(key.to_str().unwrap().to_string());
+                } else if file_type.is_dir() {
+                    toc.dirs.push(key.to_str().unwrap().to_string());
+                } else if file_type.is_file() {
+                    toc.files.push(key.to_str().unwrap().to_string());
+                } else {
+                    toc.unknown.push(key.to_str().unwrap().to_string());
+                }
+            }
+            Err(e) => toc.errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+        }
+        match &tx {
+            Some(tx) => tx.send(toc).unwrap(),
+            None => {},
         }
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
@@ -117,6 +169,7 @@ pub struct Walk {
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
+    rx: Option<channel::Receiver<Toc>>,
     has_results: bool,
     start_time: Instant,
     duration: Duration,
@@ -132,7 +185,9 @@ impl Walk {
         toc_locked.errors.clear();
     }
 
-    fn rs_start(&mut self) -> bool {
+    fn rs_start(&mut self,
+        tx: Option<channel::Sender<Toc>>,
+    ) -> bool {
         if self.thr.is_some() {
             return false
         }
@@ -147,11 +202,19 @@ impl Walk {
         let toc = self.toc.clone();
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
-        self.thr = Some(thread::spawn(move || {
-            rs_toc(root_path,
-                   sorted, skip_hidden, max_depth,
-                   toc, Some(alive))
-        }));
+        if tx.is_none() {
+            self.thr = Some(thread::spawn(move || {
+                rs_toc(root_path,
+                       sorted, skip_hidden, max_depth,
+                       toc, Some(alive))
+            }));
+        } else {
+            self.thr = Some(thread::spawn(move || {
+                rs_toc_iter(root_path,
+                            sorted, skip_hidden, max_depth,
+                            Some(alive), tx)
+            }));
+        }
         true
     }
 
@@ -167,6 +230,16 @@ impl Walk {
         self.duration = self.start_time.elapsed();
         self.has_results = true;
         true
+    }
+
+    fn rs_busy(&self) -> bool {
+        match &self.alive {
+            Some(alive) => match alive.upgrade() {
+                Some(_) => true,
+                None => return false,
+            },
+            None => false,
+        }
     }
 }
 
@@ -194,6 +267,7 @@ impl Walk {
             })),
             thr: None,
             alive: None,
+            rx: None,
             has_results: false,
             start_time: Instant::now(),
             duration: Duration::new(0, 0),
@@ -206,16 +280,15 @@ impl Walk {
     }
 
     #[getter]
-    fn has_results(&self) -> PyResult<bool> {
-       Ok(self.has_results)
-    }
-
-    #[getter]
     fn duration(&self) -> PyResult<f64> {
        Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
     }
 
-    fn as_dict(&self) -> PyResult<PyObject> {
+    fn has_results(&self) -> PyResult<bool> {
+        Ok(self.has_results)
+     }
+ 
+     fn as_dict(&self) -> PyResult<PyObject> {
         let gil = GILGuard::acquire();
         let toc_locked = self.toc.lock().unwrap();
         let pyresult = PyDict::new(gil.python());
@@ -248,7 +321,7 @@ impl Walk {
     }
 
     fn start(&mut self) -> PyResult<bool> {
-        if !self.rs_start() {
+        if !self.rs_start(None) {
             return Err(exceptions::RuntimeError::py_err("Thread already running"))
         }
         Ok(true)
@@ -262,13 +335,7 @@ impl Walk {
     }
 
     fn busy(&self) -> PyResult<bool> {
-        match &self.alive {
-            Some(alive) => match alive.upgrade() {
-                Some(_) => Ok(true),
-                None => return Ok(false),
-            },
-            None => Ok(false),
-        }
+        Ok(self.rs_busy())
     }
 }
 
@@ -282,7 +349,7 @@ impl pyo3::class::PyObjectProtocol for Walk {
 #[pyproto]
 impl<'p> PyContextProtocol<'p> for Walk {
     fn __enter__(&'p mut self) -> PyResult<()> {
-        self.rs_start();
+        self.rs_start(None);
         Ok(())
     }
 
@@ -305,20 +372,23 @@ impl<'p> PyContextProtocol<'p> for Walk {
 
 #[pyproto]
 impl<'p> PyIterProtocol for Walk {
-    fn __iter__(slf: PyRefMut<Self>) -> PyResult<Py<Walk>> {
+    fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Walk>> {
+        let (tx, rx) = channel::unbounded();
+        slf.rx = Some(rx);
+        slf.rs_start(Some(tx));
         Ok(slf.into())
     }
 
     fn __next__(slf: PyRefMut<Self>) -> PyResult<Option<Toc>> {
-        let toc_locked = slf.toc.lock().unwrap();
-        if toc_locked.dirs.is_empty()
-                && toc_locked.files.is_empty()
-                && toc_locked.symlinks.is_empty()
-                && toc_locked.unknown.is_empty()
-                && toc_locked.errors.is_empty() {
-            return Ok(None)
+        match &slf.rx {
+            Some(rx) => match rx.recv() {
+                Ok(val) => Ok(Some(val)),
+                Err(_) => {
+                    Ok(None)
+                },
+            },
+            None => Ok(None),
         }
-        Ok(Some(toc_locked.clone()))
     }
 }
 

@@ -1,18 +1,18 @@
-use std::time::Instant;
-use std::thread;
-use std::sync::{Arc, Mutex, Weak};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::ops::DerefMut;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, Weak};
+use std::thread;
+use std::time::Instant;
 
-use jwalk::WalkDir;
+use crossbeam_channel as channel;
 #[cfg(unix)]
 use expanduser::expanduser;
-use crossbeam_channel as channel;
+use jwalk::WalkDir;
 
+use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyType, PyAny, PyDict};
 use pyo3::{Python, wrap_pyfunction, PyContextProtocol, PyIterProtocol};
-use pyo3::exceptions::{self, ValueError};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -61,7 +61,7 @@ impl Toc {
 
     #[getter]
     fn duration(&self) -> PyResult<f64> {
-       Ok(self.duration)
+        Ok(self.duration)
     }
 }
 
@@ -82,7 +82,7 @@ fn update_toc(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, 
                 toc.unknown.push(key.to_str().unwrap().to_string());
             }
         }
-        Err(e) => toc.errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+        Err(e) => toc.errors.push(e.to_string()),  // TODO: Need to fetch failed path from somewhere
     }
 }
 
@@ -121,7 +121,7 @@ pub fn rs_toc_iter(
     skip_hidden: bool,
     max_depth: usize,
     alive: Option<Arc<AtomicBool>>,
-    tx: Option<channel::Sender<Toc>>
+    tx: Option<channel::Sender<Toc>>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
@@ -158,20 +158,20 @@ pub fn rs_toc_iter(
                     send = true;
                 }
             },
-            None => {},
+            None => {}
         }
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
                 break;
             },
-            None => {},
+            None => {}
         }
     }
     toc.duration = start_time.elapsed().as_millis() as f64 * 0.001;
     if send {
         match &tx {
             Some(tx) => tx.send(toc).unwrap(),
-            None => {},
+            None => {}
         }
     }
 }
@@ -194,16 +194,19 @@ pub fn toc(
     }));
     let toc_cloned = toc.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
-        rs_toc(root_path,
-               sorted.unwrap_or(false),
-               skip_hidden.unwrap_or(false),
-               max_depth.unwrap_or(::std::usize::MAX),
-               toc_cloned, None);
+        rs_toc(
+            root_path,
+            sorted.unwrap_or(false),
+            skip_hidden.unwrap_or(false),
+            max_depth.unwrap_or(::std::usize::MAX),
+            toc_cloned,
+            None
+        );
         Ok(())
     });
     match rc {
         Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
-        _ => ()
+        _ => (),
     }
     let toc_cloned = toc.lock().unwrap().clone();
     Ok(toc_cloned.into())
@@ -240,7 +243,7 @@ impl Walk {
         tx: Option<channel::Sender<Toc>>,
     ) -> bool {
         if self.thr.is_some() {
-            return false
+            return false;
         }
         if self.has_results {
             self.rs_init();
@@ -274,7 +277,7 @@ impl Walk {
                 Some(alive) => (*alive).store(false, Ordering::Relaxed),
                 None => return false,
             },
-            None => {},
+            None => {}
         }
         self.thr.take().map(thread::JoinHandle::join);
         self.has_results = true;
@@ -324,14 +327,14 @@ impl Walk {
 
     #[getter]
     fn toc(&self) -> PyResult<Toc> {
-       Ok(Arc::clone(&self.toc).lock().unwrap().clone())
+        Ok(Arc::clone(&self.toc).lock().unwrap().clone())
     }
 
     fn has_results(&self) -> PyResult<bool> {
         Ok(self.has_results)
-     }
+    }
 
-     fn as_dict(&self) -> PyResult<PyObject> {
+    fn as_dict(&self) -> PyResult<PyObject> {
         let gil = GILGuard::acquire();
         let toc_locked = self.toc.lock().unwrap();
         let pyresult = PyDict::new(gil.python());
@@ -355,23 +358,28 @@ impl Walk {
     }
 
     fn list(&mut self) -> PyResult<Toc> {
-        rs_toc(self.root_path.clone(),
-               self.sorted, self.skip_hidden, self.max_depth,
-               self.toc.clone(), None);
+        rs_toc(
+            self.root_path.clone(),
+            self.sorted,
+            self.skip_hidden,
+            self.max_depth,
+            self.toc.clone(),
+            None
+        );
         self.has_results = true;
         Ok(Arc::clone(&self.toc).lock().unwrap().clone())
     }
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+            return Err(exceptions::RuntimeError::py_err("Thread already running"));
         }
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::RuntimeError::py_err("Thread not running"))
+            return Err(exceptions::RuntimeError::py_err("Thread not running"));
         }
         Ok(true)
     }
@@ -392,7 +400,7 @@ impl pyo3::class::PyObjectProtocol for Walk {
 impl<'p> PyContextProtocol<'p> for Walk {
     fn __enter__(&'p mut self) -> PyResult<()> {
         if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+            return Err(exceptions::RuntimeError::py_err("Thread already running"));
         }
         Ok(())
     }
@@ -404,7 +412,7 @@ impl<'p> PyContextProtocol<'p> for Walk {
         _traceback: Option<&'p PyAny>,
     ) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Ok(false)
+            return Ok(false);
         }
         if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
             Ok(true)
@@ -418,7 +426,7 @@ impl<'p> PyContextProtocol<'p> for Walk {
 impl<'p> PyIterProtocol for Walk {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Walk>> {
         if slf.thr.is_some() {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+            return Err(exceptions::RuntimeError::py_err("Thread already running"));
         }
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);

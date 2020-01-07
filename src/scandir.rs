@@ -1,17 +1,17 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{UNIX_EPOCH, Instant};
 use std::thread;
 use std::sync::{Arc, Mutex, Weak};
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use jwalk::WalkDir;
+use crossbeam_channel as channel;
 #[cfg(unix)]
 use expanduser::expanduser;
-use crossbeam_channel as channel;
+use jwalk::WalkDir;
 
+use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyType, PyAny, PyTuple, PyDict};
 use pyo3::{Python, wrap_pyfunction, PyContextProtocol, PyIterProtocol};
-use pyo3::exceptions::{self, ValueError};
 
 use crate::def::*;
 
@@ -80,11 +80,8 @@ fn create_entry(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>
             let mut size: u64 = 0;
             let mut blksize: u64 = 4096;
             let mut blocks: u64 = 0;
-            #[cfg(unix)]
             let mut uid: u32 = 0;
-            #[cfg(unix)]
             let mut gid: u32 = 0;
-            #[cfg(unix)]
             let mut rdev: u64 = 0;
             if v.metadata_result.is_some() {
                 let metadata = v.metadata_result.as_ref().unwrap().as_ref().unwrap();
@@ -135,32 +132,33 @@ fn create_entry(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>
             let mut key = v.parent_path.to_path_buf();
             key.push(v.file_name.clone().into_string().unwrap());
             let entry = DirEntry {
-                    is_symlink: file_type.is_symlink(),
-                    is_dir: file_type.is_dir(),
-                    is_file: file_type.is_file(),
-                    ctime: ctime,
-                    mtime: mtime,
-                    atime: atime,
-                    mode: mode,
-                    ino: ino,
-                    dev: dev,
-                    nlink: nlink,
-                    size: size,
-                    blksize: blksize,
-                    blocks: blocks,
-                    #[cfg(unix)]
-                    uid: uid,
-                    #[cfg(unix)]
-                    gid: gid,
-                    #[cfg(unix)]
-                    rdev: rdev,
-                };
-            Entry{ path: key.to_str().unwrap().to_string(),
-                   entry: Stats::DirEntry(entry) }
+                is_symlink: file_type.is_symlink(),
+                is_dir: file_type.is_dir(),
+                is_file: file_type.is_file(),
+                ctime: ctime,
+                mtime: mtime,
+                atime: atime,
+                mode: mode,
+                ino: ino,
+                dev: dev,
+                nlink: nlink,
+                size: size,
+                blksize: blksize,
+                blocks: blocks,
+                uid: uid,
+                gid: gid,
+                rdev: rdev,
+            };
+            Entry{
+                path: key.to_str().unwrap().to_string(),
+                entry: Stats::DirEntry(entry),
+            }
         },
         // TODO: Need to fetch failed path from somewhere
-        Err(e) => Entry { path: String::from("?"),
-                          entry: Stats::Error(e.to_string()) }
+        Err(e) => Entry {
+            path: String::from("?"),
+            entry: Stats::Error(e.to_string()),
+        }
     }
 }
 
@@ -234,10 +232,12 @@ fn rs_entries_iter(
     }
     match &tx {
         Some(tx) => {
-            tx.send(Entry { path: String::from("?"),
-                            entry: Stats::Duration(start_time.elapsed().as_millis() as f64 * 0.001) }).unwrap();
+            tx.send(Entry {
+                path: String::from("?"),
+                entry: Stats::Duration(start_time.elapsed().as_millis() as f64 * 0.001),
+            }).unwrap();
         },
-        None => {},
+        None => {}
     }
 }
 
@@ -257,18 +257,21 @@ pub fn entries(
     }));
     let result_cloned = result.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
-        rs_entries(root_path,
-                   sorted.unwrap_or(false),
-                   skip_hidden.unwrap_or(false),
-                   metadata.unwrap_or(false),
-                   metadata_ext.unwrap_or(false),
-                   max_depth.unwrap_or(::std::usize::MAX),
-                   result_cloned, None);
+        rs_entries(
+            root_path,
+            sorted.unwrap_or(false),
+            skip_hidden.unwrap_or(false),
+            metadata.unwrap_or(false),
+            metadata_ext.unwrap_or(false),
+            max_depth.unwrap_or(::std::usize::MAX),
+            result_cloned,
+            None
+        );
         Ok(())
     });
     match rc {
         Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
-        _ => ()
+        _ => (),
     }
     let result_cloned = result.lock().unwrap().clone();
     Ok(result_cloned.into())
@@ -303,7 +306,7 @@ impl Scandir {
         tx: Option<channel::Sender<Entry>>,
     ) -> bool {
         if self.thr.is_some() {
-            return false
+            return false;
         }
         if self.has_results {
             self.rs_init();
@@ -319,13 +322,27 @@ impl Scandir {
         self.alive = Some(Arc::downgrade(&alive));
         self.thr = Some(thread::spawn(move || {
             if tx.is_none() {
-                rs_entries(root_path,
-                        sorted, skip_hidden, metadata, metadata_ext, max_depth,
-                        entries, Some(alive))
+                rs_entries(
+                    root_path,
+                    sorted,
+                    skip_hidden,
+                    metadata,
+                    metadata_ext,
+                    max_depth,
+                    entries,
+                    Some(alive),
+                )
             } else {
-                rs_entries_iter(root_path,
-                    sorted, skip_hidden, metadata, metadata_ext, max_depth,
-                    Some(alive), tx)
+                rs_entries_iter(
+                    root_path,
+                    sorted,
+                    skip_hidden,
+                    metadata,
+                    metadata_ext,
+                    max_depth,
+                    Some(alive),
+                    tx,
+                )
         }
         }));
         true
@@ -337,7 +354,7 @@ impl Scandir {
                 Some(alive) => (*alive).store(false, Ordering::Relaxed),
                 None => return false,
             },
-            None => {},
+            None => {}
         }
         self.thr.take().map(thread::JoinHandle::join);
         self.has_results = true;
@@ -377,14 +394,14 @@ impl Scandir {
 
     #[getter]
     fn entries(&self) -> PyResult<Entries> {
-       Ok(Arc::clone(&self.entries).lock().unwrap().clone())
+        Ok(Arc::clone(&self.entries).lock().unwrap().clone())
     }
 
     fn has_results(&self) -> PyResult<bool> {
         Ok(self.has_results)
-     }
+    }
 
-     fn as_dict(&self) -> PyResult<PyObject> {
+    fn as_dict(&self) -> PyResult<PyObject> {
         let entries_locked = self.entries.lock().unwrap();
         let gil = GILGuard::acquire();
         let py = gil.python();
@@ -400,22 +417,29 @@ impl Scandir {
     }
 
     fn collect(&self) -> PyResult<Entries> {
-        rs_entries(self.root_path.clone(),
-                   self.sorted, self.skip_hidden, self.metadata, self.metadata_ext, self.max_depth,
-                   self.entries.clone(), None);
+        rs_entries(
+            self.root_path.clone(),
+            self.sorted,
+            self.skip_hidden,
+            self.metadata,
+            self.metadata_ext,
+            self.max_depth,
+            self.entries.clone(),
+            None
+        );
         Ok(Arc::clone(&self.entries).lock().unwrap().clone())
     }
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+            return Err(exceptions::RuntimeError::py_err("Thread already running"));
         }
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::RuntimeError::py_err("Thread not running"))
+            return Err(exceptions::RuntimeError::py_err("Thread not running"));
         }
         Ok(true)
     }
@@ -442,7 +466,7 @@ impl pyo3::class::PyObjectProtocol for Scandir {
 impl<'p> PyContextProtocol<'p> for Scandir {
     fn __enter__(&'p mut self) -> PyResult<()> {
         if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+            return Err(exceptions::RuntimeError::py_err("Thread already running"));
         }
         Ok(())
     }
@@ -454,7 +478,7 @@ impl<'p> PyContextProtocol<'p> for Scandir {
         _traceback: Option<&'p PyAny>,
     ) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Ok(false)
+            return Ok(false);
         }
         if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
             Ok(true)
@@ -468,7 +492,7 @@ impl<'p> PyContextProtocol<'p> for Scandir {
 impl<'p> PyIterProtocol for Scandir {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Scandir>> {
         if slf.thr.is_some() {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+            return Err(exceptions::RuntimeError::py_err("Thread already running"));
         }
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);

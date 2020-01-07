@@ -2,6 +2,7 @@ use std::time::Instant;
 use std::thread;
 use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::ops::DerefMut;
 
 use jwalk::WalkDir;
 #[cfg(unix)]
@@ -64,6 +65,27 @@ impl Toc {
     }
 }
 
+fn update_toc(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
+              toc: &mut Toc) {
+    match &entry {
+        Ok(v) => {
+            let file_type = v.file_type_result.as_ref().unwrap();
+            let mut key = v.parent_path.to_path_buf();
+            key.push(v.file_name.clone().into_string().unwrap());
+            if file_type.is_symlink() {
+                toc.symlinks.push(key.to_str().unwrap().to_string());
+            } else if file_type.is_dir() {
+                toc.dirs.push(key.to_str().unwrap().to_string());
+            } else if file_type.is_file() {
+                toc.files.push(key.to_str().unwrap().to_string());
+            } else {
+                toc.unknown.push(key.to_str().unwrap().to_string());
+            }
+        }
+        Err(e) => toc.errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+    }
+}
+
 pub fn rs_toc(
     root_path: String,
     sorted: bool,
@@ -80,25 +102,9 @@ pub fn rs_toc(
         .sort(sorted)
         .max_depth(max_depth)
     {
-        match &entry {
-            Ok(v) => {
-                let file_type = v.file_type_result.as_ref().unwrap();
-                let mut key = v.parent_path.to_path_buf();
-                key.push(v.file_name.clone().into_string().unwrap());
-                let mut toc_locked = toc.lock().unwrap();
-                if file_type.is_symlink() {
-                    toc_locked.symlinks.push(key.to_str().unwrap().to_string());
-                } else if file_type.is_dir() {
-                    toc_locked.dirs.push(key.to_str().unwrap().to_string());
-                } else if file_type.is_file() {
-                    toc_locked.files.push(key.to_str().unwrap().to_string());
-                } else {
-                    toc_locked.unknown.push(key.to_str().unwrap().to_string());
-                }
-                toc_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
-            }
-            Err(e) => toc.lock().unwrap().errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
-        }
+        let mut toc_locked = toc.lock().unwrap();
+        update_toc(&entry, toc_locked.deref_mut());
+        toc_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
                 break;
@@ -120,7 +126,7 @@ pub fn rs_toc_iter(
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
     let start_time = Instant::now();
-    let mut toc = Toc { 
+    let mut toc = Toc {
         dirs: Vec::new(),
         files: Vec::new(),
         symlinks: Vec::new(),
@@ -134,29 +140,12 @@ pub fn rs_toc_iter(
         .sort(sorted)
         .max_depth(max_depth)
     {
-        match &entry {
-            Ok(v) => {
-                let file_type = v.file_type_result.as_ref().unwrap();
-                let mut key = v.parent_path.to_path_buf();
-                key.push(v.file_name.clone().into_string().unwrap());
-                if file_type.is_symlink() {
-                    toc.symlinks.push(key.to_str().unwrap().to_string());
-                } else if file_type.is_dir() {
-                    toc.dirs.push(key.to_str().unwrap().to_string());
-                } else if file_type.is_file() {
-                    toc.files.push(key.to_str().unwrap().to_string());
-                } else {
-                    toc.unknown.push(key.to_str().unwrap().to_string());
-                }
-            }
-            Err(e) => toc.errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
-        }
-        send = true;
+        update_toc(&entry, &mut toc);
         match &tx {
             Some(tx) => {
                 if tx.is_empty() {
                     tx.send(toc).unwrap();
-                    toc = Toc { 
+                    toc = Toc {
                         dirs: Vec::new(),
                         files: Vec::new(),
                         symlinks: Vec::new(),
@@ -165,6 +154,8 @@ pub fn rs_toc_iter(
                         duration: start_time.elapsed().as_millis() as f64 * 0.001,
                     };
                     send = false;
+                } else {
+                    send = true;
                 }
             },
             None => {},
@@ -193,7 +184,7 @@ pub fn toc(
     skip_hidden: Option<bool>,
     max_depth: Option<usize>,
 ) -> PyResult<Toc> {
-    let toc = Arc::new(Mutex::new(Toc { 
+    let toc = Arc::new(Mutex::new(Toc {
         dirs: Vec::new(),
         files: Vec::new(),
         symlinks: Vec::new(),
@@ -316,7 +307,7 @@ impl Walk {
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
-            toc: Arc::new(Mutex::new(Toc { 
+            toc: Arc::new(Mutex::new(Toc {
                 dirs: Vec::new(),
                 files: Vec::new(),
                 symlinks: Vec::new(),
@@ -339,7 +330,7 @@ impl Walk {
     fn has_results(&self) -> PyResult<bool> {
         Ok(self.has_results)
      }
- 
+
      fn as_dict(&self) -> PyResult<PyObject> {
         let gil = GILGuard::acquire();
         let toc_locked = self.toc.lock().unwrap();

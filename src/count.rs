@@ -1,4 +1,4 @@
-use std::time::{Instant, Duration};
+use std::time::Instant;
 use std::thread;
 use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,8 +24,7 @@ pub struct Statistics {
     pub size: u64,
     pub usage: u64,
     pub errors: Vec<String>,
-    pub start_time: Instant,
-    pub duration: Duration,
+    pub duration: f64,
 }
 
 #[pyproto]
@@ -84,7 +83,7 @@ impl Statistics {
 
     #[getter]
     fn duration(&self) -> PyResult<f64> {
-       Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
+       Ok(self.duration)
     }
 }
 
@@ -111,6 +110,8 @@ fn rs_count(
     #[cfg(unix)]
     let mut pipes: u32 = 0;
     let mut cnt: u32 = 0;
+    let start_time = Instant::now();
+    let mut update_time = Instant::now();
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(false)
@@ -162,7 +163,7 @@ fn rs_count(
             Err(e) => errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
         }
         cnt += 1;
-        if cnt >= 1000 {
+        if (cnt >= 1000) || (update_time.elapsed().as_millis() >= 10) {
             let mut stats_locked = statistics.lock().unwrap();
             stats_locked.dirs = dirs;
             stats_locked.files = files;
@@ -174,12 +175,14 @@ fn rs_count(
                 stats_locked.errors.extend_from_slice(&errors);
                 errors.clear();
             }
+            stats_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
             #[cfg(unix)]
             {
                 stats_locked.devices = devices;
                 stats_locked.pipes = pipes;
             }
             cnt = 0;
+            update_time = Instant::now();
         }
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
@@ -188,24 +191,22 @@ fn rs_count(
             None => {},
         }
     }
+    let mut stats_locked = statistics.lock().unwrap();
+    stats_locked.dirs = dirs;
+    stats_locked.files = files;
+    stats_locked.slinks = slinks;
+    stats_locked.hlinks = hlinks;
+    stats_locked.size = size;
+    stats_locked.usage = usage;
+    if stats_locked.errors.len() < errors.len() {
+        stats_locked.errors.extend_from_slice(&errors);
+        errors.clear();
+    }
+    stats_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
+    #[cfg(unix)]
     {
-        let mut stats_locked = statistics.lock().unwrap();
-        stats_locked.dirs = dirs;
-        stats_locked.files = files;
-        stats_locked.slinks = slinks;
-        stats_locked.hlinks = hlinks;
-        stats_locked.size = size;
-        stats_locked.usage = usage;
-        if stats_locked.errors.len() < errors.len() {
-            stats_locked.errors.extend_from_slice(&errors);
-            errors.clear();
-        }
-        stats_locked.duration = stats_locked.start_time.elapsed();
-        #[cfg(unix)]
-        {
-            stats_locked.devices = devices;
-            stats_locked.pipes = pipes;
-        }
+        stats_locked.devices = devices;
+        stats_locked.pipes = pipes;
     }
 }
 
@@ -228,8 +229,7 @@ pub fn count(
         size: 0,
         usage: 0,
         errors: Vec::new(),
-        start_time: Instant::now(),
-        duration: Duration::new(0, 0),
+        duration: 0.0,
     }));
     let stats_cloned = statistics.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
@@ -350,8 +350,7 @@ impl Count {
                 size: 0,
                 usage: 0,
                 errors: Vec::new(),
-                start_time: Instant::now(),
-                duration: Duration::new(0, 0),
+                duration: 0.0,
             })),
             thr: None,
             alive: None,

@@ -1,16 +1,16 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use std::thread;
 use std::sync::{Arc, Mutex, Weak};
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use jwalk::WalkDir;
 #[cfg(unix)]
 use expanduser::expanduser;
+use jwalk::WalkDir;
 
+use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyType, PyAny, PyDict};
 use pyo3::{Python, wrap_pyfunction, PyContextProtocol};
-use pyo3::exceptions::{self, ValueError};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -83,7 +83,7 @@ impl Statistics {
 
     #[getter]
     fn duration(&self) -> PyResult<f64> {
-       Ok(self.duration)
+        Ok(self.duration)
     }
 }
 
@@ -124,11 +124,9 @@ fn rs_count(
                 let file_type = v.file_type_result.as_ref().unwrap();
                 if file_type.is_dir() {
                     dirs += 1;
-                }
-                else if file_type.is_file() {
+                } else if file_type.is_file() {
                     files += 1;
-                }
-                else if file_type.is_symlink() {
+                } else if file_type.is_symlink() {
                     slinks += 1;
                 }
                 if v.metadata_result.is_some() {
@@ -160,7 +158,7 @@ fn rs_count(
                     }
                 }
             }
-            Err(e) => errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
+            Err(e) => errors.push(e.to_string()),  // TODO: Need to fetch failed path from somewhere
         }
         cnt += 1;
         if (cnt >= 1000) || (update_time.elapsed().as_millis() >= 10) {
@@ -233,17 +231,20 @@ pub fn count(
     }));
     let stats_cloned = statistics.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
-        rs_count(&root_path,
-                 skip_hidden.unwrap_or(false),
-                 metadata.unwrap_or(false),
-                 metadata_ext.unwrap_or(false),
-                 max_depth.unwrap_or(::std::usize::MAX),
-                 &stats_cloned, None);
+        rs_count(
+            &root_path,
+            skip_hidden.unwrap_or(false),
+            metadata.unwrap_or(false),
+            metadata_ext.unwrap_or(false),
+            max_depth.unwrap_or(::std::usize::MAX),
+            &stats_cloned,
+            None,
+        );
         Ok(())
     });
     match rc {
         Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
-        _ => ()
+        _ => (),
     }
     let stats_cloned = statistics.lock().unwrap().clone();
     Ok(stats_cloned.into())
@@ -299,9 +300,14 @@ impl Count {
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
         self.thr = Some(thread::spawn(move || {
-            rs_count(&root_path,
-                     skip_hidden, metadata, metadata_ext, max_depth,
-                     &statistics, Some(alive))
+            rs_count(
+                &root_path,
+                skip_hidden,
+                metadata,
+                metadata_ext,
+                max_depth,
+                &statistics,
+                Some(alive))
         }));
         true
     }
@@ -310,9 +316,9 @@ impl Count {
         match &self.alive {
             Some(alive) => match alive.upgrade() {
                 Some(alive) => (*alive).store(false, Ordering::Relaxed),
-                None => {},
+                None => {}
             },
-            None => {},
+            None => {}
         }
         if self.thr.is_none() {
             return false
@@ -360,14 +366,14 @@ impl Count {
 
     #[getter]
     fn statistics(&self) -> PyResult<Statistics> {
-       Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
+        Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
     }
 
     fn has_results(&self) -> PyResult<bool> {
         Ok(self.has_results)
      }
 
-     fn as_dict(&self) -> PyResult<PyObject> {
+    fn as_dict(&self) -> PyResult<PyObject> {
         let gil = GILGuard::acquire();
         let stats_locked = self.statistics.lock().unwrap();
         let pyresult = PyDict::new(gil.python());
@@ -405,17 +411,19 @@ impl Count {
     fn collect(&mut self) -> PyResult<Statistics> {
         let gil = GILGuard::acquire();
         let rc: std::result::Result<(), std::io::Error> = gil.python().allow_threads(|| {
-            rs_count(&self.root_path,
-                     self.skip_hidden,
-                     self.metadata,
-                     self.metadata_ext,
-                     self.max_depth,
-                     &self.statistics, None);
+            rs_count(
+                &self.root_path,
+                self.skip_hidden,
+                self.metadata,
+                self.metadata_ext,
+                self.max_depth,
+                &self.statistics,
+                None);
             Ok(())
         });
         match rc {
             Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
-            _ => ()
+            _ => (),
         }
         self.has_results = true;
         Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
@@ -467,7 +475,7 @@ impl<'p> PyContextProtocol<'p> for Count {
         _traceback: Option<&'p PyAny>,
     ) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Ok(false)
+            return Ok(false);
         }
         if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
             Ok(true)

@@ -1,4 +1,4 @@
-use std::time::{Instant, Duration};
+use std::time::Instant;
 use std::thread;
 use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -21,12 +21,46 @@ pub struct Toc {
     pub symlinks: Vec<String>,
     pub unknown: Vec<String>,
     pub errors: Vec<String>,
+    pub duration: f64,
 }
 
 #[pyproto]
 impl pyo3::class::PyObjectProtocol for Toc {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
+    }
+}
+
+#[pymethods]
+impl Toc {
+    #[getter]
+    fn dirs(&self) -> PyResult<Vec<String>> {
+        Ok(self.dirs.to_vec())
+    }
+
+    #[getter]
+    fn files(&self) -> PyResult<Vec<String>> {
+        Ok(self.files.to_vec())
+    }
+
+    #[getter]
+    fn symlinks(&self) -> PyResult<Vec<String>> {
+        Ok(self.symlinks.to_vec())
+    }
+
+    #[getter]
+    fn unknown(&self) -> PyResult<Vec<String>> {
+        Ok(self.unknown.to_vec())
+    }
+
+    #[getter]
+    fn errors(&self) -> PyResult<Vec<String>> {
+        Ok(self.errors.to_vec())
+    }
+
+    #[getter]
+    fn duration(&self) -> PyResult<f64> {
+       Ok(self.duration)
     }
 }
 
@@ -40,6 +74,7 @@ pub fn rs_toc(
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
+    let start_time = Instant::now();
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)
@@ -60,6 +95,7 @@ pub fn rs_toc(
                 } else {
                     toc_locked.unknown.push(key.to_str().unwrap().to_string());
                 }
+                toc_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
             }
             Err(e) => toc.lock().unwrap().errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
         }
@@ -70,6 +106,7 @@ pub fn rs_toc(
             None => {},
         }
     }
+    toc.lock().unwrap().duration = start_time.elapsed().as_millis() as f64 * 0.001;
 }
 
 pub fn rs_toc_iter(
@@ -82,18 +119,21 @@ pub fn rs_toc_iter(
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
+    let start_time = Instant::now();
+    let mut toc = Toc { 
+        dirs: Vec::new(),
+        files: Vec::new(),
+        symlinks: Vec::new(),
+        unknown: Vec::new(),
+        errors: Vec::new(),
+        duration: 0.0,
+    };
+    let mut send = false;
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
     {
-        let mut toc = Toc { 
-            dirs: Vec::new(),
-            files: Vec::new(),
-            symlinks: Vec::new(),
-            unknown: Vec::new(),
-            errors: Vec::new(),
-        };
         match &entry {
             Ok(v) => {
                 let file_type = v.file_type_result.as_ref().unwrap();
@@ -111,14 +151,35 @@ pub fn rs_toc_iter(
             }
             Err(e) => toc.errors.push(e.to_string())  // TODO: Need to fetch failed path from somewhere
         }
+        send = true;
         match &tx {
-            Some(tx) => tx.send(toc).unwrap(),
+            Some(tx) => {
+                if tx.is_empty() {
+                    tx.send(toc).unwrap();
+                    toc = Toc { 
+                        dirs: Vec::new(),
+                        files: Vec::new(),
+                        symlinks: Vec::new(),
+                        unknown: Vec::new(),
+                        errors: Vec::new(),
+                        duration: start_time.elapsed().as_millis() as f64 * 0.001,
+                    };
+                    send = false;
+                }
+            },
             None => {},
         }
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
                 break;
             },
+            None => {},
+        }
+    }
+    toc.duration = start_time.elapsed().as_millis() as f64 * 0.001;
+    if send {
+        match &tx {
+            Some(tx) => tx.send(toc).unwrap(),
             None => {},
         }
     }
@@ -138,6 +199,7 @@ pub fn toc(
         symlinks: Vec::new(),
         unknown: Vec::new(),
         errors: Vec::new(),
+        duration: 0.0,
     }));
     let toc_cloned = toc.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
@@ -171,8 +233,6 @@ pub struct Walk {
     alive: Option<Weak<AtomicBool>>,
     rx: Option<channel::Receiver<Toc>>,
     has_results: bool,
-    start_time: Instant,
-    duration: Duration,
 }
 
 impl Walk {
@@ -191,7 +251,6 @@ impl Walk {
         if self.thr.is_some() {
             return false
         }
-        self.start_time = Instant::now();
         if self.has_results {
             self.rs_init();
         }
@@ -227,7 +286,6 @@ impl Walk {
             None => {},
         }
         self.thr.take().map(thread::JoinHandle::join);
-        self.duration = self.start_time.elapsed();
         self.has_results = true;
         true
     }
@@ -264,24 +322,18 @@ impl Walk {
                 symlinks: Vec::new(),
                 unknown: Vec::new(),
                 errors: Vec::new(),
+                duration: 0.0,
             })),
             thr: None,
             alive: None,
             rx: None,
             has_results: false,
-            start_time: Instant::now(),
-            duration: Duration::new(0, 0),
         });
     }
 
     #[getter]
     fn toc(&self) -> PyResult<Toc> {
        Ok(Arc::clone(&self.toc).lock().unwrap().clone())
-    }
-
-    #[getter]
-    fn duration(&self) -> PyResult<f64> {
-       Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
     }
 
     fn has_results(&self) -> PyResult<bool> {
@@ -307,15 +359,14 @@ impl Walk {
         if !toc_locked.errors.is_empty() {
             pyresult.set_item("errors", toc_locked.errors.to_vec()).unwrap();
         }
+        pyresult.set_item("duration", toc_locked.duration().unwrap()).unwrap();
         Ok(pyresult.into())
     }
 
     fn list(&mut self) -> PyResult<Toc> {
-        self.start_time = Instant::now();
         rs_toc(self.root_path.clone(),
                self.sorted, self.skip_hidden, self.max_depth,
                self.toc.clone(), None);
-        self.duration = self.start_time.elapsed();
         self.has_results = true;
         Ok(Arc::clone(&self.toc).lock().unwrap().clone())
     }
@@ -349,7 +400,9 @@ impl pyo3::class::PyObjectProtocol for Walk {
 #[pyproto]
 impl<'p> PyContextProtocol<'p> for Walk {
     fn __enter__(&'p mut self) -> PyResult<()> {
-        self.rs_start(None);
+        if !self.rs_start(None) {
+            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+        }
         Ok(())
     }
 
@@ -373,6 +426,9 @@ impl<'p> PyContextProtocol<'p> for Walk {
 #[pyproto]
 impl<'p> PyIterProtocol for Walk {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Walk>> {
+        if slf.thr.is_some() {
+            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+        }
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);
         slf.rs_start(Some(tx));
@@ -383,9 +439,7 @@ impl<'p> PyIterProtocol for Walk {
         match &slf.rx {
             Some(rx) => match rx.recv() {
                 Ok(val) => Ok(Some(val)),
-                Err(_) => {
-                    Ok(None)
-                },
+                Err(_) => Ok(None),
             },
             None => Ok(None),
         }

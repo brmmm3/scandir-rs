@@ -17,11 +17,8 @@ pub struct DirEntry {
     pub size: u64,
     pub blksize: u64,
     pub blocks: u64,
-    #[cfg(unix)]
     pub uid: u32,
-    #[cfg(unix)]
     pub gid: u32,
-    #[cfg(unix)]
     pub rdev: u64,
 }
 
@@ -43,11 +40,8 @@ impl DirEntry {
         size: u64,
         blksize: u64,
         blocks: u64,
-        #[cfg(unix)]
         uid: u32,
-        #[cfg(unix)]
         gid: u32,
-        #[cfg(unix)]
         rdev: u64,
     ) {
         obj.init(DirEntry {
@@ -64,11 +58,8 @@ impl DirEntry {
             size: size,
             blksize: blksize,
             blocks: blocks,
-            #[cfg(unix)]
             uid: uid,
-            #[cfg(unix)]
             gid: gid,
-            #[cfg(unix)]
             rdev: rdev,
         });
     }

@@ -8,6 +8,6 @@ import scandir_rs as r
 W = r.walk.Walk("~/workspace")
 
 for result in W:
-    print(dir(result))
+    print(result)
 
 #print(W.list())

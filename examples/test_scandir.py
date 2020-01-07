@@ -7,7 +7,7 @@ import scandir_rs as r
 
 #print(r.walk.toc("~/workspace", sorted=True))
 
-W = r.walk.Walk("~/workspace")
+W = r.scandir.Walk("~/workspace")
 
 for result in W:
     print(result)

@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import time
 import sys
 
@@ -24,7 +26,7 @@ C = r.count.Count("~/workspace", metadata_ext=True)
 with C:
     while C.busy():
         print(C.statistics)
-        time.sleep(0.1)
+        time.sleep(0.01)
 print("FINISHED")
 print(C.statistics)
 print(r.count.Count("~/workspace", metadata_ext=True).collect())

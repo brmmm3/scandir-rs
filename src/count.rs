@@ -24,12 +24,67 @@ pub struct Statistics {
     pub size: u64,
     pub usage: u64,
     pub errors: Vec<String>,
+    pub start_time: Instant,
+    pub duration: Duration,
 }
 
 #[pyproto]
 impl pyo3::class::PyObjectProtocol for Statistics {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
+    }
+}
+
+#[pymethods]
+impl Statistics {
+    #[getter]
+    fn dirs(&self) -> PyResult<u32> {
+        Ok(self.dirs)
+    }
+
+    #[getter]
+    fn files(&self) -> PyResult<u32> {
+        Ok(self.files)
+    }
+
+    #[getter]
+    fn slinks(&self) -> PyResult<u32> {
+        Ok(self.slinks)
+    }
+
+    #[getter]
+    fn hlinks(&self) -> PyResult<u32> {
+        Ok(self.hlinks)
+    }
+
+    #[getter]
+    fn devices(&self) -> PyResult<u32> {
+        Ok(self.devices)
+    }
+
+    #[getter]
+    fn pipes(&self) -> PyResult<u32> {
+        Ok(self.pipes)
+    }
+
+    #[getter]
+    fn size(&self) -> PyResult<u64> {
+        Ok(self.size)
+    }
+
+    #[getter]
+    fn usage(&self) -> PyResult<u64> {
+        Ok(self.usage)
+    }
+
+    #[getter]
+    fn errors(&self) -> PyResult<Vec<String>> {
+        Ok(self.errors.to_vec())
+    }
+
+    #[getter]
+    fn duration(&self) -> PyResult<f64> {
+       Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
     }
 }
 
@@ -145,6 +200,7 @@ fn rs_count(
             stats_locked.errors.extend_from_slice(&errors);
             errors.clear();
         }
+        stats_locked.duration = stats_locked.start_time.elapsed();
         #[cfg(unix)]
         {
             stats_locked.devices = devices;
@@ -172,6 +228,8 @@ pub fn count(
         size: 0,
         usage: 0,
         errors: Vec::new(),
+        start_time: Instant::now(),
+        duration: Duration::new(0, 0),
     }));
     let stats_cloned = statistics.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
@@ -206,8 +264,6 @@ pub struct Count {
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
     has_results: bool,
-    start_time: Instant,
-    duration: Duration,
 }
 
 impl Count {
@@ -231,7 +287,6 @@ impl Count {
         if self.thr.is_some() {
             return false
         }
-        self.start_time = Instant::now();
         if self.has_results {
             self.rs_init();
         }
@@ -255,12 +310,14 @@ impl Count {
         match &self.alive {
             Some(alive) => match alive.upgrade() {
                 Some(alive) => (*alive).store(false, Ordering::Relaxed),
-                None => return false,
+                None => {},
             },
             None => {},
         }
+        if self.thr.is_none() {
+            return false
+        }
         self.thr.take().map(thread::JoinHandle::join);
-        self.duration = self.start_time.elapsed();
         self.has_results = true;
         true
     }
@@ -293,23 +350,18 @@ impl Count {
                 size: 0,
                 usage: 0,
                 errors: Vec::new(),
+                start_time: Instant::now(),
+                duration: Duration::new(0, 0),
             })),
             thr: None,
             alive: None,
             has_results: false,
-            start_time: Instant::now(),
-            duration: Duration::new(0, 0),
         });
     }
 
     #[getter]
     fn statistics(&self) -> PyResult<Statistics> {
        Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
-    }
-
-    #[getter]
-    fn duration(&self) -> PyResult<f64> {
-       Ok(self.duration.as_secs() as f64 + self.duration.subsec_nanos() as f64 * 1e-9)
     }
 
     fn has_results(&self) -> PyResult<bool> {
@@ -347,15 +399,14 @@ impl Count {
         if !stats_locked.errors.is_empty() {
             pyresult.set_item("errors", stats_locked.errors.to_vec()).unwrap();
         }
+        pyresult.set_item("duration", stats_locked.duration().unwrap()).unwrap();
         Ok(pyresult.to_object(gil.python()))
     }
 
     fn collect(&mut self) -> PyResult<Statistics> {
-        self.start_time = Instant::now();
         rs_count(self.root_path.clone(),
                  self.skip_hidden, self.metadata, self.metadata_ext, self.max_depth,
                  self.statistics.clone(), None);
-        self.duration = self.start_time.elapsed();
         self.has_results = true;
         Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
     }

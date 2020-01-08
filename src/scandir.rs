@@ -46,13 +46,6 @@ pub struct Entries {
     pub duration: f64,
 }
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Entries {
-    fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{:?}", self))
-    }
-}
-
 #[pymethods]
 impl Entries {
     #[getter]
@@ -63,6 +56,13 @@ impl Entries {
     #[getter]
     fn duration(&self) -> PyResult<f64> {
        Ok(self.duration)
+    }
+}
+
+#[pyproto]
+impl pyo3::class::PyObjectProtocol for Entries {
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
     }
 }
 

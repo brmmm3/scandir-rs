@@ -63,6 +63,15 @@ impl Toc {
     fn duration(&self) -> PyResult<f64> {
         Ok(self.duration)
     }
+
+    fn clear(&mut self) {
+        self.dirs.clear();
+        self.files.clear();
+        self.symlinks.clear();
+        self.unknown.clear();
+        self.errors.clear();
+        self.duration = 0.0;
+    }
 }
 
 fn update_toc(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
@@ -327,7 +336,10 @@ impl Walk {
 
     #[getter]
     fn toc(&self) -> PyResult<Toc> {
-        Ok(Arc::clone(&self.toc).lock().unwrap().clone())
+        let mut toc_locked = self.toc.lock().unwrap();
+        let tmp_toc = toc_locked.clone();
+        toc_locked.deref_mut().clear();
+        Ok(tmp_toc)
     }
 
     fn has_results(&self) -> PyResult<bool> {
@@ -336,7 +348,7 @@ impl Walk {
 
     fn as_dict(&self) -> PyResult<PyObject> {
         let gil = GILGuard::acquire();
-        let toc_locked = self.toc.lock().unwrap();
+        let mut toc_locked = self.toc.lock().unwrap();
         let pyresult = PyDict::new(gil.python());
         if !toc_locked.dirs.is_empty() {
             pyresult.set_item("dirs", toc_locked.dirs.to_vec()).unwrap();
@@ -354,10 +366,11 @@ impl Walk {
             pyresult.set_item("errors", toc_locked.errors.to_vec()).unwrap();
         }
         pyresult.set_item("duration", toc_locked.duration().unwrap()).unwrap();
+        toc_locked.deref_mut().clear();
         Ok(pyresult.into())
     }
 
-    fn list(&mut self) -> PyResult<Toc> {
+    fn collect(&mut self) -> PyResult<Toc> {
         rs_toc(
             self.root_path.clone(),
             self.sorted,

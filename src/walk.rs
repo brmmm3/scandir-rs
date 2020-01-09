@@ -402,7 +402,7 @@ impl Walk {
 
     #[getter]
     fn duration(&self) -> PyResult<f64> {
-        Ok(f64::from_bits(self.duration.load(Ordering::Relaxed)))
+        Ok(f64::from_bits(self.duration.load(Ordering::Relaxed)) * 0.001)
     }
 
     fn has_results(&self) -> PyResult<bool> {

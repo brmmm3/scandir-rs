@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::wrap_pymodule;
 
 mod def;
+use def::*;
 mod count;
 use count::*;
 mod walk;
@@ -15,6 +16,8 @@ mod test;
 #[pymodule(scandir_rs)]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add("ITER_TYPE_TOC", ITER_TYPE_TOC)?;
+    m.add("ITER_TYPE_WALK", ITER_TYPE_WALK)?;
     m.add_wrapped(wrap_pymodule!(count))?;
     m.add_wrapped(wrap_pymodule!(walk))?;
     m.add_wrapped(wrap_pymodule!(scandir))?;

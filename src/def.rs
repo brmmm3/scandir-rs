@@ -1,5 +1,9 @@
 use pyo3::prelude::*;
 use pyo3::PyObjectProtocol;
+use pyo3::types::PyTuple;
+
+pub const ITER_TYPE_TOC: u8 = 0;
+pub const ITER_TYPE_WALK: u8 = 1;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -70,4 +74,101 @@ impl<'p> PyObjectProtocol<'p> for DirEntry {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:#?}", self))
     }
+}
+
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct Toc {
+    pub dirs: Vec<String>,
+    pub files: Vec<String>,
+    pub symlinks: Vec<String>,
+    pub other: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+#[pyproto]
+impl pyo3::class::PyObjectProtocol for Toc {
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+}
+
+#[pymethods]
+impl Toc {
+    #[getter]
+    fn dirs(&self) -> PyResult<Vec<String>> {
+        Ok(self.dirs.to_vec())
+    }
+
+    #[getter]
+    fn files(&self) -> PyResult<Vec<String>> {
+        Ok(self.files.to_vec())
+    }
+
+    #[getter]
+    fn symlinks(&self) -> PyResult<Vec<String>> {
+        Ok(self.symlinks.to_vec())
+    }
+
+    #[getter]
+    fn other(&self) -> PyResult<Vec<String>> {
+        Ok(self.other.to_vec())
+    }
+
+    #[getter]
+    fn errors(&self) -> PyResult<Vec<String>> {
+        Ok(self.errors.to_vec())
+    }
+
+    pub fn clear(&mut self) {
+        self.dirs.clear();
+        self.files.clear();
+        self.symlinks.clear();
+        self.other.clear();
+        self.errors.clear();
+    }
+}
+
+impl ToPyObject for Toc {
+    #[inline]
+    fn to_object(&self, py: Python) -> PyObject {
+        PyTuple::new(py, &[self.dirs.to_object(py),
+                           self.files.to_object(py),
+                           self.symlinks.to_object(py),
+                           self.other.to_object(py),
+                           self.errors.to_object(py)]).into()
+    }
+}
+
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct WalkEntry {
+    pub path: String,
+    pub toc: Toc,
+}
+
+#[pyproto]
+impl pyo3::class::PyObjectProtocol for WalkEntry {
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+}
+
+impl ToPyObject for WalkEntry {
+    #[inline]
+    fn to_object(&self, py: Python) -> PyObject {
+        PyTuple::new(py,
+            &[self.path.to_object(py),
+              self.toc.dirs.to_object(py),
+              self.toc.files.to_object(py),
+              self.toc.symlinks.to_object(py),
+              self.toc.other.to_object(py),
+              self.toc.errors.to_object(py)]).into()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum IterResult {
+    Toc(Toc),
+    WalkEntry(WalkEntry),
 }

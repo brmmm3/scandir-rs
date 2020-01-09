@@ -1,5 +1,7 @@
+use std::fmt::Debug;
+use std::collections::HashMap;
 use std::ops::DerefMut;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::Instant;
@@ -14,65 +16,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyType, PyAny, PyDict};
 use pyo3::{Python, wrap_pyfunction, PyContextProtocol, PyIterProtocol};
 
-#[pyclass]
-#[derive(Debug, Clone)]
-pub struct Toc {
-    pub dirs: Vec<String>,
-    pub files: Vec<String>,
-    pub symlinks: Vec<String>,
-    pub unknown: Vec<String>,
-    pub errors: Vec<String>,
-    pub duration: f64,
-}
-
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Toc {
-    fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{:?}", self))
-    }
-}
-
-#[pymethods]
-impl Toc {
-    #[getter]
-    fn dirs(&self) -> PyResult<Vec<String>> {
-        Ok(self.dirs.to_vec())
-    }
-
-    #[getter]
-    fn files(&self) -> PyResult<Vec<String>> {
-        Ok(self.files.to_vec())
-    }
-
-    #[getter]
-    fn symlinks(&self) -> PyResult<Vec<String>> {
-        Ok(self.symlinks.to_vec())
-    }
-
-    #[getter]
-    fn unknown(&self) -> PyResult<Vec<String>> {
-        Ok(self.unknown.to_vec())
-    }
-
-    #[getter]
-    fn errors(&self) -> PyResult<Vec<String>> {
-        Ok(self.errors.to_vec())
-    }
-
-    #[getter]
-    fn duration(&self) -> PyResult<f64> {
-        Ok(self.duration)
-    }
-
-    fn clear(&mut self) {
-        self.dirs.clear();
-        self.files.clear();
-        self.symlinks.clear();
-        self.unknown.clear();
-        self.errors.clear();
-        self.duration = 0.0;
-    }
-}
+use crate::def::*;
 
 fn update_toc(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
               toc: &mut Toc) {
@@ -88,7 +32,7 @@ fn update_toc(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, 
             } else if file_type.is_file() {
                 toc.files.push(key.to_str().unwrap().to_string());
             } else {
-                toc.unknown.push(key.to_str().unwrap().to_string());
+                toc.other.push(key.to_str().unwrap().to_string());
             }
         }
         Err(e) => toc.errors.push(e.to_string()),  // TODO: Need to fetch failed path from somewhere
@@ -101,6 +45,7 @@ pub fn rs_toc(
     skip_hidden: bool,
     max_depth: usize,
     toc: Arc<Mutex<Toc>>,
+    duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
@@ -113,7 +58,6 @@ pub fn rs_toc(
     {
         let mut toc_locked = toc.lock().unwrap();
         update_toc(&entry, toc_locked.deref_mut());
-        toc_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
                 break;
@@ -121,7 +65,13 @@ pub fn rs_toc(
             None => {},
         }
     }
-    toc.lock().unwrap().duration = start_time.elapsed().as_millis() as f64 * 0.001;
+    match &duration {
+        Some(d) => {
+            let dt = start_time.elapsed().as_millis() as f64;
+            d.store(dt.to_bits(), Ordering::Relaxed);
+        },
+        None => {}
+    }
 }
 
 pub fn rs_toc_iter(
@@ -129,8 +79,9 @@ pub fn rs_toc_iter(
     sorted: bool,
     skip_hidden: bool,
     max_depth: usize,
+    duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
-    tx: Option<channel::Sender<Toc>>,
+    tx: channel::Sender<IterResult>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
@@ -139,9 +90,8 @@ pub fn rs_toc_iter(
         dirs: Vec::new(),
         files: Vec::new(),
         symlinks: Vec::new(),
-        unknown: Vec::new(),
+        other: Vec::new(),
         errors: Vec::new(),
-        duration: 0.0,
     };
     let mut send = false;
     for entry in WalkDir::new(root_path)
@@ -150,24 +100,18 @@ pub fn rs_toc_iter(
         .max_depth(max_depth)
     {
         update_toc(&entry, &mut toc);
-        match &tx {
-            Some(tx) => {
-                if tx.is_empty() {
-                    tx.send(toc).unwrap();
-                    toc = Toc {
-                        dirs: Vec::new(),
-                        files: Vec::new(),
-                        symlinks: Vec::new(),
-                        unknown: Vec::new(),
-                        errors: Vec::new(),
-                        duration: start_time.elapsed().as_millis() as f64 * 0.001,
-                    };
-                    send = false;
-                } else {
-                    send = true;
-                }
-            },
-            None => {}
+        if tx.is_empty() {
+            tx.send(IterResult::Toc(toc)).unwrap();
+            toc = Toc {
+                dirs: Vec::new(),
+                files: Vec::new(),
+                symlinks: Vec::new(),
+                other: Vec::new(),
+                errors: Vec::new(),
+            };
+            send = false;
+        } else {
+            send = true;
         }
         match &alive {
             Some(a) => if !a.load(Ordering::Relaxed) {
@@ -176,12 +120,85 @@ pub fn rs_toc_iter(
             None => {}
         }
     }
-    toc.duration = start_time.elapsed().as_millis() as f64 * 0.001;
     if send {
-        match &tx {
-            Some(tx) => tx.send(toc).unwrap(),
+        tx.send(IterResult::Toc(toc)).unwrap();
+    }
+    match &duration {
+        Some(d) => {
+            let dt = start_time.elapsed().as_millis() as f64;
+            d.store(dt.to_bits(), Ordering::Relaxed);
+        },
+        None => {}
+    }
+}
+
+pub fn rs_walk_iter(
+    root_path: String,
+    sorted: bool,
+    skip_hidden: bool,
+    max_depth: usize,
+    duration: Option<Arc<AtomicU64>>,
+    alive: Option<Arc<AtomicBool>>,
+    tx: channel::Sender<IterResult>,
+) {
+    #[cfg(unix)]
+    let root_path = expanduser(root_path).unwrap();
+    let start_time = Instant::now();
+    let mut list: Vec<String> = Vec::new();
+    let mut map: HashMap<String, Toc> = HashMap::new();
+    let mut errors: Vec<String> = Vec::new();
+    for entry in WalkDir::new(root_path)
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .max_depth(max_depth)
+    {
+        match &entry {
+            Ok(v) => {
+                let file_type = v.file_type_result.as_ref().unwrap();
+                let dir = v.parent_path.to_str().unwrap().to_string();
+                let file_name = v.file_name.clone().into_string().unwrap();
+                if file_type.is_symlink() {
+                    map.get_mut(&dir).unwrap().symlinks.push(file_name);
+                } else if file_type.is_dir() {
+                    let path = v.path().to_str().unwrap().to_string();
+                    list.push(path.clone());
+                    map.insert(path, Toc {
+                        dirs: Vec::new(),
+                        files: Vec::new(),
+                        symlinks: Vec::new(),
+                        other: Vec::new(),
+                        errors: Vec::new(),
+                    });
+                    match map.get_mut(&dir) {
+                        Some(toc) => toc.dirs.push(file_name),
+                        None => {}
+                    }
+                } else if file_type.is_file() {
+                    map.get_mut(&dir).unwrap().files.push(file_name);
+                } else {
+                    map.get_mut(&dir).unwrap().other.push(file_name);
+                }
+            },
+            Err(e) => errors.push(e.to_string()),  // TODO: Need to fetch failed path from somewhere
+        }
+        match &alive {
+            Some(a) => if !a.load(Ordering::Relaxed) {
+                break;
+            },
             None => {}
         }
+    }
+    match &duration {
+        Some(d) => {
+            let dt = start_time.elapsed().as_millis() as f64;
+            d.store(dt.to_bits(), Ordering::Relaxed);
+        },
+        None => {}
+    }
+    for key in list {
+        tx.send(IterResult::WalkEntry(WalkEntry {
+             path: key.clone(),
+             toc: map.get(&key).unwrap().clone() })).unwrap();
     }
 }
 
@@ -197,9 +214,8 @@ pub fn toc(
         dirs: Vec::new(),
         files: Vec::new(),
         symlinks: Vec::new(),
-        unknown: Vec::new(),
+        other: Vec::new(),
         errors: Vec::new(),
-        duration: 0.0,
     }));
     let toc_cloned = toc.clone();
     let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
@@ -209,6 +225,7 @@ pub fn toc(
             skip_hidden.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
             toc_cloned,
+            None,
             None
         );
         Ok(())
@@ -229,12 +246,14 @@ pub struct Walk {
     sorted: bool,
     skip_hidden: bool,
     max_depth: usize,
+    iter_type: u8,
     // Results
     toc: Arc<Mutex<Toc>>,
+    duration: Arc<AtomicU64>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
-    rx: Option<channel::Receiver<Toc>>,
+    rx: Option<channel::Receiver<IterResult>>,
     has_results: bool,
 }
 
@@ -244,12 +263,25 @@ impl Walk {
         toc_locked.dirs.clear();
         toc_locked.files.clear();
         toc_locked.symlinks.clear();
-        toc_locked.unknown.clear();
+        toc_locked.other.clear();
         toc_locked.errors.clear();
     }
 
+    fn rs_collect(&mut self) {
+        rs_toc(
+            self.root_path.clone(),
+            self.sorted,
+            self.skip_hidden,
+            self.max_depth,
+            self.toc.clone(),
+            Some(self.duration.clone()),
+            None
+        );
+        self.has_results = true;
+    }
+
     fn rs_start(&mut self,
-        tx: Option<channel::Sender<Toc>>,
+        tx: Option<channel::Sender<IterResult>>,
     ) -> bool {
         if self.thr.is_some() {
             return false;
@@ -262,20 +294,44 @@ impl Walk {
         let skip_hidden = self.skip_hidden;
         let max_depth = self.max_depth;
         let toc = self.toc.clone();
+        let duration = self.duration.clone();
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
         if tx.is_none() {
             self.thr = Some(thread::spawn(move || {
-                rs_toc(root_path,
-                       sorted, skip_hidden, max_depth,
-                       toc, Some(alive))
+                rs_toc(
+                    root_path,
+                    sorted,
+                    skip_hidden,
+                    max_depth,
+                    toc,
+                    Some(duration),
+                    Some(alive))
             }));
         } else {
-            self.thr = Some(thread::spawn(move || {
-                rs_toc_iter(root_path,
-                            sorted, skip_hidden, max_depth,
-                            Some(alive), tx)
-            }));
+            if self.iter_type == ITER_TYPE_TOC {
+                self.thr = Some(thread::spawn(move || {
+                    rs_toc_iter(
+                        root_path,
+                        sorted,
+                        skip_hidden,
+                        max_depth,
+                        Some(duration),
+                        Some(alive),
+                        tx.unwrap())
+                }));
+            } else {
+                self.thr = Some(thread::spawn(move || {
+                    rs_walk_iter(
+                        root_path,
+                        sorted,
+                        skip_hidden,
+                        max_depth,
+                        Some(duration),
+                        Some(alive),
+                        tx.unwrap())
+                }));
+            }
         }
         true
     }
@@ -313,20 +369,22 @@ impl Walk {
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
         max_depth: Option<usize>,
+        iter_type: Option<u8>,
     ) {
         obj.init(Walk {
             root_path: String::from(root_path),
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
+            iter_type: iter_type.unwrap_or(ITER_TYPE_TOC),
             toc: Arc::new(Mutex::new(Toc {
                 dirs: Vec::new(),
                 files: Vec::new(),
                 symlinks: Vec::new(),
-                unknown: Vec::new(),
+                other: Vec::new(),
                 errors: Vec::new(),
-                duration: 0.0,
             })),
+            duration: Arc::new(AtomicU64::new(0)),
             thr: None,
             alive: None,
             rx: None,
@@ -340,6 +398,11 @@ impl Walk {
         let tmp_toc = toc_locked.clone();
         toc_locked.deref_mut().clear();
         Ok(tmp_toc)
+    }
+
+    #[getter]
+    fn duration(&self) -> PyResult<f64> {
+        Ok(f64::from_bits(self.duration.load(Ordering::Relaxed)))
     }
 
     fn has_results(&self) -> PyResult<bool> {
@@ -359,27 +422,18 @@ impl Walk {
         if !toc_locked.symlinks.is_empty() {
             pyresult.set_item("symlinks", toc_locked.symlinks.to_vec()).unwrap();
         }
-        if !toc_locked.unknown.is_empty() {
-            pyresult.set_item("unknown", toc_locked.unknown.to_vec()).unwrap();
+        if !toc_locked.other.is_empty() {
+            pyresult.set_item("other", toc_locked.other.to_vec()).unwrap();
         }
         if !toc_locked.errors.is_empty() {
             pyresult.set_item("errors", toc_locked.errors.to_vec()).unwrap();
         }
-        pyresult.set_item("duration", toc_locked.duration().unwrap()).unwrap();
         toc_locked.deref_mut().clear();
         Ok(pyresult.into())
     }
 
     fn collect(&mut self) -> PyResult<Toc> {
-        rs_toc(
-            self.root_path.clone(),
-            self.sorted,
-            self.skip_hidden,
-            self.max_depth,
-            self.toc.clone(),
-            None
-        );
-        self.has_results = true;
+        self.rs_collect();
         Ok(Arc::clone(&self.toc).lock().unwrap().clone())
     }
 
@@ -447,10 +501,14 @@ impl<'p> PyIterProtocol for Walk {
         Ok(slf.into())
     }
 
-    fn __next__(slf: PyRefMut<Self>) -> PyResult<Option<Toc>> {
+    fn __next__(slf: PyRefMut<Self>) -> PyResult<Option<PyObject>> {
+        let gil = GILGuard::acquire();
         match &slf.rx {
             Some(rx) => match rx.recv() {
-                Ok(val) => Ok(Some(val)),
+                Ok(val) => match val {
+                    IterResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
+                    IterResult::WalkEntry(entry) => Ok(Some(entry.to_object(gil.python()))),
+                },
                 Err(_) => Ok(None),
             },
             None => Ok(None),

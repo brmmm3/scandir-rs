@@ -219,7 +219,9 @@ fn rs_entries_iter(
         let entry = create_entry(&entry);
         match &tx {
             Some(tx) => {
-                tx.send(entry).unwrap();
+                if tx.send(entry).is_err() {
+                    return;
+                }
             },
             None => {},
         }
@@ -232,10 +234,10 @@ fn rs_entries_iter(
     }
     match &tx {
         Some(tx) => {
-            tx.send(Entry {
+            let _ = tx.send(Entry {
                 path: String::from("?"),
                 entry: Stats::Duration(start_time.elapsed().as_millis() as f64 * 0.001),
-            }).unwrap();
+            });
         },
         None => {}
     }

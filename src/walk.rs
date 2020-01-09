@@ -101,7 +101,9 @@ pub fn rs_toc_iter(
     {
         update_toc(&entry, &mut toc);
         if tx.is_empty() {
-            tx.send(IterResult::Toc(toc)).unwrap();
+            if tx.send(IterResult::Toc(toc)).is_err() {
+                return;
+            }
             toc = Toc {
                 dirs: Vec::new(),
                 files: Vec::new(),
@@ -121,7 +123,7 @@ pub fn rs_toc_iter(
         }
     }
     if send {
-        tx.send(IterResult::Toc(toc)).unwrap();
+        let _ = tx.send(IterResult::Toc(toc));
     }
     match &duration {
         Some(d) => {
@@ -196,9 +198,11 @@ pub fn rs_walk_iter(
         None => {}
     }
     for key in list {
-        tx.send(IterResult::WalkEntry(WalkEntry {
+        if tx.send(IterResult::WalkEntry(WalkEntry {
              path: key.clone(),
-             toc: map.get(&key).unwrap().clone() })).unwrap();
+             toc: map.get(&key).unwrap().clone() })).is_err() {
+                 break;
+             }
     }
 }
 

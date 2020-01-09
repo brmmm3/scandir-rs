@@ -4,6 +4,7 @@ use pyo3::types::PyTuple;
 
 pub const ITER_TYPE_TOC: u8 = 0;
 pub const ITER_TYPE_WALK: u8 = 1;
+pub const ITER_TYPE_WALKEXT: u8 = 2;
 
 #[pyclass]
 #[derive(Debug, Clone)]

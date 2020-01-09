@@ -13,7 +13,7 @@ use jwalk::WalkDir;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyType, PyAny, PyDict};
+use pyo3::types::{PyType, PyAny, PyTuple, PyDict};
 use pyo3::{Python, wrap_pyfunction, PyContextProtocol, PyIterProtocol};
 
 use crate::def::*;
@@ -507,7 +507,20 @@ impl<'p> PyIterProtocol for Walk {
             Some(rx) => match rx.recv() {
                 Ok(val) => match val {
                     IterResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
-                    IterResult::WalkEntry(entry) => Ok(Some(entry.to_object(gil.python()))),
+                    IterResult::WalkEntry(mut entry) => {
+                        if slf.iter_type == ITER_TYPE_WALKEXT {
+                            Ok(Some(entry.to_object(gil.python())))
+                        } else {
+                            let py = gil.python();
+                            let mut files = entry.toc.files.to_vec();
+                            files.append(&mut entry.toc.symlinks);
+                            files.append(&mut entry.toc.other);
+                            Ok(Some(PyTuple::new(py,
+                                &[entry.path.to_object(py),
+                                  entry.toc.dirs.to_object(py),
+                                  files.to_object(py)]).into()))
+                        }
+                    }
                 },
                 Err(_) => Ok(None),
             },

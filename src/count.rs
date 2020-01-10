@@ -90,8 +90,7 @@ impl Statistics {
 fn rs_count(
     root_path: &String,
     skip_hidden: bool,
-    metadata: bool,
-    metadata_ext: bool,
+    extended: bool,
     mut max_depth: usize,
     statistics: &Arc<Mutex<Statistics>>,
     alive: Option<Arc<AtomicBool>>,
@@ -118,8 +117,8 @@ fn rs_count(
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(false)
-        .preload_metadata(metadata)
-        .preload_metadata_ext(metadata_ext)
+        .preload_metadata(extended)
+        .preload_metadata_ext(extended)
         .max_depth(max_depth)
     {
         match &entry {
@@ -216,8 +215,7 @@ pub fn count(
     py: Python,
     root_path: String,
     skip_hidden: Option<bool>,
-    metadata: Option<bool>,
-    metadata_ext: Option<bool>,
+    extended: Option<bool>,
     max_depth: Option<usize>,
 ) -> PyResult<Statistics> {
     let statistics = Arc::new(Mutex::new(Statistics {
@@ -237,8 +235,7 @@ pub fn count(
         rs_count(
             &root_path,
             skip_hidden.unwrap_or(false),
-            metadata.unwrap_or(false),
-            metadata_ext.unwrap_or(false),
+            extended.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
             &stats_cloned,
             None,
@@ -259,8 +256,7 @@ pub struct Count {
     // Options
     root_path: String,
     skip_hidden: bool,
-    metadata: bool,
-    metadata_ext: bool,
+    extended: bool,
     max_depth: usize,
     // Results
     statistics: Arc<Mutex<Statistics>>,
@@ -296,8 +292,7 @@ impl Count {
         }
         let root_path = String::from(&self.root_path);
         let skip_hidden = self.skip_hidden;
-        let metadata = self.metadata;
-        let metadata_ext = self.metadata_ext;
+        let extended = self.extended;
         let max_depth = self.max_depth;
         let statistics = self.statistics.clone();
         let alive = Arc::new(AtomicBool::new(true));
@@ -306,8 +301,7 @@ impl Count {
             rs_count(
                 &root_path,
                 skip_hidden,
-                metadata,
-                metadata_ext,
+                extended,
                 max_depth,
                 &statistics,
                 Some(alive))
@@ -339,15 +333,13 @@ impl Count {
         obj: &PyRawObject,
         root_path: &str,
         skip_hidden: Option<bool>,
-        metadata: Option<bool>,
-        metadata_ext: Option<bool>,
+        extended: Option<bool>,
         max_depth: Option<usize>,
     ) {
         obj.init(Count {
             root_path: String::from(root_path),
             skip_hidden: skip_hidden.unwrap_or(false),
-            metadata: metadata.unwrap_or(false),
-            metadata_ext: metadata_ext.unwrap_or(false),
+            extended: extended.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
             statistics: Arc::new(Mutex::new(Statistics {
                 dirs: 0,
@@ -417,8 +409,7 @@ impl Count {
             rs_count(
                 &self.root_path,
                 self.skip_hidden,
-                self.metadata,
-                self.metadata_ext,
+                self.extended,
                 self.max_depth,
                 &self.statistics,
                 None);

@@ -11,7 +11,7 @@ If your are just interested in directory statistics you can use the submodule ``
 
 - ``count`` for determining statistics of a directory.
 - ``walk`` for getting names of directory entries.
-- ``scandir`` fir getting detailed stats of directory entries.
+- ``scandir`` for getting detailed stats of directory entries.
 
 For the API see:
 

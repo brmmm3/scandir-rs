@@ -35,7 +35,7 @@ Same as above but with one additional parameter:
 
 ### Iteration types
 
-- ``ITER_TYPE_TOC`` returned data is a list of relative paths (same as returned by method ``toc``).
+- ``ITER_TYPE_TOC`` returned data is a ``Toc`` object.
 - ``ITER_TYPE_WALK`` returned data is same as returned by ``os.walk``. This is the default since version 0.7.2.
 - ``ITER_TYPE_WALKEXT`` returned data contains additional groups: ``symlinks``, ``other`` and ``errors``.
 

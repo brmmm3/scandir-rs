@@ -389,7 +389,7 @@ impl Walk {
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
-            iter_type: iter_type.unwrap_or(ITER_TYPE_TOC),
+            iter_type: iter_type.unwrap_or(ITER_TYPE_WALK),
             toc: Arc::new(Mutex::new(Toc {
                 dirs: Vec::new(),
                 files: Vec::new(),

@@ -168,13 +168,16 @@ fn rs_entries(
     skip_hidden: bool,
     metadata: bool,
     metadata_ext: bool,
-    max_depth: usize,
+    mut max_depth: usize,
     result: Arc<Mutex<Entries>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
     let start_time = Instant::now();
+    if max_depth == 0 {
+        max_depth = ::std::usize::MAX;
+    }
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)
@@ -202,13 +205,16 @@ fn rs_entries_iter(
     skip_hidden: bool,
     metadata: bool,
     metadata_ext: bool,
-    max_depth: usize,
+    mut max_depth: usize,
     alive: Option<Arc<AtomicBool>>,
     tx: Option<channel::Sender<Entry>>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
     let start_time = Instant::now();
+    if max_depth == 0 {
+        max_depth = ::std::usize::MAX;
+    }
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)

@@ -43,7 +43,7 @@ pub fn rs_toc(
     root_path: String,
     sorted: bool,
     skip_hidden: bool,
-    max_depth: usize,
+    mut max_depth: usize,
     toc: Arc<Mutex<Toc>>,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
@@ -51,6 +51,9 @@ pub fn rs_toc(
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
     let start_time = Instant::now();
+    if max_depth == 0 {
+        max_depth = ::std::usize::MAX;
+    }
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)
@@ -78,13 +81,16 @@ pub fn rs_toc_iter(
     root_path: String,
     sorted: bool,
     skip_hidden: bool,
-    max_depth: usize,
+    mut max_depth: usize,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
     tx: channel::Sender<IterResult>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
+    if max_depth == 0 {
+        max_depth = ::std::usize::MAX;
+    }
     let start_time = Instant::now();
     let mut toc = Toc {
         dirs: Vec::new(),
@@ -138,13 +144,16 @@ pub fn rs_walk_iter(
     root_path: String,
     sorted: bool,
     skip_hidden: bool,
-    max_depth: usize,
+    mut max_depth: usize,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
     tx: channel::Sender<IterResult>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
+    if max_depth == 0 {
+        max_depth = ::std::usize::MAX;
+    }
     let start_time = Instant::now();
     let mut list: Vec<String> = Vec::new();
     let mut map: HashMap<String, Toc> = HashMap::new();

@@ -92,7 +92,7 @@ fn rs_count(
     skip_hidden: bool,
     metadata: bool,
     metadata_ext: bool,
-    max_depth: usize,
+    mut max_depth: usize,
     statistics: &Arc<Mutex<Statistics>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
@@ -112,6 +112,9 @@ fn rs_count(
     let mut cnt: u32 = 0;
     let start_time = Instant::now();
     let mut update_time = Instant::now();
+    if max_depth == 0 {
+        max_depth = ::std::usize::MAX;
+    }
     for entry in WalkDir::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(false)

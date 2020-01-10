@@ -1,5 +1,4 @@
-`scandir-rs`
-============
+# `scandir-rs`
 
 ``scandir_rs`` is a directory iteration module like ``os.walk()``,
 but with more features and higher speed. Depending on the function call
@@ -8,18 +7,68 @@ with the name. Using ``scandir_rs`` is about **2-17 times faster** than ``os.wal
 
 If your are just interested in directory statistics you can use the submodule ``count``.
 
+``scandir_rs`` contains following submodules:
+
+- ``count`` for determining statistics of a directory.
+- ``walk`` for getting names of directory entries.
+- ``scandir`` fir getting detailed stats of directory entries.
+
 For the API see [doc/API.md](doc/API.md)
 
-Benchmarks
-----------
+## Examples
+
+Get statistics of a directory:
+
+```python
+import scandir_rs as scandir
+print(scandir.count.count("~/workspace", metadata_ext=True))
+```
+
+The same, but asynchronously in background using a class instance and a context manager:
+
+```python
+import scandir_rs as scandir
+C = scandir.count.Count("~/workspace", metadata_ext=True))
+with C:
+    while C.busy():
+        statistics = C.statistics
+        # Do something
+```
+
+``os.walk()`` example:
+
+```python
+import scandir_rs as scandir
+for root, dirs, files in scandir.walk.Walk("~/workspace", iter_type=scandir.ITER_TYPE_WALK):
+    # Do something
+```
+
+``os.scandir()`` example:
+
+```python
+import scandir_rs as scandir
+for entry in scandir.scandir.Scandir("~/workspace", metadata_ext=True):
+    # Do something
+```
+
+## Benchmarks
 
 See [examples/benchmark.py](examples/benchmark.py)
 
 In the below table the line **scandir_rs.walk.Walk** returns comparable
 results to os.walk.
 
+### Linux with Ryzen 5 2400G and SSD
 
-**~/workspace: dirs: 22845, files: 321354, slinks: 130, hlinks: 22849, devices: 4, pipes: 1, size: 4.6GB, usage: 5.4GB on Linux with Ryzen 5 2400G and SSD**
+#### Directory *~/workspace* with
+
+- 22845 directories
+- 321354 files
+- 130 symlinks
+- 22849 hardlinks
+- 4 devices
+- 1 pipes
+- 4.6GB size and 5.4GB usage on disk
 
 | Time [s] | Method                                              |
 |----------|-----------------------------------------------------|
@@ -38,7 +87,13 @@ results to os.walk.
 
 Up to **2 times faster** on Linux.
 
-**C:\Windows: dirs: 84248, files: 293108, size: 44.4GB, usage: 45.2GB on Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD**
+### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
+
+#### Directory *C:\Windows* with
+
+- 84248 directories
+- 293108 files
+- 44.4GB size and 45.2GB usage on disk
 
 | Time [s] | Method                                              |
 |----------|-----------------------------------------------------|
@@ -57,7 +112,12 @@ Up to **2 times faster** on Linux.
 
 Up to **6.7 times faster** on Windows 10.
 
-**C:\testdir: dirs: 185563, files: 1641277, slinks: 2696, size: 97GB, usage: 100.5GB on Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD**
+#### Directory *C:\testdir* with
+
+- 185563 directories
+- 1641277 files
+- 2696 symlinks
+- 97GB size and 100.5GB usage on disk
 
 | Time [s] | Method                                              |
 |----------|-----------------------------------------------------|

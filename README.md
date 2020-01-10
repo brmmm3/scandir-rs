@@ -13,7 +13,11 @@ If your are just interested in directory statistics you can use the submodule ``
 - ``walk`` for getting names of directory entries.
 - ``scandir`` fir getting detailed stats of directory entries.
 
-For the API see [doc/API.md](doc/API.md)
+For the API see:
+
+- Submodule ``count`` [doc/count.md](doc/count.md)
+- Submodule ``walk`` [doc/walk.md](doc/walk.md)
+- Submodule ``scandir`` [doc/scandir.md](doc/scandir.md)
 
 ## Examples
 

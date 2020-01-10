@@ -10,9 +10,9 @@ mod tests {
         let gil = Python::acquire_gil();
         let py = gil.python();
         #[cfg(unix)]
-        println!("{:#?}", count(py, String::from("/usr"), Some(false), Some(false), Some(false), None).unwrap());
+        println!("{:#?}", count(py, String::from("/usr"), Some(false), Some(false), None).unwrap());
         #[cfg(windows)]
-        println!("{:#?}", count(py, String::from("C:/Windows"), Some(false), Some(false), Some(false), None).unwrap());
+        println!("{:#?}", count(py, String::from("C:/Windows"), Some(false), Some(false), None).unwrap());
     }
 
     #[test]
@@ -21,9 +21,9 @@ mod tests {
         let py = gil.python();
 
         #[cfg(unix)]
-        count(py, String::from("/usr"), Some(true), Some(false), Some(false), None).unwrap();
+        count(py, String::from("/usr"), Some(true), Some(false), None).unwrap();
         #[cfg(windows)]
-        count(py, String::from("C:/Windows"), Some(true), Some(false), Some(false), None).unwrap();
+        count(py, String::from("C:/Windows"), Some(false), Some(false), None).unwrap();
     }
 
     #[test]
@@ -32,9 +32,9 @@ mod tests {
         let py = gil.python();
 
         #[cfg(unix)]
-        println!("{:#?}", count(py, String::from("/usr"), Some(true), Some(true), Some(false), None).unwrap());
+        println!("{:#?}", count(py, String::from("/usr"), Some(true), Some(false), None).unwrap());
         #[cfg(windows)]
-        println!("{:#?}", count(py, String::from("C:/Windows"), Some(true), Some(true), Some(false), None).unwrap());
+        println!("{:#?}", count(py, String::from("C:/Windows"), Some(true), Some(false), None).unwrap());
     }
 
     #[test]
@@ -43,8 +43,8 @@ mod tests {
         let py = gil.python();
 
         #[cfg(unix)]
-        count(py, String::from("/usr"), Some(true), Some(true), Some(true), None).unwrap();
+        count(py, String::from("/usr"), Some(true), Some(true), None).unwrap();
         #[cfg(windows)]
-        count(py, String::from("C:/Windows"), Some(true), Some(true), Some(true), None).unwrap();
+        count(py, String::from("C:/Windows"), Some(true), Some(true), None).unwrap();
     }
 }

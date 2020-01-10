@@ -4,7 +4,7 @@
 
 The ``Statistics`` class is the return value of method ``count``, also of property ``statistics`` and class method ``collect`` of class ``Count``.
 
-### It has collowing class members
+### ``Statistics`` has collowing class members
 
 - ``dirs`` contains number of directories.
 - ``files`` contains number of files.

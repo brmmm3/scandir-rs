@@ -28,17 +28,37 @@ The ``Entry`` class is a property of the ``Entries`` class.
 - ``ctime`` creation time in seconds as float.
 - ``mtime`` modification time in seconds as float.
 - ``atime`` access time in seconds as float.
+- ``mode`` file access mode.
+- ``ino`` inode number (only for Unix).
+- ``dev`` device number (only for Unix).
+- ``nlink`` number of hard links.
+- ``size`` size of entry.
+- ``blksize`` block size of file system.
+- ``blocks`` number of blocks used.
+- ``uid`` user id (only for Unix).
+- ``gid`` groud id (only for Unix).
+- ``rdev`` device number (for character and block devices on Unix).
 
-    pub mode: u32,
-    pub ino: u64,
-    pub dev: u64,
-    pub nlink: u64,
-    pub size: u64,
-    pub blksize: u64,
-    pub blocks: u64,
-    pub uid: u32,
-    pub gid: u32,
-    pub rdev: u64,
+## ``entries(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0)``
+
+Scans directory provided through parameter ``root_path`` and returns an ``Entries`` object. This function is blocking and releases the GIL.
+
+### Parameters
+
+- ``root_path`` is directory to scan. ``~`` is allowed on Unix systems.
+- ``sorted`` if ``True`` alphabetically sort results.
+- ``skip_hidden`` if ``True`` ignore all hidden files and directories.
+- ``metadata`` if ``True`` also fetch some metadata.
+- ``metadata_ext`` if ``True`` also fetch extended metadata.
+- ``max_depth`` is maximum depth of iteration. If ``0`` then depth limit is disabled.
+
+## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0)``
+
+Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
+
+### ``entries``
+
+Returns an ``Entries`` object with the current results. The internal results object will be cleared after this call.
 
 ### ``has_results()``
 

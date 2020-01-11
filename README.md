@@ -19,6 +19,30 @@ For the API see:
 - Submodule ``walk`` [doc/walk.md](doc/walk.md)
 - Submodule ``scandir`` [doc/scandir.md](doc/scandir.md)
 
+## Installation
+
+For building this wheel from source you need Rust with channel ``nightly`` and the tool ``maturin``.
+
+Switch to channel ``nightly``:
+
+```sh
+rustup default nightly
+```
+
+Install ``maturin``:
+
+```sh
+cargo install maturin
+```
+
+Build wheel:
+
+```sh
+maturin build --release
+```
+
+``maturin`` will build the wheels for all Python versions installed on your system.
+
 ## Examples
 
 Get statistics of a directory:

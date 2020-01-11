@@ -16,8 +16,8 @@ If your are just interested in directory statistics you can use the submodule ``
 For the API see:
 
 - Submodule ``count`` [doc/count.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/count.md)
-- Submodule ``walk`` [doc/walk.md]([doc](https://github.com/brmmm3/scandir-rs/blob/master/doc)/walk.md)
-- Submodule ``scandir`` [doc/scandir.md]([doc](https://github.com/brmmm3/scandir-rs/blob/master/doc)/scandir.md)
+- Submodule ``walk`` [doc/walk.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/walk.md)
+- Submodule ``scandir`` [doc/scandir.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/scandir.md)
 
 ## Installation
 

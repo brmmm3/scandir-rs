@@ -49,13 +49,28 @@ Get statistics of a directory:
 
 ```python
 import scandir_rs as scandir
+
 print(scandir.count.count("~/workspace", metadata_ext=True))
 ```
 
-The same, but asynchronously in background using a class instance and a context manager:
+The same, but asynchronously in background using a class instance:
 
 ```python
 import scandir_rs as scandir
+
+scanner = scandir.count.Count("~/workspace", metadata_ext=True))
+scanner.start())  # Start background thread pool
+...
+value = scanner.statistics  # Can be read at any time
+...
+scanner.stop()  # If you want to cancel the scanner
+```
+
+and with a context manager:
+
+```python
+import scandir_rs as scandir
+
 C = scandir.count.Count("~/workspace", metadata_ext=True))
 with C:
     while C.busy():
@@ -67,7 +82,8 @@ with C:
 
 ```python
 import scandir_rs as scandir
-for root, dirs, files in scandir.walk.Walk("~/workspace", iter_type=scandir.ITER_TYPE_WALK):
+
+for root, dirs, files in scandir.walk.Walk("~/workspace"):
     # Do something
 ```
 
@@ -75,13 +91,14 @@ for root, dirs, files in scandir.walk.Walk("~/workspace", iter_type=scandir.ITER
 
 ```python
 import scandir_rs as scandir
+
 for entry in scandir.scandir.Scandir("~/workspace", metadata_ext=True):
     # Do something
 ```
 
 ## Benchmarks
 
-See [examples/benchmark.py](examples/benchmark.py)
+See [examples/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/examples/benchmark.py)
 
 In the below table the line **scandir_rs.walk.Walk** returns comparable
 results to os.walk.

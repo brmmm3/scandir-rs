@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
@@ -13,13 +13,15 @@ use jwalk::WalkDir;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyType, PyAny, PyTuple, PyDict};
-use pyo3::{Python, wrap_pyfunction, PyContextProtocol, PyIterProtocol};
+use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
+use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
 use crate::def::*;
 
-fn update_toc(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
-              toc: &mut Toc) {
+fn update_toc(
+    entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
+    toc: &mut Toc,
+) {
     match &entry {
         Ok(v) => {
             let file_type = v.file_type_result.as_ref().unwrap();
@@ -35,7 +37,7 @@ fn update_toc(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, 
                 toc.other.push(key.to_str().unwrap().to_string());
             }
         }
-        Err(e) => toc.errors.push(e.to_string()),  // TODO: Need to fetch failed path from somewhere
+        Err(e) => toc.errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere
     }
 }
 
@@ -62,17 +64,19 @@ pub fn rs_toc(
         let mut toc_locked = toc.lock().unwrap();
         update_toc(&entry, toc_locked.deref_mut());
         match &alive {
-            Some(a) => if !a.load(Ordering::Relaxed) {
-                break;
-            },
-            None => {},
+            Some(a) => {
+                if !a.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+            None => {}
         }
     }
     match &duration {
         Some(d) => {
             let dt = start_time.elapsed().as_millis() as f64;
             d.store(dt.to_bits(), Ordering::Relaxed);
-        },
+        }
         None => {}
     }
 }
@@ -122,9 +126,11 @@ pub fn rs_toc_iter(
             send = true;
         }
         match &alive {
-            Some(a) => if !a.load(Ordering::Relaxed) {
-                break;
-            },
+            Some(a) => {
+                if !a.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
             None => {}
         }
     }
@@ -135,7 +141,7 @@ pub fn rs_toc_iter(
         Some(d) => {
             let dt = start_time.elapsed().as_millis() as f64;
             d.store(dt.to_bits(), Ordering::Relaxed);
-        },
+        }
         None => {}
     }
 }
@@ -173,13 +179,16 @@ pub fn rs_walk_iter(
                 } else if file_type.is_dir() {
                     let path = v.path().to_str().unwrap().to_string();
                     list.push(path.clone());
-                    map.insert(path, Toc {
-                        dirs: Vec::new(),
-                        files: Vec::new(),
-                        symlinks: Vec::new(),
-                        other: Vec::new(),
-                        errors: Vec::new(),
-                    });
+                    map.insert(
+                        path,
+                        Toc {
+                            dirs: Vec::new(),
+                            files: Vec::new(),
+                            symlinks: Vec::new(),
+                            other: Vec::new(),
+                            errors: Vec::new(),
+                        },
+                    );
                     match map.get_mut(&dir) {
                         Some(toc) => toc.dirs.push(file_name),
                         None => {}
@@ -189,13 +198,15 @@ pub fn rs_walk_iter(
                 } else {
                     map.get_mut(&dir).unwrap().other.push(file_name);
                 }
-            },
-            Err(e) => errors.push(e.to_string()),  // TODO: Need to fetch failed path from somewhere
+            }
+            Err(e) => errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere
         }
         match &alive {
-            Some(a) => if !a.load(Ordering::Relaxed) {
-                break;
-            },
+            Some(a) => {
+                if !a.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
             None => {}
         }
     }
@@ -203,15 +214,19 @@ pub fn rs_walk_iter(
         Some(d) => {
             let dt = start_time.elapsed().as_millis() as f64;
             d.store(dt.to_bits(), Ordering::Relaxed);
-        },
+        }
         None => {}
     }
     for key in list {
-        if tx.send(IterResult::WalkEntry(WalkEntry {
-             path: key.clone(),
-             toc: map.get(&key).unwrap().clone() })).is_err() {
-                 break;
-             }
+        if tx
+            .send(IterResult::WalkEntry(WalkEntry {
+                path: key.clone(),
+                toc: map.get(&key).unwrap().clone(),
+            }))
+            .is_err()
+        {
+            break;
+        }
     }
 }
 
@@ -239,7 +254,7 @@ pub fn toc(
             max_depth.unwrap_or(::std::usize::MAX),
             toc_cloned,
             None,
-            None
+            None,
         );
         Ok(())
     });
@@ -288,14 +303,12 @@ impl Walk {
             self.max_depth,
             self.toc.clone(),
             Some(self.duration.clone()),
-            None
+            None,
         );
         self.has_results = true;
     }
 
-    fn rs_start(&mut self,
-        tx: Option<channel::Sender<IterResult>>,
-    ) -> bool {
+    fn rs_start(&mut self, tx: Option<channel::Sender<IterResult>>) -> bool {
         if self.thr.is_some() {
             return false;
         }
@@ -319,7 +332,8 @@ impl Walk {
                     max_depth,
                     toc,
                     Some(duration),
-                    Some(alive))
+                    Some(alive),
+                )
             }));
         } else {
             if self.iter_type == ITER_TYPE_TOC {
@@ -331,7 +345,8 @@ impl Walk {
                         max_depth,
                         Some(duration),
                         Some(alive),
-                        tx.unwrap())
+                        tx.unwrap(),
+                    )
                 }));
             } else {
                 self.thr = Some(thread::spawn(move || {
@@ -342,7 +357,8 @@ impl Walk {
                         max_depth,
                         Some(duration),
                         Some(alive),
-                        tx.unwrap())
+                        tx.unwrap(),
+                    )
                 }));
             }
         }
@@ -430,16 +446,24 @@ impl Walk {
             pyresult.set_item("dirs", toc_locked.dirs.to_vec()).unwrap();
         }
         if !toc_locked.files.is_empty() {
-            pyresult.set_item("files", toc_locked.files.to_vec()).unwrap();
+            pyresult
+                .set_item("files", toc_locked.files.to_vec())
+                .unwrap();
         }
         if !toc_locked.symlinks.is_empty() {
-            pyresult.set_item("symlinks", toc_locked.symlinks.to_vec()).unwrap();
+            pyresult
+                .set_item("symlinks", toc_locked.symlinks.to_vec())
+                .unwrap();
         }
         if !toc_locked.other.is_empty() {
-            pyresult.set_item("other", toc_locked.other.to_vec()).unwrap();
+            pyresult
+                .set_item("other", toc_locked.other.to_vec())
+                .unwrap();
         }
         if !toc_locked.errors.is_empty() {
-            pyresult.set_item("errors", toc_locked.errors.to_vec()).unwrap();
+            pyresult
+                .set_item("errors", toc_locked.errors.to_vec())
+                .unwrap();
         }
         toc_locked.deref_mut().clear();
         Ok(pyresult.into())
@@ -528,10 +552,17 @@ impl<'p> PyIterProtocol for Walk {
                             let mut files = entry.toc.files.to_vec();
                             files.append(&mut entry.toc.symlinks);
                             files.append(&mut entry.toc.other);
-                            Ok(Some(PyTuple::new(py,
-                                &[entry.path.to_object(py),
-                                  entry.toc.dirs.to_object(py),
-                                  files.to_object(py)]).into()))
+                            Ok(Some(
+                                PyTuple::new(
+                                    py,
+                                    &[
+                                        entry.path.to_object(py),
+                                        entry.toc.dirs.to_object(py),
+                                        files.to_object(py),
+                                    ],
+                                )
+                                .into(),
+                            ))
                         }
                     }
                 },

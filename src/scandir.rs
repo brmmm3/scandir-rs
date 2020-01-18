@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{UNIX_EPOCH, Instant};
-use std::thread;
 use std::sync::{Arc, Mutex, Weak};
+use std::thread;
+use std::time::{Instant, UNIX_EPOCH};
 
 use crossbeam_channel as channel;
 #[cfg(unix)]
@@ -10,8 +10,8 @@ use jwalk::WalkDir;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyType, PyAny, PyTuple, PyDict};
-use pyo3::{Python, wrap_pyfunction, PyContextProtocol, PyIterProtocol};
+use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
+use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
 use crate::def::*;
 
@@ -32,9 +32,18 @@ impl ToPyObject for Entry {
     #[inline]
     fn to_object(&self, py: Python) -> PyObject {
         match &self.entry {
-            Stats::DirEntry(e) => PyTuple::new(py, &[self.path.to_object(py), PyRef::new(py, e.clone()).unwrap().to_object(py)]).into(),
+            Stats::DirEntry(e) => PyTuple::new(
+                py,
+                &[
+                    self.path.to_object(py),
+                    PyRef::new(py, e.clone()).unwrap().to_object(py),
+                ],
+            )
+            .into(),
             Stats::Error(e) => PyTuple::new(py, &[self.path.to_object(py), e.to_object(py)]).into(),
-            Stats::Duration(e) => PyTuple::new(py, &[self.path.to_object(py), e.to_object(py)]).into(),
+            Stats::Duration(e) => {
+                PyTuple::new(py, &[self.path.to_object(py), e.to_object(py)]).into()
+            }
         }
     }
 }
@@ -55,7 +64,7 @@ impl Entries {
 
     #[getter]
     fn duration(&self) -> PyResult<f64> {
-       Ok(self.duration)
+        Ok(self.duration)
     }
 }
 
@@ -66,7 +75,9 @@ impl pyo3::class::PyObjectProtocol for Entries {
     }
 }
 
-fn create_entry(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>) -> Entry {
+fn create_entry(
+    entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
+) -> Entry {
     match entry {
         Ok(v) => {
             let file_type = v.file_type_result.as_ref().unwrap();
@@ -149,16 +160,16 @@ fn create_entry(entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>
                 gid: gid,
                 rdev: rdev,
             };
-            Entry{
+            Entry {
                 path: key.to_str().unwrap().to_string(),
                 entry: Stats::DirEntry(entry),
             }
-        },
+        }
         // TODO: Need to fetch failed path from somewhere
         Err(e) => Entry {
             path: String::from("?"),
             entry: Stats::Error(e.to_string()),
-        }
+        },
     }
 }
 
@@ -190,10 +201,12 @@ fn rs_entries(
         result_locked.entries.push(entry);
         result_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
         match &alive {
-            Some(a) => if !a.load(Ordering::Relaxed) {
-                break;
-            },
-            None => {},
+            Some(a) => {
+                if !a.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+            None => {}
         }
     }
     result.lock().unwrap().duration = start_time.elapsed().as_millis() as f64 * 0.001;
@@ -228,14 +241,16 @@ fn rs_entries_iter(
                 if tx.send(entry).is_err() {
                     return;
                 }
-            },
-            None => {},
+            }
+            None => {}
         }
         match &alive {
-            Some(a) => if !a.load(Ordering::Relaxed) {
-                break;
-            },
-            None => {},
+            Some(a) => {
+                if !a.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+            None => {}
         }
     }
     match &tx {
@@ -244,7 +259,7 @@ fn rs_entries_iter(
                 path: String::from("?"),
                 entry: Stats::Duration(start_time.elapsed().as_millis() as f64 * 0.001),
             });
-        },
+        }
         None => {}
     }
 }
@@ -273,7 +288,7 @@ pub fn entries(
             metadata_ext.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
             result_cloned,
-            None
+            None,
         );
         Ok(())
     });
@@ -310,9 +325,7 @@ impl Scandir {
         entries_locked.entries.clear();
     }
 
-    fn rs_start(&mut self,
-        tx: Option<channel::Sender<Entry>>,
-    ) -> bool {
+    fn rs_start(&mut self, tx: Option<channel::Sender<Entry>>) -> bool {
         if self.thr.is_some() {
             return false;
         }
@@ -351,7 +364,7 @@ impl Scandir {
                     Some(alive),
                     tx,
                 )
-        }
+            }
         }));
         true
     }
@@ -416,9 +429,11 @@ impl Scandir {
         let pyresult = PyDict::new(py);
         for entry in &entries_locked.entries {
             match &entry.entry {
-                Stats::DirEntry(e) => pyresult.set_item(entry.path.to_object(py), PyRef::new(py, e.clone()).unwrap()).unwrap(),
+                Stats::DirEntry(e) => pyresult
+                    .set_item(entry.path.to_object(py), PyRef::new(py, e.clone()).unwrap())
+                    .unwrap(),
                 Stats::Error(e) => pyresult.set_item(entry.path.to_object(py), e).unwrap(),
-                Stats::Duration(_) => {},
+                Stats::Duration(_) => {}
             }
         }
         Ok(pyresult.into())
@@ -433,7 +448,7 @@ impl Scandir {
             self.metadata_ext,
             self.max_depth,
             self.entries.clone(),
-            None
+            None,
         );
         Ok(Arc::clone(&self.entries).lock().unwrap().clone())
     }

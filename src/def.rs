@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
-use pyo3::PyObjectProtocol;
 use pyo3::types::PyTuple;
+use pyo3::PyObjectProtocol;
 
 pub const ITER_TYPE_TOC: u8 = 0;
 pub const ITER_TYPE_WALK: u8 = 1;
@@ -68,6 +68,83 @@ impl DirEntry {
             rdev: rdev,
         });
     }
+
+    fn is_symlink(&self) -> PyResult<bool> {
+        Ok(self.is_symlink.into())
+    }
+
+    fn is_dir(&self) -> PyResult<bool> {
+        Ok(self.is_dir.into())
+    }
+
+    fn is_file(&self) -> PyResult<bool> {
+        Ok(self.is_file.into())
+    }
+
+    #[getter]
+    fn ctime(&self) -> PyResult<f64> {
+        Ok(self.ctime.into())
+    }
+
+    #[getter]
+    fn mtime(&self) -> PyResult<f64> {
+        Ok(self.mtime.into())
+    }
+
+    #[getter]
+    fn atime(&self) -> PyResult<f64> {
+        Ok(self.atime.into())
+    }
+
+    #[getter]
+    fn mode(&self) -> PyResult<u32> {
+        Ok(self.mode.into())
+    }
+
+    #[getter]
+    fn ino(&self) -> PyResult<u64> {
+        Ok(self.ino.into())
+    }
+
+    #[getter]
+    fn dev(&self) -> PyResult<u64> {
+        Ok(self.dev.into())
+    }
+
+    #[getter]
+    fn nlink(&self) -> PyResult<u64> {
+        Ok(self.nlink.into())
+    }
+
+    #[getter]
+    fn size(&self) -> PyResult<u64> {
+        Ok(self.size.into())
+    }
+
+    #[getter]
+    fn blksize(&self) -> PyResult<u64> {
+        Ok(self.blksize.into())
+    }
+
+    #[getter]
+    fn blocks(&self) -> PyResult<u64> {
+        Ok(self.blocks.into())
+    }
+
+    #[getter]
+    fn uid(&self) -> PyResult<u32> {
+        Ok(self.uid.into())
+    }
+
+    #[getter]
+    fn gid(&self) -> PyResult<u32> {
+        Ok(self.gid.into())
+    }
+
+    #[getter]
+    fn rdev(&self) -> PyResult<u64> {
+        Ok(self.rdev.into())
+    }
 }
 
 #[pyproto]
@@ -133,11 +210,17 @@ impl Toc {
 impl ToPyObject for Toc {
     #[inline]
     fn to_object(&self, py: Python) -> PyObject {
-        PyTuple::new(py, &[self.dirs.to_object(py),
-                           self.files.to_object(py),
-                           self.symlinks.to_object(py),
-                           self.other.to_object(py),
-                           self.errors.to_object(py)]).into()
+        PyTuple::new(
+            py,
+            &[
+                self.dirs.to_object(py),
+                self.files.to_object(py),
+                self.symlinks.to_object(py),
+                self.other.to_object(py),
+                self.errors.to_object(py),
+            ],
+        )
+        .into()
     }
 }
 
@@ -158,13 +241,18 @@ impl pyo3::class::PyObjectProtocol for WalkEntry {
 impl ToPyObject for WalkEntry {
     #[inline]
     fn to_object(&self, py: Python) -> PyObject {
-        PyTuple::new(py,
-            &[self.path.to_object(py),
-              self.toc.dirs.to_object(py),
-              self.toc.files.to_object(py),
-              self.toc.symlinks.to_object(py),
-              self.toc.other.to_object(py),
-              self.toc.errors.to_object(py)]).into()
+        PyTuple::new(
+            py,
+            &[
+                self.path.to_object(py),
+                self.toc.dirs.to_object(py),
+                self.toc.files.to_object(py),
+                self.toc.symlinks.to_object(py),
+                self.toc.other.to_object(py),
+                self.toc.errors.to_object(py),
+            ],
+        )
+        .into()
     }
 }
 

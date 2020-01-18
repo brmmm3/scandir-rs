@@ -5,11 +5,11 @@ use pyo3::wrap_pymodule;
 
 mod def;
 use def::*;
-mod count;
+pub mod count;
 use count::*;
-mod walk;
+pub mod walk;
 use walk::*;
-mod scandir;
+pub mod scandir;
 use scandir::*;
 mod test;
 

@@ -1,7 +1,8 @@
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
-use std::thread;
 use std::sync::{Arc, Mutex, Weak};
+use std::thread;
+use std::time::Instant;
 
 #[cfg(unix)]
 use expanduser::expanduser;
@@ -9,8 +10,8 @@ use jwalk::WalkDir;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyType, PyAny, PyDict};
-use pyo3::{Python, wrap_pyfunction, PyContextProtocol};
+use pyo3::types::{PyAny, PyDict, PyType};
+use pyo3::{wrap_pyfunction, PyContextProtocol, Python};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -90,7 +91,7 @@ impl Statistics {
 fn rs_count(
     root_path: &String,
     skip_hidden: bool,
-    extended: bool,
+    extended: bool,  // If true: Count also hardlinks, devices, pipes, size and usage
     mut max_depth: usize,
     statistics: &Arc<Mutex<Statistics>>,
     alive: Option<Arc<AtomicBool>>,
@@ -111,6 +112,7 @@ fn rs_count(
     let mut cnt: u32 = 0;
     let start_time = Instant::now();
     let mut update_time = Instant::now();
+    let mut file_indexes: HashSet<u64> = HashSet::new();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
@@ -136,7 +138,11 @@ fn rs_count(
                     if metadata_ext.is_some() {
                         let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
                         if metadata_ext.nlink > 1 {
-                            hlinks += 1;
+                            if file_indexes.contains(&metadata_ext.ino) {
+                                hlinks += 1;
+                            } else {
+                                file_indexes.insert(metadata_ext.ino);
+                            }
                         }
                         size += metadata_ext.size;
                         #[cfg(unix)]
@@ -285,7 +291,7 @@ impl Count {
 
     fn rs_start(&mut self) -> bool {
         if self.thr.is_some() {
-            return false
+            return false;
         }
         if self.has_results {
             self.rs_init();
@@ -304,7 +310,8 @@ impl Count {
                 extended,
                 max_depth,
                 &statistics,
-                Some(alive))
+                Some(alive),
+            )
         }));
         true
     }
@@ -318,7 +325,7 @@ impl Count {
             None => {}
         }
         if self.thr.is_none() {
-            return false
+            return false;
         }
         self.thr.take().map(thread::JoinHandle::join);
         self.has_results = true;
@@ -366,7 +373,7 @@ impl Count {
 
     fn has_results(&self) -> PyResult<bool> {
         Ok(self.has_results)
-     }
+    }
 
     fn as_dict(&self) -> PyResult<PyObject> {
         let gil = GILGuard::acquire();
@@ -397,9 +404,13 @@ impl Count {
             pyresult.set_item("usage", stats_locked.usage).unwrap();
         }
         if !stats_locked.errors.is_empty() {
-            pyresult.set_item("errors", stats_locked.errors.to_vec()).unwrap();
+            pyresult
+                .set_item("errors", stats_locked.errors.to_vec())
+                .unwrap();
         }
-        pyresult.set_item("duration", stats_locked.duration().unwrap()).unwrap();
+        pyresult
+            .set_item("duration", stats_locked.duration().unwrap())
+            .unwrap();
         Ok(pyresult.to_object(gil.python()))
     }
 
@@ -412,7 +423,8 @@ impl Count {
                 self.extended,
                 self.max_depth,
                 &self.statistics,
-                None);
+                None,
+            );
             Ok(())
         });
         match rc {
@@ -425,14 +437,14 @@ impl Count {
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start() {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"))
+            return Err(exceptions::RuntimeError::py_err("Thread already running"));
         }
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::RuntimeError::py_err("Thread not running"))
+            return Err(exceptions::RuntimeError::py_err("Thread not running"));
         }
         Ok(true)
     }

@@ -11,7 +11,7 @@ GC support currently NOT working!
 import gc
 
 def test():
-    C = r.count.Count("~/workspace", metadata_ext=True)
+    C = r.count.Count("~/workspace", extended=True)
     C.start()
     del C
 
@@ -21,7 +21,7 @@ gc.collect()
 sys.exit()
 """
 
-C = r.count.Count("~/workspace", metadata_ext=True)
+C = r.count.Count("~/workspace", extended=True)
 
 with C:
     while C.busy():
@@ -29,10 +29,10 @@ with C:
         time.sleep(0.01)
 print("FINISHED")
 print(C.statistics)
-print(r.count.Count("~/workspace", metadata_ext=True).collect())
-print(r.count.count("~/workspace", metadata_ext=True))
+print(r.count.Count("~/workspace", extended=True).collect())
+print(r.count.count("~/workspace", extended=True))
 
-C = r.count.Count("~/workspace", metadata_ext=True)
+C = r.count.Count("~/workspace", extended=True)
 C.start()
 print(C.busy())
 print(dir(C))

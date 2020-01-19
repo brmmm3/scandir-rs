@@ -36,7 +36,7 @@ if __name__ == "__main__":
     t1 = time.time()
     thr = Counter()
     thr.start()
-    c = r.count(root, metadata_ext=True)
+    c = r.count(root, extended=True)
     thr.stop()
     dt = time.time() - t1
     print(c)

@@ -13,7 +13,7 @@ else:
 print(f"Benchmarking directory: {dirName}")
 if os.name != 'nt':
     dirName = os.path.expanduser(dirName)
-print(r.count.count(dirName, metadata_ext=True))
+print(r.count.count(dirName, extended=True))
 print()
 
 t1 = time.time()

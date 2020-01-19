@@ -50,7 +50,7 @@ Get statistics of a directory:
 ```python
 import scandir_rs as scandir
 
-print(scandir.count.count("~/workspace", metadata_ext=True))
+print(scandir.count.count("~/workspace", extended=True))
 ```
 
 The same, but asynchronously in background using a class instance:
@@ -58,7 +58,7 @@ The same, but asynchronously in background using a class instance:
 ```python
 import scandir_rs as scandir
 
-scanner = scandir.count.Count("~/workspace", metadata_ext=True))
+scanner = scandir.count.Count("~/workspace", extended=True))
 scanner.start())  # Start background thread pool
 ...
 value = scanner.statistics  # Can be read at any time
@@ -71,7 +71,7 @@ and with a context manager:
 ```python
 import scandir_rs as scandir
 
-C = scandir.count.Count("~/workspace", metadata_ext=True))
+C = scandir.count.Count("~/workspace", extended=True))
 with C:
     while C.busy():
         statistics = C.statistics

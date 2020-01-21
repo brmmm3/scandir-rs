@@ -87,13 +87,22 @@ for root, dirs, files in scandir.walk.Walk("~/workspace"):
     # Do something
 ```
 
+with extended data:
+
+```python
+import scandir_rs as scandir
+
+for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace", iter_type=scandir.ITER_TYPE_WALKEXT):
+    # Do something
+```
+
 ``os.scandir()`` example:
 
 ```python
 import scandir_rs as scandir
 
-for entry in scandir.scandir.Scandir("~/workspace", metadata_ext=True):
-    # Do something
+for path, entry in scandir.scandir.Scandir("~/workspace", metadata_ext=True):
+    # entry is a custom DirEntry object
 ```
 
 ## Benchmarks

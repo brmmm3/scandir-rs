@@ -52,7 +52,7 @@ Scans directory provided through parameter ``root_path`` and returns an ``Entrie
 - ``metadata_ext`` if ``True`` also fetch extended metadata.
 - ``max_depth`` is maximum depth of iteration. If ``0`` then depth limit is disabled.
 
-## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0)``
+## ``Scandir(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0)``
 
 Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
 

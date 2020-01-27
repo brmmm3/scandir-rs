@@ -4,14 +4,13 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::Instant;
 
-#[cfg(unix)]
-use expanduser::expanduser;
-use jwalk::WalkDir;
-
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, Python};
+
+use crate::common::{create_filter, expand_path, walk};
+use crate::def::*;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -91,13 +90,14 @@ impl Statistics {
 fn rs_count(
     root_path: &String,
     skip_hidden: bool,
-    extended: bool,  // If true: Count also hardlinks, devices, pipes, size and usage
+    extended: bool, // If true: Count also hardlinks, devices, pipes, size and usage
     mut max_depth: usize,
+    filter: Option<Filter>,
     statistics: &Arc<Mutex<Statistics>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
-    let root_path = expanduser(root_path).unwrap();
+    let root_path = expand_path(&root_path);
     let mut dirs: u32 = 0;
     let mut files: u32 = 0;
     let mut slinks: u32 = 0;
@@ -116,13 +116,17 @@ fn rs_count(
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden)
-        .sort(false)
-        .preload_metadata(extended)
-        .preload_metadata_ext(extended)
-        .max_depth(max_depth)
-    {
+    for entry in walk(
+        &root_path,
+        false,
+        skip_hidden,
+        max_depth,
+        filter,
+        match extended {
+            false => RETURN_TYPE_FAST,
+            true => RETURN_TYPE_EXT,
+        },
+    ) {
         match &entry {
             Ok(v) => {
                 let file_type = v.file_type_result.as_ref().unwrap();
@@ -166,7 +170,7 @@ fn rs_count(
                     }
                 }
             }
-            Err(e) => errors.push(e.to_string()),  // TODO: Need to fetch failed path from somewhere
+            Err(e) => errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere
         }
         cnt += 1;
         if (cnt >= 1000) || (update_time.elapsed().as_millis() >= 10) {
@@ -191,10 +195,12 @@ fn rs_count(
             update_time = Instant::now();
         }
         match &alive {
-            Some(a) => if !a.load(Ordering::Relaxed) {
-                break;
-            },
-            None => {},
+            Some(a) => {
+                if !a.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+            None => {}
         }
     }
     let mut stats_locked = statistics.lock().unwrap();
@@ -223,7 +229,22 @@ pub fn count(
     skip_hidden: Option<bool>,
     extended: Option<bool>,
     max_depth: Option<usize>,
+    dir_include: Option<Vec<String>>,
+    dir_exclude: Option<Vec<String>>,
+    file_include: Option<Vec<String>>,
+    file_exclude: Option<Vec<String>>,
+    case_sensitive: Option<bool>,
 ) -> PyResult<Statistics> {
+    let filter = match create_filter(
+        dir_include,
+        dir_exclude,
+        file_include,
+        file_exclude,
+        case_sensitive,
+    ) {
+        Ok(f) => f,
+        Err(e) => return Err(exceptions::ValueError::py_err(e.to_string())),
+    };
     let statistics = Arc::new(Mutex::new(Statistics {
         dirs: 0,
         files: 0,
@@ -243,6 +264,7 @@ pub fn count(
             skip_hidden.unwrap_or(false),
             extended.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
+            filter,
             &stats_cloned,
             None,
         );
@@ -264,6 +286,7 @@ pub struct Count {
     skip_hidden: bool,
     extended: bool,
     max_depth: usize,
+    filter: Option<Filter>,
     // Results
     statistics: Arc<Mutex<Statistics>>,
     // Internal
@@ -300,6 +323,7 @@ impl Count {
         let skip_hidden = self.skip_hidden;
         let extended = self.extended;
         let max_depth = self.max_depth;
+        let filter = self.filter.clone();
         let statistics = self.statistics.clone();
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
@@ -309,6 +333,7 @@ impl Count {
                 skip_hidden,
                 extended,
                 max_depth,
+                filter,
                 &statistics,
                 Some(alive),
             )
@@ -348,6 +373,7 @@ impl Count {
             skip_hidden: skip_hidden.unwrap_or(false),
             extended: extended.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
+            filter: None,
             statistics: Arc::new(Mutex::new(Statistics {
                 dirs: 0,
                 files: 0,
@@ -422,6 +448,7 @@ impl Count {
                 self.skip_hidden,
                 self.extended,
                 self.max_depth,
+                self.filter.clone(),
                 &self.statistics,
                 None,
             );

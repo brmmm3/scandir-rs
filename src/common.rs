@@ -1,7 +1,17 @@
+#[cfg(unix)]
+use expanduser::expanduser;
+
+use glob::{MatchOptions, Pattern};
 use jwalk::WalkDirGeneric;
-use glob::{Pattern, MatchOptions};
 
 use crate::def::*;
+
+pub fn expand_path(path: &str) -> String {
+    #[cfg(unix)]
+    let path = expanduser(path).unwrap();
+    #[cfg(unix)]
+    path.to_string_lossy().into_owned()
+}
 
 pub fn create_filter(
     dir_include: Option<Vec<String>>,
@@ -9,7 +19,7 @@ pub fn create_filter(
     file_include: Option<Vec<String>>,
     file_exclude: Option<Vec<String>>,
     case_sensitive: Option<bool>,
-) -> Option<Filter> {
+) -> Result<Option<Filter>, glob::PatternError> {
     let mut filter = Filter {
         dir_include: Vec::new(),
         dir_exclude: Vec::new(),
@@ -19,31 +29,58 @@ pub fn create_filter(
             true => None,
             false => Some(MatchOptions {
                 case_sensitive: false,
-                ..MatchOptions::new()})},
+                ..MatchOptions::new()
+            }),
+        },
     };
     match dir_include {
-        Some(f) => filter.dir_include.append(&mut f.iter().map(|s| Pattern::new(s).unwrap()).collect::<Vec<_>>()),
-        None => {},
+        Some(f) => {
+            let f = &mut f
+                .iter()
+                .map(|s| Pattern::new(s))
+                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+            filter.dir_include.append(f);
+        }
+        None => {}
     }
     match dir_exclude {
-        Some(f) => filter.dir_exclude.append(&mut f.iter().map(|s| Pattern::new(s).unwrap()).collect::<Vec<_>>()),
-        None => {},
+        Some(f) => {
+            let f = &mut f
+                .iter()
+                .map(|s| Pattern::new(s))
+                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+            filter.dir_exclude.append(f);
+        }
+        None => {}
     }
     match file_include {
-        Some(f) => filter.file_include.append(&mut f.iter().map(|s| Pattern::new(s).unwrap()).collect::<Vec<_>>()),
-        None => {},
+        Some(f) => {
+            let f = &mut f
+                .iter()
+                .map(|s| Pattern::new(s))
+                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+            filter.file_include.append(f);
+        }
+        None => {}
     }
     match file_exclude {
-        Some(f) => filter.file_exclude.append(&mut f.iter().map(|s| Pattern::new(s).unwrap()).collect::<Vec<_>>()),
-        None => {},
+        Some(f) => {
+            let f = &mut f
+                .iter()
+                .map(|s| Pattern::new(s))
+                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+            filter.file_exclude.append(f);
+        }
+        None => {}
     }
     if filter.dir_include.is_empty()
-            && filter.dir_exclude.is_empty()
-            && filter.file_include.is_empty()
-            && filter.file_exclude.is_empty() {
-        return None;
+        && filter.dir_exclude.is_empty()
+        && filter.file_include.is_empty()
+        && filter.file_exclude.is_empty()
+    {
+        return Ok(None);
     }
-    Some(filter)
+    Ok(Some(filter))
 }
 
 fn filter_direntry(
@@ -70,7 +107,7 @@ fn filter_direntry(
                     return true;
                 }
             }
-        },
+        }
         None => {
             for f in filter {
                 if f.as_str().ends_with("**") && !key.ends_with("/") {
@@ -85,7 +122,7 @@ fn filter_direntry(
                     return true;
                 }
             }
-        },
+        }
     }
     false
 }
@@ -97,11 +134,15 @@ fn filter_dir(
 ) -> bool {
     let mut key = dir_entry.parent_path.to_path_buf();
     key.push(dir_entry.file_name.clone().into_string().unwrap());
-    let key = key.to_str().unwrap().get(root_path_len..).unwrap_or("").to_string();
+    let key = key
+        .to_str()
+        .unwrap()
+        .get(root_path_len..)
+        .unwrap_or("")
+        .to_string();
     if filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false) {
         return false;
-    }
-    else if !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true) {
+    } else if !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true) {
         return false;
     }
     true
@@ -128,22 +169,25 @@ pub fn walk(
         .process_entries(move |_parent_client_state, children| {
             // Custom filter
             children.retain(|dir_entry_result| {
-                dir_entry_result.as_ref().map(|dir_entry| {
-                    let filter_ref = filter.as_ref().unwrap();
-                    if dir_entry.file_type_result.as_ref().unwrap().is_dir() {
-                        return filter_dir(root_path_len, dir_entry, filter_ref);
-                    } else {
-                        let options = filter_ref.options;
-                        let key = dir_entry.file_name.to_str().unwrap();
-                        if filter_direntry(key, &filter_ref.file_exclude, options, false) {
-                            return false;
+                dir_entry_result
+                    .as_ref()
+                    .map(|dir_entry| {
+                        let filter_ref = filter.as_ref().unwrap();
+                        if dir_entry.file_type_result.as_ref().unwrap().is_dir() {
+                            return filter_dir(root_path_len, dir_entry, filter_ref);
+                        } else {
+                            let options = filter_ref.options;
+                            let key = dir_entry.file_name.to_str().unwrap();
+                            if filter_direntry(key, &filter_ref.file_exclude, options, false) {
+                                return false;
+                            } else if !filter_direntry(key, &filter_ref.file_include, options, true)
+                            {
+                                return false;
+                            }
                         }
-                        else if !filter_direntry(key, &filter_ref.file_include, options, true) {
-                            return false;
-                        }
-                    }
-                    true
-                }).unwrap_or(false)
+                        true
+                    })
+                    .unwrap_or(false)
             });
             // Custom skip
             children.iter_mut().for_each(|dir_entry_result| {

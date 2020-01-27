@@ -4,16 +4,14 @@ use std::thread;
 use std::time::{Instant, UNIX_EPOCH};
 
 use crossbeam_channel as channel;
-#[cfg(unix)]
-use expanduser::expanduser;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
+use crate::common::{create_filter, expand_path, walk};
 use crate::def::*;
-use crate::common::{create_filter, walk};
 
 #[derive(Debug, Clone)]
 pub enum Stats {
@@ -22,9 +20,12 @@ pub enum Stats {
     Duration(f64),
 }
 
+/// Scandir result
 #[derive(Debug, Clone)]
 pub struct Entry {
+    /// Absolute path
     path: String,
+    /// File stats
     entry: Stats,
 }
 
@@ -37,10 +38,16 @@ impl ToPyObject for Entry {
                 &[
                     self.path.to_object(py),
                     match e {
-                        ScandirResult::DirEntry(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
-                        ScandirResult::DirEntryExt(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
-                        ScandirResult::DirEntryFull(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
-                    }
+                        ScandirResult::DirEntry(e) => {
+                            PyRef::new(py, e.clone()).unwrap().to_object(py)
+                        }
+                        ScandirResult::DirEntryExt(e) => {
+                            PyRef::new(py, e.clone()).unwrap().to_object(py)
+                        }
+                        ScandirResult::DirEntryFull(e) => {
+                            PyRef::new(py, e.clone()).unwrap().to_object(py)
+                        }
+                    },
                 ],
             )
             .into(),
@@ -52,10 +59,13 @@ impl ToPyObject for Entry {
     }
 }
 
+/// Scandir results
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Entries {
+    /// List of scandir results
     pub entries: Vec<Entry>,
+    /// Time used for iteration
     pub duration: f64,
 }
 
@@ -223,14 +233,20 @@ fn rs_entries(
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
-    let root_path = expanduser(root_path).unwrap();
-    let root_path = root_path.to_string_lossy();
-    let root_path_len = root_path.len() + 1;
+    let root_path = expand_path(&root_path);
+    let root_path_len = root_path.len();
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     };
-    for entry in walk(&root_path, sorted, skip_hidden, max_depth, filter, return_type) {
+    for entry in walk(
+        &root_path,
+        sorted,
+        skip_hidden,
+        max_depth,
+        filter,
+        return_type,
+    ) {
         let entry = create_entry(root_path_len, return_type, &entry);
         let mut result_locked = result.lock().unwrap();
         result_locked.entries.push(entry);
@@ -258,14 +274,20 @@ fn rs_entries_iter(
     tx: Option<channel::Sender<Entry>>,
 ) {
     #[cfg(unix)]
-    let root_path = expanduser(root_path).unwrap();
-    let root_path = root_path.to_string_lossy();
+    let root_path = expand_path(&root_path);
     let root_path_len = root_path.len() + 1;
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    for entry in walk(&root_path, sorted, skip_hidden, max_depth, filter, return_type) {
+    for entry in walk(
+        &root_path,
+        sorted,
+        skip_hidden,
+        max_depth,
+        filter,
+        return_type,
+    ) {
         let entry = create_entry(root_path_len, return_type, &entry);
         match &tx {
             Some(tx) => {
@@ -311,8 +333,20 @@ pub fn entries<'a>(
 ) -> PyResult<Entries> {
     let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
     if return_type > RETURN_TYPE_FULL {
-        return Err(exceptions::ValueError::py_err("Invalid return type".to_string()))
+        return Err(exceptions::ValueError::py_err(
+            "Invalid return type".to_string(),
+        ));
     }
+    let filter = match create_filter(
+        dir_include,
+        dir_exclude,
+        file_include,
+        file_exclude,
+        case_sensitive,
+    ) {
+        Ok(f) => f,
+        Err(e) => return Err(exceptions::ValueError::py_err(e.to_string())),
+    };
     let result = Arc::new(Mutex::new(Entries {
         entries: Vec::new(),
         duration: 0.0,
@@ -324,7 +358,7 @@ pub fn entries<'a>(
             sorted.unwrap_or(false),
             skip_hidden.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
-            create_filter(dir_include, dir_exclude, file_include, file_exclude, case_sensitive),
+            filter,
             return_type,
             result_cloned,
             None,
@@ -339,6 +373,7 @@ pub fn entries<'a>(
     Ok(result_cloned.into())
 }
 
+/// Class for iterating a file tree and returning `Entry` objects
 #[pyclass]
 #[derive(Debug)]
 pub struct Scandir {
@@ -438,13 +473,28 @@ impl Scandir {
         case_sensitive: Option<bool>,
         return_type: Option<u8>,
     ) {
+        let filter = match create_filter(
+            dir_include,
+            dir_exclude,
+            file_include,
+            file_exclude,
+            case_sensitive,
+        ) {
+            Ok(f) => f,
+            Err(e) => {
+                let gil = Python::acquire_gil();
+                let py = gil.python();
+                PyErr::new::<exceptions::ValueError, _>(e.to_string()).restore(py);
+                None
+            }
+        };
         obj.init(Scandir {
             root_path: String::from(root_path),
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
             return_type: return_type.unwrap_or(RETURN_TYPE_BASE),
-            filter: create_filter(dir_include, dir_exclude, file_include, file_exclude, case_sensitive),
+            filter: filter,
             entries: Arc::new(Mutex::new(Entries {
                 entries: Vec::new(),
                 duration: 0.0,
@@ -473,12 +523,20 @@ impl Scandir {
         for entry in &entries_locked.entries {
             match &entry.entry {
                 Stats::ScandirResult(e) => pyresult
-                    .set_item(entry.path.to_object(py),
+                    .set_item(
+                        entry.path.to_object(py),
                         match e {
-                            ScandirResult::DirEntry(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
-                            ScandirResult::DirEntryExt(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
-                            ScandirResult::DirEntryFull(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
-                        })
+                            ScandirResult::DirEntry(e) => {
+                                PyRef::new(py, e.clone()).unwrap().to_object(py)
+                            }
+                            ScandirResult::DirEntryExt(e) => {
+                                PyRef::new(py, e.clone()).unwrap().to_object(py)
+                            }
+                            ScandirResult::DirEntryFull(e) => {
+                                PyRef::new(py, e.clone()).unwrap().to_object(py)
+                            }
+                        },
+                    )
                     .unwrap(),
                 Stats::Error(e) => pyresult.set_item(entry.path.to_object(py), e).unwrap(),
                 Stats::Duration(_) => {}

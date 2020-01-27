@@ -7,15 +7,13 @@ use std::thread;
 use std::time::Instant;
 
 use crossbeam_channel as channel;
-#[cfg(unix)]
-use expanduser::expanduser;
-use jwalk::WalkDir;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
+use crate::common::{create_filter, expand_path, walk};
 use crate::def::*;
 
 fn update_toc(
@@ -46,21 +44,25 @@ pub fn rs_toc(
     sorted: bool,
     skip_hidden: bool,
     mut max_depth: usize,
+    filter: Option<Filter>,
     toc: Arc<Mutex<Toc>>,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
-    let root_path = expanduser(root_path).unwrap();
+    let root_path = expand_path(&root_path);
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden)
-        .sort(sorted)
-        .max_depth(max_depth)
-    {
+    for entry in walk(
+        &root_path,
+        sorted,
+        skip_hidden,
+        max_depth,
+        filter,
+        RETURN_TYPE_FAST,
+    ) {
         let mut toc_locked = toc.lock().unwrap();
         update_toc(&entry, toc_locked.deref_mut());
         match &alive {
@@ -86,12 +88,13 @@ pub fn rs_toc_iter(
     sorted: bool,
     skip_hidden: bool,
     mut max_depth: usize,
+    filter: Option<Filter>,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
     tx: channel::Sender<WalkResult>,
 ) {
     #[cfg(unix)]
-    let root_path = expanduser(root_path).unwrap();
+    let root_path = expand_path(&root_path);
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
@@ -104,11 +107,14 @@ pub fn rs_toc_iter(
         errors: Vec::new(),
     };
     let mut send = false;
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden)
-        .sort(sorted)
-        .max_depth(max_depth)
-    {
+    for entry in walk(
+        &root_path,
+        sorted,
+        skip_hidden,
+        max_depth,
+        filter,
+        RETURN_TYPE_FAST,
+    ) {
         update_toc(&entry, &mut toc);
         if tx.is_empty() {
             if tx.send(WalkResult::Toc(toc)).is_err() {
@@ -151,12 +157,13 @@ pub fn rs_walk_iter(
     sorted: bool,
     skip_hidden: bool,
     mut max_depth: usize,
+    filter: Option<Filter>,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
     tx: channel::Sender<WalkResult>,
 ) {
     #[cfg(unix)]
-    let root_path = expanduser(root_path).unwrap();
+    let root_path = expand_path(&root_path);
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
@@ -164,11 +171,14 @@ pub fn rs_walk_iter(
     let mut list: Vec<String> = Vec::new();
     let mut map: HashMap<String, Toc> = HashMap::new();
     let mut errors: Vec<String> = Vec::new();
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden)
-        .sort(sorted)
-        .max_depth(max_depth)
-    {
+    for entry in walk(
+        &root_path,
+        sorted,
+        skip_hidden,
+        max_depth,
+        filter,
+        RETURN_TYPE_FAST,
+    ) {
         match &entry {
             Ok(v) => {
                 let file_type = v.file_type_result.as_ref().unwrap();
@@ -237,7 +247,22 @@ pub fn toc(
     sorted: Option<bool>,
     skip_hidden: Option<bool>,
     max_depth: Option<usize>,
+    dir_include: Option<Vec<String>>,
+    dir_exclude: Option<Vec<String>>,
+    file_include: Option<Vec<String>>,
+    file_exclude: Option<Vec<String>>,
+    case_sensitive: Option<bool>,
 ) -> PyResult<Toc> {
+    let filter = match create_filter(
+        dir_include,
+        dir_exclude,
+        file_include,
+        file_exclude,
+        case_sensitive,
+    ) {
+        Ok(f) => f,
+        Err(e) => return Err(exceptions::ValueError::py_err(e.to_string())),
+    };
     let toc = Arc::new(Mutex::new(Toc {
         dirs: Vec::new(),
         files: Vec::new(),
@@ -252,6 +277,7 @@ pub fn toc(
             sorted.unwrap_or(false),
             skip_hidden.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
+            filter,
             toc_cloned,
             None,
             None,
@@ -275,6 +301,7 @@ pub struct Walk {
     skip_hidden: bool,
     max_depth: usize,
     return_type: u8,
+    filter: Option<Filter>,
     // Results
     toc: Arc<Mutex<Toc>>,
     duration: Arc<AtomicU64>,
@@ -301,6 +328,7 @@ impl Walk {
             self.sorted,
             self.skip_hidden,
             self.max_depth,
+            self.filter.clone(),
             self.toc.clone(),
             Some(self.duration.clone()),
             None,
@@ -319,6 +347,7 @@ impl Walk {
         let sorted = self.sorted;
         let skip_hidden = self.skip_hidden;
         let max_depth = self.max_depth;
+        let filter = self.filter.clone();
         let toc = self.toc.clone();
         let duration = self.duration.clone();
         let alive = Arc::new(AtomicBool::new(true));
@@ -330,6 +359,7 @@ impl Walk {
                     sorted,
                     skip_hidden,
                     max_depth,
+                    filter,
                     toc,
                     Some(duration),
                     Some(alive),
@@ -343,6 +373,7 @@ impl Walk {
                         sorted,
                         skip_hidden,
                         max_depth,
+                        filter,
                         Some(duration),
                         Some(alive),
                         tx.unwrap(),
@@ -355,6 +386,7 @@ impl Walk {
                         sorted,
                         skip_hidden,
                         max_depth,
+                        filter,
                         Some(duration),
                         Some(alive),
                         tx.unwrap(),
@@ -398,14 +430,35 @@ impl Walk {
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
         max_depth: Option<usize>,
+        dir_include: Option<Vec<String>>,
+        dir_exclude: Option<Vec<String>>,
+        file_include: Option<Vec<String>>,
+        file_exclude: Option<Vec<String>>,
+        case_sensitive: Option<bool>,
         return_type: Option<u8>,
     ) {
+        let filter = match create_filter(
+            dir_include,
+            dir_exclude,
+            file_include,
+            file_exclude,
+            case_sensitive,
+        ) {
+            Ok(f) => f,
+            Err(e) => {
+                let gil = Python::acquire_gil();
+                let py = gil.python();
+                PyErr::new::<exceptions::ValueError, _>(e.to_string()).restore(py);
+                None
+            }
+        };
         obj.init(Walk {
             root_path: String::from(root_path),
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
             return_type: return_type.unwrap_or(RETURN_TYPE_WALK),
+            filter: filter,
             toc: Arc::new(Mutex::new(Toc {
                 dirs: Vec::new(),
                 files: Vec::new(),

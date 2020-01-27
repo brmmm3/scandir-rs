@@ -92,7 +92,8 @@ with extended data:
 ```python
 import scandir_rs as scandir
 
-for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace", return_type=scandir.RETURN_TYPE_EXT):
+for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace",
+        return_type=scandir.RETURN_TYPE_EXT):
     # Do something
 ```
 
@@ -101,7 +102,8 @@ for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace
 ```python
 import scandir_rs as scandir
 
-for path, entry in scandir.scandir.Scandir("~/workspace", metadata_ext=True):
+for path, entry in scandir.scandir.Scandir("~/workspace",
+        return_type=scandir.RETURN_TYPE_EXT):
     # entry is a custom DirEntry object
 ```
 
@@ -124,20 +126,20 @@ results to os.walk.
 - 1 pipes
 - 4.6GB size and 5.4GB usage on disk
 
-| Time [s] | Method                                              |
-|----------|-----------------------------------------------------|
-| 0.547    | os.walk (Python 3.7)                                |
-| 0.132    | scandir_rs.count.count                              |
-| 0.142    | scandir_rs.count.Count                              |
-| 0.237    | scandir_rs.walk.Walk                                |
-| 0.224    | scandir_rs.walk.toc                                 |
-| 0.242    | scandir_rs.walk.collect                             |
-| 0.262    | scandir_rs.scandir.entries                          |
-| 0.344    | scandir_rs.scandir.entries(metadata=True)           |
-| 0.336    | scandir_rs.scandir.entries(metadata_ext=True)       |
-| 0.280    | scandir_rs.scandir.Scandir.collect                  |
-| 0.262    | scandir_rs.scandir.Scandir.iter                     |
-| 0.330    | scandir_rs.scandir.Scandir.iter(metadata_ext=True)  |
+| Time [s] | Method                                             |
+| -------- | -------------------------------------------------- |
+| 0.547    | os.walk (Python 3.7)                               |
+| 0.132    | scandir_rs.count.count                             |
+| 0.142    | scandir_rs.count.Count                             |
+| 0.237    | scandir_rs.walk.Walk                               |
+| 0.224    | scandir_rs.walk.toc                                |
+| 0.242    | scandir_rs.walk.collect                            |
+| 0.262    | scandir_rs.scandir.entries                         |
+| 0.344    | scandir_rs.scandir.entries(metadata=True)          |
+| 0.336    | scandir_rs.scandir.entries(metadata_ext=True)      |
+| 0.280    | scandir_rs.scandir.Scandir.collect                 |
+| 0.262    | scandir_rs.scandir.Scandir.iter                    |
+| 0.330    | scandir_rs.scandir.Scandir.iter(metadata_ext=True) |
 
 Up to **2 times faster** on Linux.
 
@@ -149,20 +151,20 @@ Up to **2 times faster** on Linux.
 - 293108 files
 - 44.4GB size and 45.2GB usage on disk
 
-| Time [s] | Method                                              |
-|----------|-----------------------------------------------------|
-| 26.881   | os.walk (Python 3.7)                                |
-| 4.094    | scandir_rs.count.count                              |
-| 3.654    | scandir_rs.count.Count                              |
-| 3.978    | scandir_rs.walk.Walk                                |
-| 3.848    | scandir_rs.walk.toc                                 |
-| 3.777    | scandir_rs.walk.collect                             |
-| 3.987    | scandir_rs.scandir.entries                          |
-| 3.905    | scandir_rs.scandir.entries(metadata=True)           |
-| 4.062    | scandir_rs.scandir.entries(metadata_ext=True)       |
-| 3.934    | scandir_rs.scandir.Scandir.collect                  |
-| 3.981    | scandir_rs.scandir.Scandir.iter                     |
-| 3.821    | scandir_rs.scandir.Scandir.iter(metadata_ext=True)  |
+| Time [s] | Method                                             |
+| -------- | -------------------------------------------------- |
+| 26.881   | os.walk (Python 3.7)                               |
+| 4.094    | scandir_rs.count.count                             |
+| 3.654    | scandir_rs.count.Count                             |
+| 3.978    | scandir_rs.walk.Walk                               |
+| 3.848    | scandir_rs.walk.toc                                |
+| 3.777    | scandir_rs.walk.collect                            |
+| 3.987    | scandir_rs.scandir.entries                         |
+| 3.905    | scandir_rs.scandir.entries(metadata=True)          |
+| 4.062    | scandir_rs.scandir.entries(metadata_ext=True)      |
+| 3.934    | scandir_rs.scandir.Scandir.collect                 |
+| 3.981    | scandir_rs.scandir.Scandir.iter                    |
+| 3.821    | scandir_rs.scandir.Scandir.iter(metadata_ext=True) |
 
 Up to **6.7 times faster** on Windows 10.
 
@@ -173,19 +175,19 @@ Up to **6.7 times faster** on Windows 10.
 - 2696 symlinks
 - 97GB size and 100.5GB usage on disk
 
-| Time [s] | Method                                              |
-|----------|-----------------------------------------------------|
-| 151.143  | os.walk (Python 3.7)                                |
-| 7.549    | scandir_rs.count.count                              |
-| 7.531    | scandir_rs.count.Count                              |
-| 8.710    | scandir_rs.walk.Walk                                |
-| 8.625    | scandir_rs.walk.toc                                 |
-| 8.599    | scandir_rs.walk.collect                             |
-| 9.014    | scandir_rs.scandir.entries                          |
-| 9.208    | scandir_rs.scandir.entries(metadata=True)           |
-| 8.925    | scandir_rs.scandir.entries(metadata_ext=True)       |
-| 9.243    | scandir_rs.scandir.Scandir.collect                  |
-| 8.462    | scandir_rs.scandir.Scandir.iter                     |
-| 8.380    | scandir_rs.scandir.Scandir.iter(metadata_ext=True)  |
+| Time [s] | Method                                             |
+| -------- | -------------------------------------------------- |
+| 151.143  | os.walk (Python 3.7)                               |
+| 7.549    | scandir_rs.count.count                             |
+| 7.531    | scandir_rs.count.Count                             |
+| 8.710    | scandir_rs.walk.Walk                               |
+| 8.625    | scandir_rs.walk.toc                                |
+| 8.599    | scandir_rs.walk.collect                            |
+| 9.014    | scandir_rs.scandir.entries                         |
+| 9.208    | scandir_rs.scandir.entries(metadata=True)          |
+| 8.925    | scandir_rs.scandir.entries(metadata_ext=True)      |
+| 9.243    | scandir_rs.scandir.Scandir.collect                 |
+| 8.462    | scandir_rs.scandir.Scandir.iter                    |
+| 8.380    | scandir_rs.scandir.Scandir.iter(metadata_ext=True) |
 
 Up to **17.4 times faster** on Windows 10.

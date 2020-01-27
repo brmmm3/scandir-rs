@@ -4,7 +4,7 @@
 
 The ``Entries`` class is the return value of method ``entries``, also of property ``entries`` and class method ``collect`` of class ``Scandir``.
 
-### ``Entries`` has collowing class members
+### ``Entries`` has following class members
 
 - ``entries`` list of ``Entry`` objects.
 - ``duration`` time taken for the iteration in seconds as float.
@@ -13,14 +13,14 @@ The ``Entries`` class is the return value of method ``entries``, also of propert
 
 The ``Entry`` class is a property of the ``Entries`` class.
 
-### ``Entry`` has collowing class members
+### ``Entry`` has following class members
 
 - ``path`` relative path of the entry.
 - ``entry`` result for the entry (either ``DirEntry`` or error string).
 
 ## ``DirEntry``
 
-### ``DirEntry`` has collowing class members
+### ``DirEntry`` has following class members
 
 - ``is_symlink`` ``True`` is entry is a symbolic link.
 - ``is_dir`` ``True`` is entry is a directory.
@@ -28,6 +28,11 @@ The ``Entry`` class is a property of the ``Entries`` class.
 - ``ctime`` creation time in seconds as float.
 - ``mtime`` modification time in seconds as float.
 - ``atime`` access time in seconds as float.
+
+## ``DirEntryExt``
+
+### ``DirEntryExt`` has following additional class members
+
 - ``mode`` file access mode.
 - ``ino`` inode number (only for Unix).
 - ``dev`` device number (only for Unix).
@@ -39,7 +44,14 @@ The ``Entry`` class is a property of the ``Entries`` class.
 - ``gid`` groud id (only for Unix).
 - ``rdev`` device number (for character and block devices on Unix).
 
-## ``entries(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0)``
+## ``DirEntryFull``
+
+### ``DirEntryFull`` has following additional class members
+
+- ``name`` filename
+- ``path`` relative path
+
+## ``entries(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True)``
 
 Scans directory provided through parameter ``root_path`` and returns an ``Entries`` object. This function is blocking and releases the GIL.
 
@@ -51,10 +63,33 @@ Scans directory provided through parameter ``root_path`` and returns an ``Entrie
 - ``metadata`` if ``True`` also fetch some metadata.
 - ``metadata_ext`` if ``True`` also fetch extended metadata.
 - ``max_depth`` is maximum depth of iteration. If ``0`` then depth limit is disabled.
+- ``dir_include`` list of patterns for directories to include.
+- ``dir_exclude`` list of patterns for directories to exclude.
+- ``file_include`` list of patterns for files to include.
+- ``file_exclude`` list of patterns for files to exclude.
+- ``case_sensitive`` if `True` then do case sensitive pattern matching.
 
-## ``Scandir(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0)``
+For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
+
+## ``Scandir(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True, return_type: int = RETURN_TYPE_WALK)``
 
 Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
+
+The returned results are tuples with absolute path and `DirEntry`, `DirEntryExt` or `DirEntryFull` object, depending on the `return_type`.
+
+### Parameters
+
+Same as above but with one additional parameter:
+
+- ``return_type`` defines type of data returned by iterator.
+
+### Iteration types
+
+- ``RETURN_TYPE_FAST`` returned data is a ``DirEntry`` object. On Windows ``DirEntry`` doesn't contain valid values!
+- ``RETURN_TYPE_BASE`` returned data is a ``DirEntry`` object.
+- ``RETURN_TYPE_EXT`` returned data is a ``DirEntryExt`` object.
+- ``RETURN_TYPE_FULL`` returned data is a ``DirEntryFull`` object.
+
 
 ### ``entries``
 

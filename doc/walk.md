@@ -4,7 +4,7 @@
 
 The ``Toc`` class is the return value of method ``toc``, also of property ``toc`` and class method ``collect`` of class ``Walk``.
 
-### ``Toc`` has collowing class members
+### ``Toc`` has following class members
 
 - ``dirs`` list of directory names.
 - ``files`` list of filenames.
@@ -12,7 +12,7 @@ The ``Toc`` class is the return value of method ``toc``, also of property ``toc`
 - ``other`` list of names of all other entry types.
 - ``errors`` list of access errors (list of strings).
 
-## ``toc(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0)``
+## ``toc(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True)``
 
 Scans directory provided through parameter ``root_path`` and returns a ``Toc`` object. This function is blocking and releases the GIL.
 
@@ -22,8 +22,15 @@ Scans directory provided through parameter ``root_path`` and returns a ``Toc`` o
 - ``sorted`` if ``True`` alphabetically sort results.
 - ``skip_hidden`` if ``True`` then ignore all hidden files and directories.
 - ``max_depth`` is maximum depth of iteration. If ``0`` then depth limit is disabled.
+- ``dir_include`` list of patterns for directories to include.
+- ``dir_exclude`` list of patterns for directories to exclude.
+- ``file_include`` list of patterns for files to include.
+- ``file_exclude`` list of patterns for files to exclude.
+- ``case_sensitive`` if `True` then do case sensitive pattern matching.
 
-## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, return_type: int = RETURN_TYPE_WALK)``
+For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
+
+## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True, return_type: int = RETURN_TYPE_WALK)``
 
 Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
 

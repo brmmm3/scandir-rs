@@ -11,7 +11,19 @@ mod tests {
         #[cfg(unix)]
         println!(
             "{:#?}",
-            count(py, String::from("/usr"), Some(false), Some(false), None).unwrap()
+            count(
+                py,
+                String::from("/usr"),
+                Some(false),
+                Some(false),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(false)
+            )
+            .unwrap()
         );
         #[cfg(windows)]
         println!(
@@ -21,7 +33,12 @@ mod tests {
                 String::from("C:/Windows"),
                 Some(false),
                 Some(false),
-                None
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(false)
             )
             .unwrap()
         );
@@ -33,7 +50,19 @@ mod tests {
         let py = gil.python();
 
         #[cfg(unix)]
-        count(py, String::from("/usr"), Some(true), Some(false), None).unwrap();
+        count(
+            py,
+            String::from("/usr"),
+            Some(true),
+            Some(false),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(false),
+        )
+        .unwrap();
         #[cfg(windows)]
         count(
             py,
@@ -41,6 +70,11 @@ mod tests {
             Some(false),
             Some(false),
             None,
+            None,
+            None,
+            None,
+            None,
+            Some(false),
         )
         .unwrap();
     }
@@ -53,7 +87,19 @@ mod tests {
         #[cfg(unix)]
         println!(
             "{:#?}",
-            count(py, String::from("/usr"), Some(true), Some(false), None).unwrap()
+            count(
+                py,
+                String::from("/usr"),
+                Some(true),
+                Some(false),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(false)
+            )
+            .unwrap()
         );
         #[cfg(windows)]
         println!(
@@ -63,7 +109,12 @@ mod tests {
                 String::from("C:/Windows"),
                 Some(true),
                 Some(false),
-                None
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(false)
             )
             .unwrap()
         );
@@ -75,8 +126,32 @@ mod tests {
         let py = gil.python();
 
         #[cfg(unix)]
-        count(py, String::from("/usr"), Some(true), Some(true), None).unwrap();
+        count(
+            py,
+            String::from("/usr"),
+            Some(true),
+            Some(true),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(false),
+        )
+        .unwrap();
         #[cfg(windows)]
-        count(py, String::from("C:/Windows"), Some(true), Some(true), None).unwrap();
+        count(
+            py,
+            String::from("C:/Windows"),
+            Some(true),
+            Some(true),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(false),
+        )
+        .unwrap();
     }
 }

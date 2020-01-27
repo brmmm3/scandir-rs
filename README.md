@@ -92,7 +92,7 @@ with extended data:
 ```python
 import scandir_rs as scandir
 
-for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace", iter_type=scandir.ITER_TYPE_WALKEXT):
+for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace", return_type=scandir.RETURN_TYPE_EXT):
     # Do something
 ```
 

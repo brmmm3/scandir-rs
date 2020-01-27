@@ -6,20 +6,20 @@ import sys
 import scandir_rs as r
 
 
-print("# iter_type=TOC:")
-for nr, result in enumerate(r.walk.Walk("~/workspace", iter_type=r.ITER_TYPE_TOC)):
+print("# return_type=TOC:")
+for nr, result in enumerate(r.walk.Walk("~/workspace", return_type=r.RETURN_TYPE_BASE)):
     print(result)
     if nr > 3:
         break
 
-print("\n# iter_type=WALK:")
+print("\n# return_type=WALK:")
 for nr, result in enumerate(r.walk.Walk("~/workspace")):
     print(result)
     if nr > 3:
         break
 
-print("\n# iter_type=WALKEXT:")
-for nr, result in enumerate(r.walk.Walk("~/workspace", iter_type=r.ITER_TYPE_WALKEXT)):
+print("\n# return_type=WALKEXT:")
+for nr, result in enumerate(r.walk.Walk("~/workspace", return_type=r.RETURN_TYPE_EXT)):
     print(result)
     if nr > 3:
         break

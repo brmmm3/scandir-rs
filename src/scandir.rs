@@ -6,7 +6,6 @@ use std::time::{Instant, UNIX_EPOCH};
 use crossbeam_channel as channel;
 #[cfg(unix)]
 use expanduser::expanduser;
-use jwalk::WalkDir;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
@@ -14,10 +13,11 @@ use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
 use crate::def::*;
+use crate::common::{create_filter, walk};
 
 #[derive(Debug, Clone)]
 pub enum Stats {
-    DirEntry(DirEntry),
+    ScandirResult(ScandirResult),
     Error(String),
     Duration(f64),
 }
@@ -32,11 +32,15 @@ impl ToPyObject for Entry {
     #[inline]
     fn to_object(&self, py: Python) -> PyObject {
         match &self.entry {
-            Stats::DirEntry(e) => PyTuple::new(
+            Stats::ScandirResult(e) => PyTuple::new(
                 py,
                 &[
                     self.path.to_object(py),
-                    PyRef::new(py, e.clone()).unwrap().to_object(py),
+                    match e {
+                        ScandirResult::DirEntry(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
+                        ScandirResult::DirEntryExt(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
+                        ScandirResult::DirEntryFull(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
+                    }
                 ],
             )
             .into(),
@@ -76,6 +80,8 @@ impl pyo3::class::PyObjectProtocol for Entries {
 }
 
 fn create_entry(
+    root_path_len: usize,
+    return_type: u8,
     entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
 ) -> Entry {
     match entry {
@@ -141,28 +147,61 @@ fn create_entry(
                 }
             }
             let mut key = v.parent_path.to_path_buf();
-            key.push(v.file_name.clone().into_string().unwrap());
-            let entry = DirEntry {
-                is_symlink: file_type.is_symlink(),
-                is_dir: file_type.is_dir(),
-                is_file: file_type.is_file(),
-                ctime: ctime,
-                mtime: mtime,
-                atime: atime,
-                mode: mode,
-                ino: ino,
-                dev: dev,
-                nlink: nlink,
-                size: size,
-                blksize: blksize,
-                blocks: blocks,
-                uid: uid,
-                gid: gid,
-                rdev: rdev,
+            let file_name = v.file_name.clone().into_string().unwrap();
+            key.push(&file_name);
+            let key = key.to_str().unwrap().to_string();
+            let entry: ScandirResult = match return_type {
+                RETURN_TYPE_FAST | RETURN_TYPE_BASE => ScandirResult::DirEntry(DirEntry {
+                    is_symlink: file_type.is_symlink(),
+                    is_dir: file_type.is_dir(),
+                    is_file: file_type.is_file(),
+                    ctime: ctime,
+                    mtime: mtime,
+                    atime: atime,
+                }),
+                RETURN_TYPE_EXT => ScandirResult::DirEntryExt(DirEntryExt {
+                    is_symlink: file_type.is_symlink(),
+                    is_dir: file_type.is_dir(),
+                    is_file: file_type.is_file(),
+                    ctime: ctime,
+                    mtime: mtime,
+                    atime: atime,
+                    mode: mode,
+                    ino: ino,
+                    dev: dev,
+                    nlink: nlink,
+                    size: size,
+                    blksize: blksize,
+                    blocks: blocks,
+                    uid: uid,
+                    gid: gid,
+                    rdev: rdev,
+                }),
+                RETURN_TYPE_FULL => ScandirResult::DirEntryFull(DirEntryFull {
+                    name: file_name,
+                    path: key.get(root_path_len..).unwrap_or("").to_string(),
+                    is_symlink: file_type.is_symlink(),
+                    is_dir: file_type.is_dir(),
+                    is_file: file_type.is_file(),
+                    ctime: ctime,
+                    mtime: mtime,
+                    atime: atime,
+                    mode: mode,
+                    ino: ino,
+                    dev: dev,
+                    nlink: nlink,
+                    size: size,
+                    blksize: blksize,
+                    blocks: blocks,
+                    uid: uid,
+                    gid: gid,
+                    rdev: rdev,
+                }),
+                _ => panic!("Wrong return type!"),
             };
             Entry {
-                path: key.to_str().unwrap().to_string(),
-                entry: Stats::DirEntry(entry),
+                path: key,
+                entry: Stats::ScandirResult(entry),
             }
         }
         // TODO: Need to fetch failed path from somewhere
@@ -177,26 +216,22 @@ fn rs_entries(
     root_path: String,
     sorted: bool,
     skip_hidden: bool,
-    metadata: bool,
-    metadata_ext: bool,
     mut max_depth: usize,
+    filter: Option<Filter>,
+    return_type: u8,
     result: Arc<Mutex<Entries>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
+    let root_path = root_path.to_string_lossy();
+    let root_path_len = root_path.len() + 1;
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
-    }
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden)
-        .sort(sorted)
-        .preload_metadata(metadata)
-        .preload_metadata_ext(metadata_ext)
-        .max_depth(max_depth)
-    {
-        let entry = create_entry(&entry);
+    };
+    for entry in walk(&root_path, sorted, skip_hidden, max_depth, filter, return_type) {
+        let entry = create_entry(root_path_len, return_type, &entry);
         let mut result_locked = result.lock().unwrap();
         result_locked.entries.push(entry);
         result_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
@@ -216,26 +251,22 @@ fn rs_entries_iter(
     root_path: String,
     sorted: bool,
     skip_hidden: bool,
-    metadata: bool,
-    metadata_ext: bool,
     mut max_depth: usize,
+    filter: Option<Filter>,
+    return_type: u8,
     alive: Option<Arc<AtomicBool>>,
     tx: Option<channel::Sender<Entry>>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
+    let root_path = root_path.to_string_lossy();
+    let root_path_len = root_path.len() + 1;
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    for entry in WalkDir::new(root_path)
-        .skip_hidden(skip_hidden)
-        .sort(sorted)
-        .preload_metadata(metadata)
-        .preload_metadata_ext(metadata_ext)
-        .max_depth(max_depth)
-    {
-        let entry = create_entry(&entry);
+    for entry in walk(&root_path, sorted, skip_hidden, max_depth, filter, return_type) {
+        let entry = create_entry(root_path_len, return_type, &entry);
         match &tx {
             Some(tx) => {
                 if tx.send(entry).is_err() {
@@ -265,15 +296,23 @@ fn rs_entries_iter(
 }
 
 #[pyfunction]
-pub fn entries(
+pub fn entries<'a>(
     py: Python,
     root_path: String,
     sorted: Option<bool>,
     skip_hidden: Option<bool>,
-    metadata: Option<bool>,
-    metadata_ext: Option<bool>,
     max_depth: Option<usize>,
+    dir_include: Option<Vec<String>>,
+    dir_exclude: Option<Vec<String>>,
+    file_include: Option<Vec<String>>,
+    file_exclude: Option<Vec<String>>,
+    case_sensitive: Option<bool>,
+    return_type: Option<u8>,
 ) -> PyResult<Entries> {
+    let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
+    if return_type > RETURN_TYPE_FULL {
+        return Err(exceptions::ValueError::py_err("Invalid return type".to_string()))
+    }
     let result = Arc::new(Mutex::new(Entries {
         entries: Vec::new(),
         duration: 0.0,
@@ -284,9 +323,9 @@ pub fn entries(
             root_path,
             sorted.unwrap_or(false),
             skip_hidden.unwrap_or(false),
-            metadata.unwrap_or(false),
-            metadata_ext.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
+            create_filter(dir_include, dir_exclude, file_include, file_exclude, case_sensitive),
+            return_type,
             result_cloned,
             None,
         );
@@ -307,9 +346,9 @@ pub struct Scandir {
     root_path: String,
     sorted: bool,
     skip_hidden: bool,
-    metadata: bool,
-    metadata_ext: bool,
     max_depth: usize,
+    return_type: u8,
+    filter: Option<Filter>,
     // Results
     entries: Arc<Mutex<Entries>>,
     // Internal
@@ -335,9 +374,9 @@ impl Scandir {
         let root_path = String::from(&self.root_path);
         let sorted = self.sorted;
         let skip_hidden = self.skip_hidden;
-        let metadata = self.metadata;
-        let metadata_ext = self.metadata_ext;
         let max_depth = self.max_depth;
+        let filter = self.filter.clone();
+        let return_type = self.return_type;
         let entries = self.entries.clone();
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
@@ -347,9 +386,9 @@ impl Scandir {
                     root_path,
                     sorted,
                     skip_hidden,
-                    metadata,
-                    metadata_ext,
                     max_depth,
+                    filter,
+                    return_type,
                     entries,
                     Some(alive),
                 )
@@ -358,9 +397,9 @@ impl Scandir {
                     root_path,
                     sorted,
                     skip_hidden,
-                    metadata,
-                    metadata_ext,
                     max_depth,
+                    filter,
+                    return_type,
                     Some(alive),
                     tx,
                 )
@@ -391,17 +430,21 @@ impl Scandir {
         root_path: &str,
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
-        metadata: Option<bool>,
-        metadata_ext: Option<bool>,
         max_depth: Option<usize>,
+        dir_include: Option<Vec<String>>,
+        dir_exclude: Option<Vec<String>>,
+        file_include: Option<Vec<String>>,
+        file_exclude: Option<Vec<String>>,
+        case_sensitive: Option<bool>,
+        return_type: Option<u8>,
     ) {
         obj.init(Scandir {
             root_path: String::from(root_path),
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
-            metadata: metadata.unwrap_or(false),
-            metadata_ext: metadata_ext.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
+            return_type: return_type.unwrap_or(RETURN_TYPE_BASE),
+            filter: create_filter(dir_include, dir_exclude, file_include, file_exclude, case_sensitive),
             entries: Arc::new(Mutex::new(Entries {
                 entries: Vec::new(),
                 duration: 0.0,
@@ -429,8 +472,13 @@ impl Scandir {
         let pyresult = PyDict::new(py);
         for entry in &entries_locked.entries {
             match &entry.entry {
-                Stats::DirEntry(e) => pyresult
-                    .set_item(entry.path.to_object(py), PyRef::new(py, e.clone()).unwrap())
+                Stats::ScandirResult(e) => pyresult
+                    .set_item(entry.path.to_object(py),
+                        match e {
+                            ScandirResult::DirEntry(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
+                            ScandirResult::DirEntryExt(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
+                            ScandirResult::DirEntryFull(e) => PyRef::new(py, e.clone()).unwrap().to_object(py),
+                        })
                     .unwrap(),
                 Stats::Error(e) => pyresult.set_item(entry.path.to_object(py), e).unwrap(),
                 Stats::Duration(_) => {}
@@ -444,9 +492,9 @@ impl Scandir {
             self.root_path.clone(),
             self.sorted,
             self.skip_hidden,
-            self.metadata,
-            self.metadata_ext,
             self.max_depth,
+            self.filter.clone(),
+            self.return_type,
             self.entries.clone(),
             None,
         );
@@ -529,7 +577,7 @@ impl<'p> PyIterProtocol for Scandir {
         match &slf.rx {
             Some(rx) => match rx.recv() {
                 Ok(val) => match &val.entry {
-                    Stats::DirEntry(_) => Ok(Some(val.to_object(py))),
+                    Stats::ScandirResult(_) => Ok(Some(val.to_object(py))),
                     Stats::Error(_) => Ok(Some(val.to_object(py))),
                     Stats::Duration(d) => {
                         let mut entries_locked = slf.entries.lock().unwrap();

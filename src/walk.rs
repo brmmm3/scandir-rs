@@ -88,7 +88,7 @@ pub fn rs_toc_iter(
     mut max_depth: usize,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
-    tx: channel::Sender<IterResult>,
+    tx: channel::Sender<WalkResult>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
@@ -111,7 +111,7 @@ pub fn rs_toc_iter(
     {
         update_toc(&entry, &mut toc);
         if tx.is_empty() {
-            if tx.send(IterResult::Toc(toc)).is_err() {
+            if tx.send(WalkResult::Toc(toc)).is_err() {
                 return;
             }
             toc = Toc {
@@ -135,7 +135,7 @@ pub fn rs_toc_iter(
         }
     }
     if send {
-        let _ = tx.send(IterResult::Toc(toc));
+        let _ = tx.send(WalkResult::Toc(toc));
     }
     match &duration {
         Some(d) => {
@@ -153,7 +153,7 @@ pub fn rs_walk_iter(
     mut max_depth: usize,
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
-    tx: channel::Sender<IterResult>,
+    tx: channel::Sender<WalkResult>,
 ) {
     #[cfg(unix)]
     let root_path = expanduser(root_path).unwrap();
@@ -219,7 +219,7 @@ pub fn rs_walk_iter(
     }
     for key in list {
         if tx
-            .send(IterResult::WalkEntry(WalkEntry {
+            .send(WalkResult::WalkEntry(WalkEntry {
                 path: key.clone(),
                 toc: map.get(&key).unwrap().clone(),
             }))
@@ -274,14 +274,14 @@ pub struct Walk {
     sorted: bool,
     skip_hidden: bool,
     max_depth: usize,
-    iter_type: u8,
+    return_type: u8,
     // Results
     toc: Arc<Mutex<Toc>>,
     duration: Arc<AtomicU64>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
-    rx: Option<channel::Receiver<IterResult>>,
+    rx: Option<channel::Receiver<WalkResult>>,
     has_results: bool,
 }
 
@@ -308,7 +308,7 @@ impl Walk {
         self.has_results = true;
     }
 
-    fn rs_start(&mut self, tx: Option<channel::Sender<IterResult>>) -> bool {
+    fn rs_start(&mut self, tx: Option<channel::Sender<WalkResult>>) -> bool {
         if self.thr.is_some() {
             return false;
         }
@@ -336,7 +336,7 @@ impl Walk {
                 )
             }));
         } else {
-            if self.iter_type == ITER_TYPE_TOC {
+            if self.return_type == RETURN_TYPE_BASE {
                 self.thr = Some(thread::spawn(move || {
                     rs_toc_iter(
                         root_path,
@@ -398,14 +398,14 @@ impl Walk {
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
         max_depth: Option<usize>,
-        iter_type: Option<u8>,
+        return_type: Option<u8>,
     ) {
         obj.init(Walk {
             root_path: String::from(root_path),
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
-            iter_type: iter_type.unwrap_or(ITER_TYPE_WALK),
+            return_type: return_type.unwrap_or(RETURN_TYPE_WALK),
             toc: Arc::new(Mutex::new(Toc {
                 dirs: Vec::new(),
                 files: Vec::new(),
@@ -543,9 +543,9 @@ impl<'p> PyIterProtocol for Walk {
         match &slf.rx {
             Some(rx) => match rx.recv() {
                 Ok(val) => match val {
-                    IterResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
-                    IterResult::WalkEntry(mut entry) => {
-                        if slf.iter_type == ITER_TYPE_WALKEXT {
+                    WalkResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
+                    WalkResult::WalkEntry(mut entry) => {
+                        if slf.return_type == RETURN_TYPE_EXT {
                             Ok(Some(entry.to_object(gil.python())))
                         } else {
                             let py = gil.python();

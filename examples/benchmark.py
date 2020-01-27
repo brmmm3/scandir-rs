@@ -33,7 +33,7 @@ dt = time.time() - t1
 print(f"scandir_rs.count.Count: {dt:.3f}")
 
 t1 = time.time()
-for result in r.walk.Walk(dirName, iter_type=r.ITER_TYPE_WALK):
+for result in r.walk.Walk(dirName, return_type=r.RETURN_TYPE_WALK):
     pass
 dt = time.time() - t1
 print(f"scandir_rs.walk.Walk: {dt:.3f}")

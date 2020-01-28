@@ -159,6 +159,14 @@ pub fn walk(
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     };
+    if filter.is_none() {
+        return WalkDirGeneric::new(root_path)
+            .skip_hidden(skip_hidden)
+            .sort(sorted)
+            .preload_metadata(return_type > RETURN_TYPE_FAST)
+            .preload_metadata_ext(return_type > RETURN_TYPE_BASE)
+            .max_depth(max_depth);
+    }
     WalkDirGeneric::new(root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)

@@ -179,7 +179,7 @@ pub fn rs_walk_iter(
         skip_hidden,
         max_depth,
         filter,
-        RETURN_TYPE_FAST,
+        RETURN_TYPE_BASE,
     ) {
         match &entry {
             Ok(v) => {

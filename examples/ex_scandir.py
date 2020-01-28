@@ -1,15 +1,31 @@
-#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 
 import time
 import sys
 
-import scandir_rs as r
+import scandir_rs as scandir
 
-#print(r.walk.toc("~/workspace", sorted=True))
 
-W = r.scandir.Walk("~/workspace")
+print("*** return_type=RETURN_TYPE_WALK:")
+for pathName, dirEntry in scandir.scandir.Scandir("~/workspace/test0",
+                                                  return_type=scandir.RETURN_TYPE_FAST):
+    print("#", pathName, dirEntry)
 
-for result in W:
-    print(result)
 
-#print(W.list())
+print("*** return_type=RETURN_TYPE_WALK:")
+for pathName, dirEntry in scandir.scandir.Scandir("~/workspace/test0",
+                                                  return_type=scandir.RETURN_TYPE_BASE):
+    print("#", pathName, dirEntry)
+
+
+print("*** return_type=RETURN_TYPE_WALK:")
+for pathName, dirEntry in scandir.scandir.Scandir("~/workspace/test0",
+                                                  return_type=scandir.RETURN_TYPE_EXT):
+    print("#", pathName, dirEntry)
+
+
+print("*** return_type=RETURN_TYPE_WALK:")
+for pathName, dirEntry in scandir.scandir.Scandir("~/workspace/test0",
+                                                  file_include=["*.txt"],
+                                                  return_type=scandir.RETURN_TYPE_FULL):
+    print("#", pathName, dirEntry)

@@ -1,25 +1,25 @@
-#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 
 import time
 import sys
 
-import scandir_rs as r
+import scandir_rs as scandir
 
 
-print("# return_type=TOC:")
-for nr, result in enumerate(r.walk.Walk("~/workspace", return_type=r.RETURN_TYPE_BASE)):
-    print(result)
-    if nr > 3:
-        break
+print("*** return_type=RETURN_TYPE_WALK:")
+for root, dirs, files in scandir.walk.Walk("~/workspace/test0",
+                                           return_type=scandir.RETURN_TYPE_WALK):
+    print("#", root)
+    print("dirs", dirs)
+    print("files", files)
 
-print("\n# return_type=WALK:")
-for nr, result in enumerate(r.walk.Walk("~/workspace")):
-    print(result)
-    if nr > 3:
-        break
 
-print("\n# return_type=WALKEXT:")
-for nr, result in enumerate(r.walk.Walk("~/workspace", return_type=r.RETURN_TYPE_EXT)):
-    print(result)
-    if nr > 3:
-        break
+print("\n*** return_type=RETURN_TYPE_EXT:")
+for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace/test0",
+                                                                    return_type=scandir.RETURN_TYPE_EXT):
+    print("#", root)
+    print("dirs", dirs)
+    print("files", files)
+    print("symlinks", symlinks)
+    print("other", other)
+    print("errors", errors)

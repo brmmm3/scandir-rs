@@ -401,43 +401,8 @@ impl Count {
         Ok(self.has_results)
     }
 
-    fn as_dict(&self) -> PyResult<PyObject> {
-        let gil = GILGuard::acquire();
-        let stats_locked = self.statistics.lock().unwrap();
-        let pyresult = PyDict::new(gil.python());
-        if stats_locked.dirs > 0 {
-            pyresult.set_item("dirs", stats_locked.dirs).unwrap();
-        }
-        if stats_locked.files > 0 {
-            pyresult.set_item("files", stats_locked.files).unwrap();
-        }
-        if stats_locked.slinks > 0 {
-            pyresult.set_item("slinks", stats_locked.slinks).unwrap();
-        }
-        if stats_locked.hlinks > 0 {
-            pyresult.set_item("hlinks", stats_locked.hlinks).unwrap();
-        }
-        if stats_locked.devices > 0 {
-            pyresult.set_item("devices", stats_locked.devices).unwrap();
-        }
-        if stats_locked.pipes > 0 {
-            pyresult.set_item("pipes", stats_locked.pipes).unwrap();
-        }
-        if stats_locked.size > 0 {
-            pyresult.set_item("size", stats_locked.size).unwrap();
-        }
-        if stats_locked.usage > 0 {
-            pyresult.set_item("usage", stats_locked.usage).unwrap();
-        }
-        if !stats_locked.errors.is_empty() {
-            pyresult
-                .set_item("errors", stats_locked.errors.to_vec())
-                .unwrap();
-        }
-        pyresult
-            .set_item("duration", stats_locked.duration().unwrap())
-            .unwrap();
-        Ok(pyresult.to_object(gil.python()))
+    fn as_dict(&self, duration: Option<bool>) -> PyResult<PyObject> {
+        self.statistics.lock().unwrap().as_dict(duration)
     }
 
     fn collect(&mut self) -> PyResult<Statistics> {

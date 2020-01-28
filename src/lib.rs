@@ -14,7 +14,6 @@ pub mod walk;
 use walk::*;
 pub mod scandir;
 use scandir::*;
-mod test;
 
 #[pymodule(scandir_rs)]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {

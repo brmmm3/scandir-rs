@@ -149,7 +149,7 @@ fn create_entry(
                     {
                         st_blksize = 4096;
                         st_blocks = st_size >> 12;
-                        if blocks << 12 < st_size {
+                        if st_blocks << 12 < st_size {
                             st_blocks += 1;
                         }
                     }

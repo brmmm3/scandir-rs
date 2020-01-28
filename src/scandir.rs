@@ -68,6 +68,7 @@ pub struct Entries {
     /// List of scandir results
     pub entries: Vec<Entry>,
     /// Time used for iteration
+    #[pyo3(get)]
     pub duration: f64,
 }
 
@@ -76,11 +77,6 @@ impl Entries {
     #[getter]
     fn entries(&self) -> PyResult<PyObject> {
         Ok(PyTuple::new(GILGuard::acquire().python(), &self.entries).into())
-    }
-
-    #[getter]
-    fn duration(&self) -> PyResult<f64> {
-        Ok(self.duration)
     }
 }
 
@@ -99,19 +95,19 @@ fn create_entry(
     match entry {
         Ok(v) => {
             let file_type = v.file_type_result.as_ref().unwrap();
-            let mut ctime: f64 = 0.0;
-            let mut mtime: f64 = 0.0;
-            let mut atime: f64 = 0.0;
-            let mut mode: u32 = 0;
-            let mut ino: u64 = 0;
-            let mut dev: u64 = 0;
-            let mut nlink: u64 = 0;
-            let mut size: u64 = 0;
-            let mut blksize: u64 = 4096;
-            let mut blocks: u64 = 0;
-            let mut uid: u32 = 0;
-            let mut gid: u32 = 0;
-            let mut rdev: u64 = 0;
+            let mut st_ctime: f64 = 0.0;
+            let mut st_mtime: f64 = 0.0;
+            let mut st_atime: f64 = 0.0;
+            let mut st_mode: u32 = 0;
+            let mut st_ino: u64 = 0;
+            let mut st_dev: u64 = 0;
+            let mut st_nlink: u64 = 0;
+            let mut st_size: u64 = 0;
+            let mut st_blksize: u64 = 4096;
+            let mut st_blocks: u64 = 0;
+            let mut st_uid: u32 = 0;
+            let mut st_gid: u32 = 0;
+            let mut st_rdev: u64 = 0;
             if v.metadata_result.is_some() {
                 let metadata = v.metadata_result.as_ref().unwrap().as_ref().unwrap();
                 let duration = metadata
@@ -119,41 +115,41 @@ fn create_entry(
                     .unwrap()
                     .duration_since(UNIX_EPOCH)
                     .unwrap();
-                ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+                st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
                 let duration = metadata
                     .modified()
                     .unwrap()
                     .duration_since(UNIX_EPOCH)
                     .unwrap();
-                mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+                st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
                 let duration = metadata
                     .accessed()
                     .unwrap()
                     .duration_since(UNIX_EPOCH)
                     .unwrap();
-                atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+                st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
                 let metadata_ext = v.ext.as_ref();
                 if metadata_ext.is_some() {
                     let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
-                    mode = metadata_ext.mode;
-                    ino = metadata_ext.ino;
-                    dev = metadata_ext.dev as u64;
-                    nlink = metadata_ext.nlink as u64;
-                    size = metadata_ext.size;
+                    st_mode = metadata_ext.mode;
+                    st_ino = metadata_ext.ino;
+                    st_dev = metadata_ext.dev as u64;
+                    st_nlink = metadata_ext.nlink as u64;
+                    st_size = metadata_ext.size;
                     #[cfg(unix)]
                     {
-                        blksize = metadata_ext.blksize;
-                        blocks = metadata_ext.blocks;
-                        uid = metadata_ext.uid;
-                        gid = metadata_ext.gid;
-                        rdev = metadata_ext.rdev;
+                        st_blksize = metadata_ext.blksize;
+                        st_blocks = metadata_ext.blocks;
+                        st_uid = metadata_ext.uid;
+                        st_gid = metadata_ext.gid;
+                        st_rdev = metadata_ext.rdev;
                     }
                     #[cfg(windows)]
                     {
-                        blksize = 4096;
-                        blocks = size >> 12;
-                        if blocks << 12 < size {
-                            blocks += 1;
+                        st_blksize = 4096;
+                        st_blocks = st_size >> 12;
+                        if blocks << 12 < st_size {
+                            st_blocks += 1;
                         }
                     }
                 }
@@ -167,27 +163,27 @@ fn create_entry(
                     is_symlink: file_type.is_symlink(),
                     is_dir: file_type.is_dir(),
                     is_file: file_type.is_file(),
-                    ctime: ctime,
-                    mtime: mtime,
-                    atime: atime,
+                    st_ctime: st_ctime,
+                    st_mtime: st_mtime,
+                    st_atime: st_atime,
                 }),
                 RETURN_TYPE_EXT => ScandirResult::DirEntryExt(DirEntryExt {
                     is_symlink: file_type.is_symlink(),
                     is_dir: file_type.is_dir(),
                     is_file: file_type.is_file(),
-                    ctime: ctime,
-                    mtime: mtime,
-                    atime: atime,
-                    mode: mode,
-                    ino: ino,
-                    dev: dev,
-                    nlink: nlink,
-                    size: size,
-                    blksize: blksize,
-                    blocks: blocks,
-                    uid: uid,
-                    gid: gid,
-                    rdev: rdev,
+                    st_ctime: st_ctime,
+                    st_mtime: st_mtime,
+                    st_atime: st_atime,
+                    st_mode: st_mode,
+                    st_ino: st_ino,
+                    st_dev: st_dev,
+                    st_nlink: st_nlink,
+                    st_size: st_size,
+                    st_blksize: st_blksize,
+                    st_blocks: st_blocks,
+                    st_uid: st_uid,
+                    st_gid: st_gid,
+                    st_rdev: st_rdev,
                 }),
                 RETURN_TYPE_FULL => ScandirResult::DirEntryFull(DirEntryFull {
                     name: file_name,
@@ -195,19 +191,19 @@ fn create_entry(
                     is_symlink: file_type.is_symlink(),
                     is_dir: file_type.is_dir(),
                     is_file: file_type.is_file(),
-                    ctime: ctime,
-                    mtime: mtime,
-                    atime: atime,
-                    mode: mode,
-                    ino: ino,
-                    dev: dev,
-                    nlink: nlink,
-                    size: size,
-                    blksize: blksize,
-                    blocks: blocks,
-                    uid: uid,
-                    gid: gid,
-                    rdev: rdev,
+                    st_ctime: st_ctime,
+                    st_mtime: st_mtime,
+                    st_atime: st_atime,
+                    st_mode: st_mode,
+                    st_ino: st_ino,
+                    st_dev: st_dev,
+                    st_nlink: st_nlink,
+                    st_size: st_size,
+                    st_blksize: st_blksize,
+                    st_blocks: st_blocks,
+                    st_uid: st_uid,
+                    st_gid: st_gid,
+                    st_rdev: st_rdev,
                 }),
                 _ => panic!("Wrong return type!"),
             };

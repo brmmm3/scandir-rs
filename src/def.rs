@@ -20,9 +20,12 @@ pub struct DirEntry {
     pub is_symlink: bool,
     pub is_dir: bool,
     pub is_file: bool,
-    pub ctime: f64,
-    pub mtime: f64,
-    pub atime: f64,
+    #[pyo3(get)]
+    pub st_ctime: f64,
+    #[pyo3(get)]
+    pub st_mtime: f64,
+    #[pyo3(get)]
+    pub st_atime: f64,
 }
 
 #[pymethods]
@@ -33,17 +36,17 @@ impl DirEntry {
         is_symlink: bool,
         is_dir: bool,
         is_file: bool,
-        ctime: f64,
-        mtime: f64,
-        atime: f64,
+        st_ctime: f64,
+        st_mtime: f64,
+        st_atime: f64,
     ) {
         obj.init(DirEntry {
             is_symlink: is_symlink,
             is_dir: is_dir,
             is_file: is_file,
-            ctime: ctime,
-            mtime: mtime,
-            atime: atime,
+            st_ctime: st_ctime,
+            st_mtime: st_mtime,
+            st_atime: st_atime,
         });
     }
 
@@ -57,21 +60,6 @@ impl DirEntry {
 
     fn is_file(&self) -> PyResult<bool> {
         Ok(self.is_file.into())
-    }
-
-    #[getter]
-    fn st_ctime(&self) -> PyResult<f64> {
-        Ok(self.ctime.into())
-    }
-
-    #[getter]
-    fn st_mtime(&self) -> PyResult<f64> {
-        Ok(self.mtime.into())
-    }
-
-    #[getter]
-    fn st_atime(&self) -> PyResult<f64> {
-        Ok(self.atime.into())
     }
 }
 
@@ -88,19 +76,32 @@ pub struct DirEntryExt {
     pub is_symlink: bool,
     pub is_dir: bool,
     pub is_file: bool,
-    pub ctime: f64,
-    pub mtime: f64,
-    pub atime: f64,
-    pub mode: u32,
-    pub ino: u64,
-    pub dev: u64,
-    pub nlink: u64,
-    pub size: u64,
-    pub blksize: u64,
-    pub blocks: u64,
-    pub uid: u32,
-    pub gid: u32,
-    pub rdev: u64,
+    #[pyo3(get)]
+    pub st_ctime: f64,
+    #[pyo3(get)]
+    pub st_mtime: f64,
+    #[pyo3(get)]
+    pub st_atime: f64,
+    #[pyo3(get)]
+    pub st_mode: u32,
+    #[pyo3(get)]
+    pub st_ino: u64,
+    #[pyo3(get)]
+    pub st_dev: u64,
+    #[pyo3(get)]
+    pub st_nlink: u64,
+    #[pyo3(get)]
+    pub st_size: u64,
+    #[pyo3(get)]
+    pub st_blksize: u64,
+    #[pyo3(get)]
+    pub st_blocks: u64,
+    #[pyo3(get)]
+    pub st_uid: u32,
+    #[pyo3(get)]
+    pub st_gid: u32,
+    #[pyo3(get)]
+    pub st_rdev: u64,
 }
 
 #[pymethods]
@@ -111,37 +112,37 @@ impl DirEntryExt {
         is_symlink: bool,
         is_dir: bool,
         is_file: bool,
-        ctime: f64,
-        mtime: f64,
-        atime: f64,
-        mode: u32,
-        ino: u64,
-        dev: u64,
-        nlink: u64,
-        size: u64,
-        blksize: u64,
-        blocks: u64,
-        uid: u32,
-        gid: u32,
-        rdev: u64,
+        st_ctime: f64,
+        st_mtime: f64,
+        st_atime: f64,
+        st_mode: u32,
+        st_ino: u64,
+        st_dev: u64,
+        st_nlink: u64,
+        st_size: u64,
+        st_blksize: u64,
+        st_blocks: u64,
+        st_uid: u32,
+        st_gid: u32,
+        st_rdev: u64,
     ) {
         obj.init(DirEntryExt {
             is_symlink: is_symlink,
             is_dir: is_dir,
             is_file: is_file,
-            ctime: ctime,
-            mtime: mtime,
-            atime: atime,
-            mode: mode,
-            ino: ino,
-            dev: dev,
-            nlink: nlink,
-            size: size,
-            blksize: blksize,
-            blocks: blocks,
-            uid: uid,
-            gid: gid,
-            rdev: rdev,
+            st_ctime: st_ctime,
+            st_mtime: st_mtime,
+            st_atime: st_atime,
+            st_mode: st_mode,
+            st_ino: st_ino,
+            st_dev: st_dev,
+            st_nlink: st_nlink,
+            st_size: st_size,
+            st_blksize: st_blksize,
+            st_blocks: st_blocks,
+            st_uid: st_uid,
+            st_gid: st_gid,
+            st_rdev: st_rdev,
         });
     }
 
@@ -155,71 +156,6 @@ impl DirEntryExt {
 
     fn is_file(&self) -> PyResult<bool> {
         Ok(self.is_file.into())
-    }
-
-    #[getter]
-    fn st_ctime(&self) -> PyResult<f64> {
-        Ok(self.ctime.into())
-    }
-
-    #[getter]
-    fn st_mtime(&self) -> PyResult<f64> {
-        Ok(self.mtime.into())
-    }
-
-    #[getter]
-    fn st_atime(&self) -> PyResult<f64> {
-        Ok(self.atime.into())
-    }
-
-    #[getter]
-    fn st_mode(&self) -> PyResult<u32> {
-        Ok(self.mode.into())
-    }
-
-    #[getter]
-    fn st_ino(&self) -> PyResult<u64> {
-        Ok(self.ino.into())
-    }
-
-    #[getter]
-    fn st_dev(&self) -> PyResult<u64> {
-        Ok(self.dev.into())
-    }
-
-    #[getter]
-    fn st_nlink(&self) -> PyResult<u64> {
-        Ok(self.nlink.into())
-    }
-
-    #[getter]
-    fn st_size(&self) -> PyResult<u64> {
-        Ok(self.size.into())
-    }
-
-    #[getter]
-    fn st_blksize(&self) -> PyResult<u64> {
-        Ok(self.blksize.into())
-    }
-
-    #[getter]
-    fn st_blocks(&self) -> PyResult<u64> {
-        Ok(self.blocks.into())
-    }
-
-    #[getter]
-    fn st_uid(&self) -> PyResult<u32> {
-        Ok(self.uid.into())
-    }
-
-    #[getter]
-    fn st_gid(&self) -> PyResult<u32> {
-        Ok(self.gid.into())
-    }
-
-    #[getter]
-    fn st_rdev(&self) -> PyResult<u64> {
-        Ok(self.rdev.into())
     }
 }
 
@@ -233,24 +169,39 @@ impl<'p> PyObjectProtocol<'p> for DirEntryExt {
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct DirEntryFull {
+    #[pyo3(get)]
     pub name: String,
+    #[pyo3(get)]
     pub path: String,
     pub is_symlink: bool,
     pub is_dir: bool,
     pub is_file: bool,
-    pub ctime: f64,
-    pub mtime: f64,
-    pub atime: f64,
-    pub mode: u32,
-    pub ino: u64,
-    pub dev: u64,
-    pub nlink: u64,
-    pub size: u64,
-    pub blksize: u64,
-    pub blocks: u64,
-    pub uid: u32,
-    pub gid: u32,
-    pub rdev: u64,
+    #[pyo3(get)]
+    pub st_ctime: f64,
+    #[pyo3(get)]
+    pub st_mtime: f64,
+    #[pyo3(get)]
+    pub st_atime: f64,
+    #[pyo3(get)]
+    pub st_mode: u32,
+    #[pyo3(get)]
+    pub st_ino: u64,
+    #[pyo3(get)]
+    pub st_dev: u64,
+    #[pyo3(get)]
+    pub st_nlink: u64,
+    #[pyo3(get)]
+    pub st_size: u64,
+    #[pyo3(get)]
+    pub st_blksize: u64,
+    #[pyo3(get)]
+    pub st_blocks: u64,
+    #[pyo3(get)]
+    pub st_uid: u32,
+    #[pyo3(get)]
+    pub st_gid: u32,
+    #[pyo3(get)]
+    pub st_rdev: u64,
 }
 
 #[pymethods]
@@ -263,19 +214,19 @@ impl DirEntryFull {
         is_symlink: bool,
         is_dir: bool,
         is_file: bool,
-        ctime: f64,
-        mtime: f64,
-        atime: f64,
-        mode: u32,
-        ino: u64,
-        dev: u64,
-        nlink: u64,
-        size: u64,
-        blksize: u64,
-        blocks: u64,
-        uid: u32,
-        gid: u32,
-        rdev: u64,
+        st_ctime: f64,
+        st_mtime: f64,
+        st_atime: f64,
+        st_mode: u32,
+        st_ino: u64,
+        st_dev: u64,
+        st_nlink: u64,
+        st_size: u64,
+        st_blksize: u64,
+        st_blocks: u64,
+        st_uid: u32,
+        st_gid: u32,
+        st_rdev: u64,
     ) {
         obj.init(DirEntryFull {
             name: name,
@@ -283,30 +234,20 @@ impl DirEntryFull {
             is_symlink: is_symlink,
             is_dir: is_dir,
             is_file: is_file,
-            ctime: ctime,
-            mtime: mtime,
-            atime: atime,
-            mode: mode,
-            ino: ino,
-            dev: dev,
-            nlink: nlink,
-            size: size,
-            blksize: blksize,
-            blocks: blocks,
-            uid: uid,
-            gid: gid,
-            rdev: rdev,
+            st_ctime: st_ctime,
+            st_mtime: st_mtime,
+            st_atime: st_atime,
+            st_mode: st_mode,
+            st_ino: st_ino,
+            st_dev: st_dev,
+            st_nlink: st_nlink,
+            st_size: st_size,
+            st_blksize: st_blksize,
+            st_blocks: st_blocks,
+            st_uid: st_uid,
+            st_gid: st_gid,
+            st_rdev: st_rdev,
         });
-    }
-
-    #[getter]
-    fn name(&self) -> PyResult<String> {
-        Ok(self.name.clone().into())
-    }
-
-    #[getter]
-    fn path(&self) -> PyResult<String> {
-        Ok(self.path.clone().into())
     }
 
     fn is_symlink(&self) -> PyResult<bool> {
@@ -319,71 +260,6 @@ impl DirEntryFull {
 
     fn is_file(&self) -> PyResult<bool> {
         Ok(self.is_file.into())
-    }
-
-    #[getter]
-    fn st_ctime(&self) -> PyResult<f64> {
-        Ok(self.ctime.into())
-    }
-
-    #[getter]
-    fn st_mtime(&self) -> PyResult<f64> {
-        Ok(self.mtime.into())
-    }
-
-    #[getter]
-    fn st_atime(&self) -> PyResult<f64> {
-        Ok(self.atime.into())
-    }
-
-    #[getter]
-    fn st_mode(&self) -> PyResult<u32> {
-        Ok(self.mode.into())
-    }
-
-    #[getter]
-    fn st_ino(&self) -> PyResult<u64> {
-        Ok(self.ino.into())
-    }
-
-    #[getter]
-    fn st_dev(&self) -> PyResult<u64> {
-        Ok(self.dev.into())
-    }
-
-    #[getter]
-    fn st_nlink(&self) -> PyResult<u64> {
-        Ok(self.nlink.into())
-    }
-
-    #[getter]
-    fn st_size(&self) -> PyResult<u64> {
-        Ok(self.size.into())
-    }
-
-    #[getter]
-    fn st_blksize(&self) -> PyResult<u64> {
-        Ok(self.blksize.into())
-    }
-
-    #[getter]
-    fn st_blocks(&self) -> PyResult<u64> {
-        Ok(self.blocks.into())
-    }
-
-    #[getter]
-    fn st_uid(&self) -> PyResult<u32> {
-        Ok(self.uid.into())
-    }
-
-    #[getter]
-    fn st_gid(&self) -> PyResult<u32> {
-        Ok(self.gid.into())
-    }
-
-    #[getter]
-    fn st_rdev(&self) -> PyResult<u64> {
-        Ok(self.rdev.into())
     }
 }
 
@@ -404,10 +280,15 @@ pub enum ScandirResult {
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Toc {
+    #[pyo3(get)]
     pub dirs: Vec<String>,
+    #[pyo3(get)]
     pub files: Vec<String>,
+    #[pyo3(get)]
     pub symlinks: Vec<String>,
+    #[pyo3(get)]
     pub other: Vec<String>,
+    #[pyo3(get)]
     pub errors: Vec<String>,
 }
 
@@ -420,31 +301,6 @@ impl pyo3::class::PyObjectProtocol for Toc {
 
 #[pymethods]
 impl Toc {
-    #[getter]
-    fn dirs(&self) -> PyResult<Vec<String>> {
-        Ok(self.dirs.to_vec())
-    }
-
-    #[getter]
-    fn files(&self) -> PyResult<Vec<String>> {
-        Ok(self.files.to_vec())
-    }
-
-    #[getter]
-    fn symlinks(&self) -> PyResult<Vec<String>> {
-        Ok(self.symlinks.to_vec())
-    }
-
-    #[getter]
-    fn other(&self) -> PyResult<Vec<String>> {
-        Ok(self.other.to_vec())
-    }
-
-    #[getter]
-    fn errors(&self) -> PyResult<Vec<String>> {
-        Ok(self.errors.to_vec())
-    }
-
     pub fn clear(&mut self) {
         self.dirs.clear();
         self.files.clear();

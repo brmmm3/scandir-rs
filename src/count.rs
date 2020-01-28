@@ -17,75 +17,73 @@ use crate::def::*;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Statistics {
+    #[pyo3(get)]
     pub dirs: u32,
+    #[pyo3(get)]
     pub files: u32,
+    #[pyo3(get)]
     pub slinks: u32,
+    #[pyo3(get)]
     pub hlinks: u32,
+    #[pyo3(get)]
     pub devices: u32,
+    #[pyo3(get)]
     pub pipes: u32,
+    #[pyo3(get)]
     pub size: u64,
+    #[pyo3(get)]
     pub usage: u64,
+    #[pyo3(get)]
     pub errors: Vec<String>,
+    #[pyo3(get)]
     pub duration: f64,
+}
+
+#[pymethods]
+impl Statistics {
+    fn as_dict(&self, duration: Option<bool>) -> PyResult<PyObject> {
+        let gil = GILGuard::acquire();
+        let pyresult = PyDict::new(gil.python());
+        if self.dirs > 0 {
+            pyresult.set_item("dirs", self.dirs).unwrap();
+        }
+        if self.files > 0 {
+            pyresult.set_item("files", self.files).unwrap();
+        }
+        if self.slinks > 0 {
+            pyresult.set_item("slinks", self.slinks).unwrap();
+        }
+        if self.hlinks > 0 {
+            pyresult.set_item("hlinks", self.hlinks).unwrap();
+        }
+        if self.devices > 0 {
+            pyresult.set_item("devices", self.devices).unwrap();
+        }
+        if self.pipes > 0 {
+            pyresult.set_item("pipes", self.pipes).unwrap();
+        }
+        if self.size > 0 {
+            pyresult.set_item("size", self.size).unwrap();
+        }
+        if self.usage > 0 {
+            pyresult.set_item("usage", self.usage).unwrap();
+        }
+        if !self.errors.is_empty() {
+            pyresult.set_item("errors", self.errors.to_vec()).unwrap();
+        }
+        if duration.unwrap_or(false) {
+            pyresult
+                .set_item("duration", self.duration().unwrap())
+                .unwrap();
+        }
+        Ok(pyresult.to_object(gil.python()))
+    }
 }
 
 #[pyproto]
 impl pyo3::class::PyObjectProtocol for Statistics {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
-    }
-}
-
-#[pymethods]
-impl Statistics {
-    #[getter]
-    fn dirs(&self) -> PyResult<u32> {
-        Ok(self.dirs)
-    }
-
-    #[getter]
-    fn files(&self) -> PyResult<u32> {
-        Ok(self.files)
-    }
-
-    #[getter]
-    fn slinks(&self) -> PyResult<u32> {
-        Ok(self.slinks)
-    }
-
-    #[getter]
-    fn hlinks(&self) -> PyResult<u32> {
-        Ok(self.hlinks)
-    }
-
-    #[getter]
-    fn devices(&self) -> PyResult<u32> {
-        Ok(self.devices)
-    }
-
-    #[getter]
-    fn pipes(&self) -> PyResult<u32> {
-        Ok(self.pipes)
-    }
-
-    #[getter]
-    fn size(&self) -> PyResult<u64> {
-        Ok(self.size)
-    }
-
-    #[getter]
-    fn usage(&self) -> PyResult<u64> {
-        Ok(self.usage)
-    }
-
-    #[getter]
-    fn errors(&self) -> PyResult<Vec<String>> {
-        Ok(self.errors.to_vec())
-    }
-
-    #[getter]
-    fn duration(&self) -> PyResult<f64> {
-        Ok(self.duration)
     }
 }
 

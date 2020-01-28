@@ -9,7 +9,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, Python};
 
-use crate::common::{create_filter, expand_path, walk};
+#[cfg(unix)]
+use crate::common::expand_path;
+use crate::common::{create_filter, walk};
 use crate::def::*;
 
 #[pyclass]

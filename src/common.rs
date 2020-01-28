@@ -6,10 +6,9 @@ use jwalk::WalkDirGeneric;
 
 use crate::def::*;
 
+#[cfg(unix)]
 pub fn expand_path(path: &str) -> String {
-    #[cfg(unix)]
     let path = expanduser(path).unwrap();
-    #[cfg(unix)]
     path.to_string_lossy().into_owned()
 }
 

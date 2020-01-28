@@ -7,7 +7,7 @@ use crossbeam_channel as channel;
 
 use pyo3::exceptions::{self, ValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
+use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
 #[cfg(unix)]
@@ -49,6 +49,7 @@ impl ToPyObject for Entry {
                         ScandirResult::DirEntryFull(e) => {
                             PyRef::new(py, e.clone()).unwrap().to_object(py)
                         }
+                        ScandirResult::Error(e) => PyString::new(py, &e).to_object(py),
                     },
                 ],
             )
@@ -205,7 +206,7 @@ fn create_entry(
                     st_gid: st_gid,
                     st_rdev: st_rdev,
                 }),
-                _ => panic!("Wrong return type!"),
+                _ => ScandirResult::Error("Wrong return type!".to_string()),
             };
             Entry {
                 path: key,
@@ -533,6 +534,7 @@ impl Scandir {
                             ScandirResult::DirEntryFull(e) => {
                                 PyRef::new(py, e.clone()).unwrap().to_object(py)
                             }
+                            ScandirResult::Error(e) => PyString::new(py, &e).to_object(py),
                         },
                     )
                     .unwrap(),

@@ -275,6 +275,7 @@ pub enum ScandirResult {
     DirEntry(DirEntry),
     DirEntryExt(DirEntryExt),
     DirEntryFull(DirEntryFull),
+    Error(String),
 }
 
 #[pyclass]

@@ -75,7 +75,7 @@ For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct
 
 Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
 
-The returned results are tuples with absolute path and `DirEntry`, `DirEntryExt` or `DirEntryFull` object, depending on the `return_type`.
+The returned results are tuples with absolute path and `DirEntry`, `DirEntryExt` or `DirEntryFull` object, depending on the `return_type`. In case of an error an error string is returned.
 
 ### Parameters
 

@@ -1,3 +1,10 @@
+[project]
+name = "scandir-rs"
+repository = "https://github.com/brmmm3/scandir-rs"
+
 [build-system]
 requires = ["maturin"]
 build-backend = "maturin"
+
+[tool.maturin]
+strip = "on"

@@ -150,15 +150,15 @@ fn rs_count(
                 }
                 if extended {
                     if let Ok(metadata) = fs::metadata(v.path()) {
-                        if metadata.nlink() > 1 {
-                            if file_indexes.contains(&metadata.ino()) {
-                                hlinks += 1;
-                            } else {
-                                file_indexes.insert(metadata.ino());
-                            }
-                        }
                         #[cfg(unix)]
                         {
+                            if metadata.nlink() > 1 {
+                                if file_indexes.contains(&metadata.ino()) {
+                                    hlinks += 1;
+                                } else {
+                                    file_indexes.insert(metadata.ino());
+                                }
+                            }
                             let file_size = metadata.size();
                             let mut blocks = file_size >> 12;
                             if blocks << 12 < file_size {
@@ -175,6 +175,17 @@ fn rs_count(
                         }
                         #[cfg(windows)]
                         {
+                            if let Some(nlink) = metadata.number_of_links() {
+                                if nlink > 1 {
+                                    if let Some(ino) = metadata.file_index() {
+                                        if file_indexes.contains(&ino) {
+                                            hlinks += 1;
+                                        } else {
+                                            file_indexes.insert(ino);
+                                        }
+                                    }
+                                }
+                            }
                             let file_size = metadata.file_size();
                             let mut blocks = file_size >> 12;
                             if blocks << 12 < file_size {

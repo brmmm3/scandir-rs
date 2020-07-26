@@ -1,3 +1,5 @@
+#![cfg_attr(windows, feature(windows_by_handle))]
+
 extern crate glob;
 
 use pyo3::prelude::*;

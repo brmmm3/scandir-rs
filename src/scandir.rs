@@ -133,13 +133,13 @@ fn create_entry(
             .duration_since(UNIX_EPOCH)
             .unwrap();
         st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        st_mode = metadata.mode();
-        st_ino = metadata.ino();
-        st_dev = metadata.dev() as u64;
-        st_nlink = metadata.nlink() as u64;
-        st_size = metadata.size();
         #[cfg(unix)]
         {
+            st_mode = metadata.mode();
+            st_ino = metadata.ino();
+            st_dev = metadata.dev() as u64;
+            st_nlink = metadata.nlink() as u64;
+            st_size = metadata.size();
             st_blksize = metadata.blksize();
             st_blocks = metadata.blocks();
             st_uid = metadata.uid();
@@ -148,6 +148,17 @@ fn create_entry(
         }
         #[cfg(windows)]
         {
+            st_mode = metadata.file_attributes();
+            if let Some(ino) = metadata.file_index() {
+                st_ino = ino;
+            }
+            if let Some(dev) = metadata.volume_serial_number() {
+                st_dev = dev as u64;
+            }
+            if let Some(nlink) = metadata.number_of_links() {
+                st_nlink = nlink as u64;
+            }
+            st_size = metadata.file_size();
             st_blksize = 4096;
             st_blocks = st_size >> 12;
             if st_blocks << 12 < st_size {

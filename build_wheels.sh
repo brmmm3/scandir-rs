@@ -19,5 +19,5 @@ pyenv shell 3.9.0b5
 pip install -U pytest
 maturin build --release --strip -i python3.9
 pip install -U build/temp.linux-x86_64-3.7/scandir-rs/wheels/scandir_rs-0.9.1-cp39-cp39-manylinux1_x86_64.whl
-pyenv shell --unset
 python3.9 -m pytest
+pyenv shell --unset

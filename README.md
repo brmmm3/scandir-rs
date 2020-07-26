@@ -35,10 +35,16 @@ Install ``maturin``:
 cargo install maturin
 ```
 
-Build wheel:
+Build wheel (not on Windows):
 
 ```sh
 maturin build --release --strip
+```
+
+Build wheel on Windows:
+
+```sh
+maturin build --release --strip --no-sdist
 ```
 
 ``maturin`` will build the wheels for all Python versions installed on your system.

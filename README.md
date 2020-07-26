@@ -38,10 +38,19 @@ cargo install maturin
 Build wheel:
 
 ```sh
-maturin build --release
+maturin build --release --strip
 ```
 
 ``maturin`` will build the wheels for all Python versions installed on your system.
+
+## Building and running tests for different Python versions
+
+To make it easier to build wheels for several different Python versions the script ``build_wheels.sh`` has been added.
+It creates wheels for Python versions 3.6, 3.7, 3.8 and 3.9. In addition it runs ``pytest`` after successfull creation of each wheel.
+
+To be able to run the script ``pyenv`` needs to be installed first including all Python interpreter versions mentioned above.
+
+Instruction how to install ``pyenv`` can be found [here](https://github.com/pyenv/pyenv).
 
 ## Examples
 

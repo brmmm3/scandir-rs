@@ -27,8 +27,7 @@ def test_count():
     tempDir = CreateTempFileTree(10, 3, 10)
     count = scandir.count.count(tempDir.name)
     tempDir.cleanup()
-    assert count.as_dict() == {'dirs': 7, 'files': 180,
-                               'size': 4096, 'usage': 4096}
+    assert count.as_dict() == {'dirs': 7, 'files': 180}
 
 
 def test_count_extended():

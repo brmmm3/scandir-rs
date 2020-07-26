@@ -32,22 +32,21 @@ pub struct DirEntry {
 impl DirEntry {
     #[new]
     fn new(
-        obj: &PyRawObject,
         is_symlink: bool,
         is_dir: bool,
         is_file: bool,
         st_ctime: f64,
         st_mtime: f64,
         st_atime: f64,
-    ) {
-        obj.init(DirEntry {
+    ) -> Self {
+        DirEntry {
             is_symlink: is_symlink,
             is_dir: is_dir,
             is_file: is_file,
             st_ctime: st_ctime,
             st_mtime: st_mtime,
             st_atime: st_atime,
-        });
+        }
     }
 
     fn is_symlink(&self) -> PyResult<bool> {
@@ -108,7 +107,6 @@ pub struct DirEntryExt {
 impl DirEntryExt {
     #[new]
     fn new(
-        obj: &PyRawObject,
         is_symlink: bool,
         is_dir: bool,
         is_file: bool,
@@ -125,8 +123,8 @@ impl DirEntryExt {
         st_uid: u32,
         st_gid: u32,
         st_rdev: u64,
-    ) {
-        obj.init(DirEntryExt {
+    ) -> Self {
+        DirEntryExt {
             is_symlink: is_symlink,
             is_dir: is_dir,
             is_file: is_file,
@@ -143,7 +141,7 @@ impl DirEntryExt {
             st_uid: st_uid,
             st_gid: st_gid,
             st_rdev: st_rdev,
-        });
+        }
     }
 
     fn is_symlink(&self) -> PyResult<bool> {
@@ -208,7 +206,6 @@ pub struct DirEntryFull {
 impl DirEntryFull {
     #[new]
     fn new(
-        obj: &PyRawObject,
         name: String,
         path: String,
         is_symlink: bool,
@@ -227,8 +224,8 @@ impl DirEntryFull {
         st_uid: u32,
         st_gid: u32,
         st_rdev: u64,
-    ) {
-        obj.init(DirEntryFull {
+    ) -> Self {
+        DirEntryFull {
             name: name,
             path: path,
             is_symlink: is_symlink,
@@ -247,7 +244,7 @@ impl DirEntryFull {
             st_uid: st_uid,
             st_gid: st_gid,
             st_rdev: st_rdev,
-        });
+        }
     }
 
     fn is_symlink(&self) -> PyResult<bool> {

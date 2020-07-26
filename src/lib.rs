@@ -1,5 +1,3 @@
-#![feature(specialization)]
-
 extern crate glob;
 
 use pyo3::prelude::*;

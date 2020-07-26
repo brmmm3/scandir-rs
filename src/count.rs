@@ -1,4 +1,9 @@
 use std::collections::HashSet;
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+#[cfg(windows)]
+use std::os::windows::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
@@ -9,9 +14,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, Python};
 
+use jwalk::WalkDirGeneric;
+
 #[cfg(unix)]
 use crate::common::expand_path;
-use crate::common::{create_filter, walk};
+use crate::common::{create_filter, filter_children};
 use crate::def::*;
 
 #[pyclass]
@@ -72,9 +79,7 @@ impl Statistics {
             pyresult.set_item("errors", self.errors.to_vec()).unwrap();
         }
         if duration.unwrap_or(false) {
-            pyresult
-                .set_item("duration", self.duration().unwrap())
-                .unwrap();
+            pyresult.set_item("duration", self.duration).unwrap();
         }
         Ok(pyresult.to_object(gil.python()))
     }
@@ -93,7 +98,7 @@ fn rs_count(
     extended: bool, // If true: Count also hardlinks, devices, pipes, size and usage
     mut max_depth: usize,
     filter: Option<Filter>,
-    statistics: &Arc<Mutex<Statistics>>,
+    statistics: Option<Arc<Mutex<Statistics>>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
     #[cfg(unix)]
@@ -116,20 +121,26 @@ fn rs_count(
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    for entry in walk(
-        &root_path,
-        false,
-        skip_hidden,
-        max_depth,
-        filter,
-        match extended {
-            false => RETURN_TYPE_FAST,
-            true => RETURN_TYPE_EXT,
-        },
-    ) {
+    let root_path_len = root_path.len() + 1;
+    for entry in WalkDirGeneric::new(&root_path)
+        .skip_hidden(skip_hidden)
+        .sort(false)
+        .max_depth(max_depth)
+        .process_read_dir(move |_, children| {
+            match &alive {
+                Some(a) => {
+                    if !a.load(Ordering::Relaxed) {
+                        return;
+                    }
+                }
+                None => {}
+            }
+            filter_children(children, &filter, root_path_len);
+        })
+    {
         match &entry {
             Ok(v) => {
-                let file_type = v.file_type_result.as_ref().unwrap();
+                let file_type = v.file_type;
                 if file_type.is_dir() {
                     dirs += 1;
                 } else if file_type.is_file() {
@@ -137,44 +148,77 @@ fn rs_count(
                 } else if file_type.is_symlink() {
                     slinks += 1;
                 }
-                if v.metadata_result.is_some() {
-                    let metadata_ext = v.ext.as_ref();
-                    if metadata_ext.is_some() {
-                        let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
-                        if metadata_ext.nlink > 1 {
-                            if file_indexes.contains(&metadata_ext.ino) {
+                if extended {
+                    if let Ok(metadata) = fs::metadata(v.path()) {
+                        if metadata.nlink() > 1 {
+                            if file_indexes.contains(&metadata.ino()) {
                                 hlinks += 1;
                             } else {
-                                file_indexes.insert(metadata_ext.ino);
+                                file_indexes.insert(metadata.ino());
                             }
                         }
-                        size += metadata_ext.size;
                         #[cfg(unix)]
                         {
-                            if metadata_ext.rdev > 0 {
-                                devices += 1;
-                            }
-                            if (metadata_ext.mode & 4096) != 0 {
-                                pipes += 1;
-                            }
-                            usage += metadata_ext.blocks * 512;
-                        }
-                        #[cfg(windows)]
-                        {
-                            let mut blocks = metadata_ext.size >> 12;
-                            if blocks << 12 < metadata_ext.size {
+                            let file_size = metadata.size();
+                            let mut blocks = file_size >> 12;
+                            if blocks << 12 < file_size {
                                 blocks += 1;
                             }
                             usage += blocks << 12;
+                            size += file_size;
+                            if metadata.rdev() > 0 {
+                                devices += 1;
+                            }
+                            if (metadata.mode() & 4096) != 0 {
+                                pipes += 1;
+                            }
                         }
+                        #[cfg(windows)]
+                        {
+                            let file_size = metadata.file_size();
+                            let mut blocks = file_size >> 12;
+                            if blocks << 12 < file_size {
+                                blocks += 1;
+                            }
+                            usage += blocks << 12;
+                            size += file_size;
+                        }
+                    }
+                }
+                cnt += 1;
+                if (cnt >= 1000) || (update_time.elapsed().as_millis() >= 10) {
+                    match &statistics {
+                        Some(stats) => {
+                            let mut stats_locked = stats.lock().unwrap();
+                            stats_locked.dirs = dirs;
+                            stats_locked.files = files;
+                            stats_locked.slinks = slinks;
+                            stats_locked.hlinks = hlinks;
+                            stats_locked.size = size;
+                            stats_locked.usage = usage;
+                            if stats_locked.errors.len() < errors.len() {
+                                stats_locked.errors.extend_from_slice(&errors);
+                                errors.clear();
+                            }
+                            stats_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
+                            #[cfg(unix)]
+                            {
+                                stats_locked.devices = devices;
+                                stats_locked.pipes = pipes;
+                            }
+                            cnt = 0;
+                            update_time = Instant::now();
+                        }
+                        None => {}
                     }
                 }
             }
             Err(e) => errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere
         }
-        cnt += 1;
-        if (cnt >= 1000) || (update_time.elapsed().as_millis() >= 10) {
-            let mut stats_locked = statistics.lock().unwrap();
+    }
+    match &statistics {
+        Some(stats) => {
+            let mut stats_locked = stats.lock().unwrap();
             stats_locked.dirs = dirs;
             stats_locked.files = files;
             stats_locked.slinks = slinks;
@@ -191,34 +235,8 @@ fn rs_count(
                 stats_locked.devices = devices;
                 stats_locked.pipes = pipes;
             }
-            cnt = 0;
-            update_time = Instant::now();
         }
-        match &alive {
-            Some(a) => {
-                if !a.load(Ordering::Relaxed) {
-                    break;
-                }
-            }
-            None => {}
-        }
-    }
-    let mut stats_locked = statistics.lock().unwrap();
-    stats_locked.dirs = dirs;
-    stats_locked.files = files;
-    stats_locked.slinks = slinks;
-    stats_locked.hlinks = hlinks;
-    stats_locked.size = size;
-    stats_locked.usage = usage;
-    if stats_locked.errors.len() < errors.len() {
-        stats_locked.errors.extend_from_slice(&errors);
-        errors.clear();
-    }
-    stats_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
-    #[cfg(unix)]
-    {
-        stats_locked.devices = devices;
-        stats_locked.pipes = pipes;
+        None => {}
     }
 }
 
@@ -265,7 +283,7 @@ pub fn count(
             extended.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
             filter,
-            &stats_cloned,
+            Some(stats_cloned),
             None,
         );
         Ok(())
@@ -334,7 +352,7 @@ impl Count {
                 extended,
                 max_depth,
                 filter,
-                &statistics,
+                Some(statistics),
                 Some(alive),
             )
         }));
@@ -362,13 +380,12 @@ impl Count {
 impl Count {
     #[new]
     fn __new__(
-        obj: &PyRawObject,
         root_path: &str,
         skip_hidden: Option<bool>,
         extended: Option<bool>,
         max_depth: Option<usize>,
-    ) {
-        obj.init(Count {
+    ) -> Self {
+        Count {
             root_path: String::from(root_path),
             skip_hidden: skip_hidden.unwrap_or(false),
             extended: extended.unwrap_or(false),
@@ -389,7 +406,7 @@ impl Count {
             thr: None,
             alive: None,
             has_results: false,
-        });
+        }
     }
 
     #[getter]
@@ -414,7 +431,7 @@ impl Count {
                 self.extended,
                 self.max_depth,
                 self.filter.clone(),
-                &self.statistics,
+                Some(self.statistics.clone()),
                 None,
             );
             Ok(())

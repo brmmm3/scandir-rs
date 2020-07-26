@@ -1,3 +1,8 @@
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+#[cfg(windows)]
+use std::os::windows::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
@@ -10,9 +15,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
+use jwalk::WalkDirGeneric;
+
 #[cfg(unix)]
 use crate::common::expand_path;
-use crate::common::{create_filter, walk};
+use crate::common::{create_filter, filter_children};
 use crate::def::*;
 
 #[derive(Debug, Clone)]
@@ -41,13 +48,13 @@ impl ToPyObject for Entry {
                     self.path.to_object(py),
                     match e {
                         ScandirResult::DirEntry(e) => {
-                            PyRef::new(py, e.clone()).unwrap().to_object(py)
+                            PyCell::new(py, e.clone()).unwrap().to_object(py)
                         }
                         ScandirResult::DirEntryExt(e) => {
-                            PyRef::new(py, e.clone()).unwrap().to_object(py)
+                            PyCell::new(py, e.clone()).unwrap().to_object(py)
                         }
                         ScandirResult::DirEntryFull(e) => {
-                            PyRef::new(py, e.clone()).unwrap().to_object(py)
+                            PyCell::new(py, e.clone()).unwrap().to_object(py)
                         }
                         ScandirResult::Error(e) => PyString::new(py, &e).to_object(py),
                     },
@@ -91,133 +98,119 @@ impl pyo3::class::PyObjectProtocol for Entries {
 fn create_entry(
     root_path_len: usize,
     return_type: u8,
-    entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
+    dir_entry: &jwalk::DirEntry<((), ())>,
 ) -> Entry {
-    match entry {
-        Ok(v) => {
-            let file_type = v.file_type_result.as_ref().unwrap();
-            let mut st_ctime: f64 = 0.0;
-            let mut st_mtime: f64 = 0.0;
-            let mut st_atime: f64 = 0.0;
-            let mut st_mode: u32 = 0;
-            let mut st_ino: u64 = 0;
-            let mut st_dev: u64 = 0;
-            let mut st_nlink: u64 = 0;
-            let mut st_size: u64 = 0;
-            let mut st_blksize: u64 = 4096;
-            let mut st_blocks: u64 = 0;
-            let mut st_uid: u32 = 0;
-            let mut st_gid: u32 = 0;
-            let mut st_rdev: u64 = 0;
-            if v.metadata_result.is_some() {
-                let metadata = v.metadata_result.as_ref().unwrap().as_ref().unwrap();
-                let duration = metadata
-                    .created()
-                    .unwrap()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap();
-                st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-                let duration = metadata
-                    .modified()
-                    .unwrap()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap();
-                st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-                let duration = metadata
-                    .accessed()
-                    .unwrap()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap();
-                st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-                let metadata_ext = v.ext.as_ref();
-                if metadata_ext.is_some() {
-                    let metadata_ext = metadata_ext.unwrap().as_ref().unwrap();
-                    st_mode = metadata_ext.mode;
-                    st_ino = metadata_ext.ino;
-                    st_dev = metadata_ext.dev as u64;
-                    st_nlink = metadata_ext.nlink as u64;
-                    st_size = metadata_ext.size;
-                    #[cfg(unix)]
-                    {
-                        st_blksize = metadata_ext.blksize;
-                        st_blocks = metadata_ext.blocks;
-                        st_uid = metadata_ext.uid;
-                        st_gid = metadata_ext.gid;
-                        st_rdev = metadata_ext.rdev;
-                    }
-                    #[cfg(windows)]
-                    {
-                        st_blksize = 4096;
-                        st_blocks = st_size >> 12;
-                        if st_blocks << 12 < st_size {
-                            st_blocks += 1;
-                        }
-                    }
-                }
-            }
-            let mut key = v.parent_path.to_path_buf();
-            let file_name = v.file_name.clone().into_string().unwrap();
-            key.push(&file_name);
-            let key = key.to_str().unwrap().to_string();
-            let entry: ScandirResult = match return_type {
-                RETURN_TYPE_FAST | RETURN_TYPE_BASE => ScandirResult::DirEntry(DirEntry {
-                    is_symlink: file_type.is_symlink(),
-                    is_dir: file_type.is_dir(),
-                    is_file: file_type.is_file(),
-                    st_ctime: st_ctime,
-                    st_mtime: st_mtime,
-                    st_atime: st_atime,
-                }),
-                RETURN_TYPE_EXT => ScandirResult::DirEntryExt(DirEntryExt {
-                    is_symlink: file_type.is_symlink(),
-                    is_dir: file_type.is_dir(),
-                    is_file: file_type.is_file(),
-                    st_ctime: st_ctime,
-                    st_mtime: st_mtime,
-                    st_atime: st_atime,
-                    st_mode: st_mode,
-                    st_ino: st_ino,
-                    st_dev: st_dev,
-                    st_nlink: st_nlink,
-                    st_size: st_size,
-                    st_blksize: st_blksize,
-                    st_blocks: st_blocks,
-                    st_uid: st_uid,
-                    st_gid: st_gid,
-                    st_rdev: st_rdev,
-                }),
-                RETURN_TYPE_FULL => ScandirResult::DirEntryFull(DirEntryFull {
-                    name: file_name,
-                    path: key.get(root_path_len..).unwrap_or("").to_string(),
-                    is_symlink: file_type.is_symlink(),
-                    is_dir: file_type.is_dir(),
-                    is_file: file_type.is_file(),
-                    st_ctime: st_ctime,
-                    st_mtime: st_mtime,
-                    st_atime: st_atime,
-                    st_mode: st_mode,
-                    st_ino: st_ino,
-                    st_dev: st_dev,
-                    st_nlink: st_nlink,
-                    st_size: st_size,
-                    st_blksize: st_blksize,
-                    st_blocks: st_blocks,
-                    st_uid: st_uid,
-                    st_gid: st_gid,
-                    st_rdev: st_rdev,
-                }),
-                _ => ScandirResult::Error("Wrong return type!".to_string()),
-            };
-            Entry {
-                path: key,
-                entry: Stats::ScandirResult(entry),
+    let file_type = dir_entry.file_type;
+    let mut st_ctime: f64 = 0.0;
+    let mut st_mtime: f64 = 0.0;
+    let mut st_atime: f64 = 0.0;
+    let mut st_mode: u32 = 0;
+    let mut st_ino: u64 = 0;
+    let mut st_dev: u64 = 0;
+    let mut st_nlink: u64 = 0;
+    let mut st_size: u64 = 0;
+    let mut st_blksize: u64 = 4096;
+    let mut st_blocks: u64 = 0;
+    let mut st_uid: u32 = 0;
+    let mut st_gid: u32 = 0;
+    let mut st_rdev: u64 = 0;
+    if let Ok(metadata) = fs::metadata(dir_entry.path()) {
+        let duration = metadata
+            .created()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap();
+        st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        let duration = metadata
+            .modified()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap();
+        st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        let duration = metadata
+            .accessed()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap();
+        st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        st_mode = metadata.mode();
+        st_ino = metadata.ino();
+        st_dev = metadata.dev() as u64;
+        st_nlink = metadata.nlink() as u64;
+        st_size = metadata.size();
+        #[cfg(unix)]
+        {
+            st_blksize = metadata.blksize();
+            st_blocks = metadata.blocks();
+            st_uid = metadata.uid();
+            st_gid = metadata.gid();
+            st_rdev = metadata.rdev();
+        }
+        #[cfg(windows)]
+        {
+            st_blksize = 4096;
+            st_blocks = st_size >> 12;
+            if st_blocks << 12 < st_size {
+                st_blocks += 1;
             }
         }
-        // TODO: Need to fetch failed path from somewhere
-        Err(e) => Entry {
-            path: String::from("?"),
-            entry: Stats::Error(e.to_string()),
-        },
+    }
+    let mut key = dir_entry.parent_path.to_path_buf();
+    let file_name = dir_entry.file_name.clone().into_string().unwrap();
+    key.push(&file_name);
+    let key = key.to_str().unwrap().to_string();
+    let entry: ScandirResult = match return_type {
+        RETURN_TYPE_FAST | RETURN_TYPE_BASE => ScandirResult::DirEntry(DirEntry {
+            is_symlink: file_type.is_symlink(),
+            is_dir: file_type.is_dir(),
+            is_file: file_type.is_file(),
+            st_ctime: st_ctime,
+            st_mtime: st_mtime,
+            st_atime: st_atime,
+        }),
+        RETURN_TYPE_EXT => ScandirResult::DirEntryExt(DirEntryExt {
+            is_symlink: file_type.is_symlink(),
+            is_dir: file_type.is_dir(),
+            is_file: file_type.is_file(),
+            st_ctime: st_ctime,
+            st_mtime: st_mtime,
+            st_atime: st_atime,
+            st_mode: st_mode,
+            st_ino: st_ino,
+            st_dev: st_dev,
+            st_nlink: st_nlink,
+            st_size: st_size,
+            st_blksize: st_blksize,
+            st_blocks: st_blocks,
+            st_uid: st_uid,
+            st_gid: st_gid,
+            st_rdev: st_rdev,
+        }),
+        RETURN_TYPE_FULL => ScandirResult::DirEntryFull(DirEntryFull {
+            name: file_name,
+            path: key.get(root_path_len..).unwrap_or("").to_string(),
+            is_symlink: file_type.is_symlink(),
+            is_dir: file_type.is_dir(),
+            is_file: file_type.is_file(),
+            st_ctime: st_ctime,
+            st_mtime: st_mtime,
+            st_atime: st_atime,
+            st_mode: st_mode,
+            st_ino: st_ino,
+            st_dev: st_dev,
+            st_nlink: st_nlink,
+            st_size: st_size,
+            st_blksize: st_blksize,
+            st_blocks: st_blocks,
+            st_uid: st_uid,
+            st_gid: st_gid,
+            st_rdev: st_rdev,
+        }),
+        _ => ScandirResult::Error("Wrong return type!".to_string()),
+    };
+    Entry {
+        path: key,
+        entry: Stats::ScandirResult(entry),
     }
 }
 
@@ -233,32 +226,43 @@ fn rs_entries(
 ) {
     #[cfg(unix)]
     let root_path = expand_path(&root_path);
-    let root_path_len = root_path.len();
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     };
-    for entry in walk(
-        &root_path,
-        sorted,
-        skip_hidden,
-        max_depth,
-        filter,
-        return_type,
-    ) {
-        let entry = create_entry(root_path_len, return_type, &entry);
-        let mut result_locked = result.lock().unwrap();
-        result_locked.entries.push(entry);
-        result_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
-        match &alive {
-            Some(a) => {
-                if !a.load(Ordering::Relaxed) {
-                    break;
+    let root_path_len = root_path.len() + 1;
+    let result_clone = result.clone();
+    WalkDirGeneric::new(&root_path)
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .max_depth(max_depth)
+        .process_read_dir(move |_, children| {
+            match &alive {
+                Some(a) => {
+                    if !a.load(Ordering::Relaxed) {
+                        return;
+                    }
                 }
+                None => {}
             }
-            None => {}
-        }
-    }
+            filter_children(children, &filter, root_path_len);
+            children.iter_mut().for_each(|dir_entry_result| {
+                match &alive {
+                    Some(a) => {
+                        if !a.load(Ordering::Relaxed) {
+                            return;
+                        }
+                    }
+                    None => {}
+                }
+                if let Ok(dir_entry) = dir_entry_result {
+                    let entry = create_entry(root_path_len, return_type, dir_entry);
+                    let mut result_locked = result_clone.lock().unwrap();
+                    result_locked.entries.push(entry);
+                    result_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
+                }
+            });
+        });
     result.lock().unwrap().duration = start_time.elapsed().as_millis() as f64 * 0.001;
 }
 
@@ -274,37 +278,40 @@ fn rs_entries_iter(
 ) {
     #[cfg(unix)]
     let root_path = expand_path(&root_path);
-    let root_path_len = root_path.len() + 1;
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    for entry in walk(
-        &root_path,
-        sorted,
-        skip_hidden,
-        max_depth,
-        filter,
-        return_type,
-    ) {
-        let entry = create_entry(root_path_len, return_type, &entry);
-        match &tx {
-            Some(tx) => {
-                if tx.send(entry).is_err() {
-                    return;
+    let root_path_len = root_path.len() + 1;
+    let tx_clone = tx.clone();
+    WalkDirGeneric::new(&root_path)
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .max_depth(max_depth)
+        .process_read_dir(move |_, children| {
+            filter_children(children, &filter, root_path_len);
+            children.iter_mut().for_each(|dir_entry_result| {
+                match &alive {
+                    Some(a) => {
+                        if !a.load(Ordering::Relaxed) {
+                            return;
+                        }
+                    }
+                    None => {}
                 }
-            }
-            None => {}
-        }
-        match &alive {
-            Some(a) => {
-                if !a.load(Ordering::Relaxed) {
-                    break;
+                if let Ok(dir_entry) = dir_entry_result {
+                    let entry = create_entry(root_path_len, return_type, dir_entry);
+                    match &tx_clone {
+                        Some(tx_clone) => {
+                            if tx_clone.send(entry).is_err() {
+                                return;
+                            }
+                        }
+                        None => {}
+                    }
                 }
-            }
-            None => {}
-        }
-    }
+            });
+        });
     match &tx {
         Some(tx) => {
             let _ = tx.send(Entry {
@@ -460,7 +467,6 @@ impl Scandir {
 impl Scandir {
     #[new]
     fn __new__(
-        obj: &PyRawObject,
         root_path: &str,
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
@@ -471,7 +477,7 @@ impl Scandir {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<u8>,
-    ) {
+    ) -> Self {
         let filter = match create_filter(
             dir_include,
             dir_exclude,
@@ -487,7 +493,7 @@ impl Scandir {
                 None
             }
         };
-        obj.init(Scandir {
+        Scandir {
             root_path: String::from(root_path),
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
@@ -502,7 +508,7 @@ impl Scandir {
             alive: None,
             rx: None,
             has_results: false,
-        });
+        }
     }
 
     #[getter]
@@ -526,13 +532,13 @@ impl Scandir {
                         entry.path.to_object(py),
                         match e {
                             ScandirResult::DirEntry(e) => {
-                                PyRef::new(py, e.clone()).unwrap().to_object(py)
+                                PyCell::new(py, e.clone()).unwrap().to_object(py)
                             }
                             ScandirResult::DirEntryExt(e) => {
-                                PyRef::new(py, e.clone()).unwrap().to_object(py)
+                                PyCell::new(py, e.clone()).unwrap().to_object(py)
                             }
                             ScandirResult::DirEntryFull(e) => {
-                                PyRef::new(py, e.clone()).unwrap().to_object(py)
+                                PyCell::new(py, e.clone()).unwrap().to_object(py)
                             }
                             ScandirResult::Error(e) => PyString::new(py, &e).to_object(py),
                         },

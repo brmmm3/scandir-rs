@@ -13,31 +13,25 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyTuple, PyType};
 use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
+use jwalk::WalkDirGeneric;
+
 #[cfg(unix)]
 use crate::common::expand_path;
-use crate::common::{create_filter, walk};
+use crate::common::{create_filter, filter_children};
 use crate::def::*;
 
-fn update_toc(
-    entry: &std::result::Result<jwalk::core::dir_entry::DirEntry<()>, std::io::Error>,
-    toc: &mut Toc,
-) {
-    match &entry {
-        Ok(v) => {
-            let file_type = v.file_type_result.as_ref().unwrap();
-            let mut key = v.parent_path.to_path_buf();
-            key.push(v.file_name.clone().into_string().unwrap());
-            if file_type.is_symlink() {
-                toc.symlinks.push(key.to_str().unwrap().to_string());
-            } else if file_type.is_dir() {
-                toc.dirs.push(key.to_str().unwrap().to_string());
-            } else if file_type.is_file() {
-                toc.files.push(key.to_str().unwrap().to_string());
-            } else {
-                toc.other.push(key.to_str().unwrap().to_string());
-            }
-        }
-        Err(e) => toc.errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere
+fn update_toc(dir_entry: &jwalk::DirEntry<((), ())>, toc: &mut Toc) {
+    let file_type = dir_entry.file_type;
+    let mut key = dir_entry.parent_path.to_path_buf();
+    key.push(dir_entry.file_name.clone().into_string().unwrap());
+    if file_type.is_symlink() {
+        toc.symlinks.push(key.to_str().unwrap().to_string());
+    } else if file_type.is_dir() {
+        toc.dirs.push(key.to_str().unwrap().to_string());
+    } else if file_type.is_file() {
+        toc.files.push(key.to_str().unwrap().to_string());
+    } else {
+        toc.other.push(key.to_str().unwrap().to_string());
     }
 }
 
@@ -57,25 +51,28 @@ pub fn rs_toc(
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    for entry in walk(
-        &root_path,
-        sorted,
-        skip_hidden,
-        max_depth,
-        filter,
-        RETURN_TYPE_FAST,
-    ) {
-        let mut toc_locked = toc.lock().unwrap();
-        update_toc(&entry, toc_locked.deref_mut());
-        match &alive {
-            Some(a) => {
-                if !a.load(Ordering::Relaxed) {
-                    break;
+    let root_path_len = root_path.len() + 1;
+    WalkDirGeneric::new(&root_path)
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .max_depth(max_depth)
+        .process_read_dir(move |_, children| {
+            filter_children(children, &filter, root_path_len);
+            children.iter_mut().for_each(|dir_entry_result| {
+                if let Ok(dir_entry) = dir_entry_result {
+                    let mut toc_locked = toc.lock().unwrap();
+                    update_toc(&dir_entry, toc_locked.deref_mut());
+                    match &alive {
+                        Some(a) => {
+                            if !a.load(Ordering::Relaxed) {
+                                return;
+                            }
+                        }
+                        None => {}
+                    }
                 }
-            }
-            None => {}
-        }
-    }
+            });
+        });
     match &duration {
         Some(d) => {
             let dt = start_time.elapsed().as_millis() as f64;
@@ -109,41 +106,47 @@ pub fn rs_toc_iter(
         errors: Vec::new(),
     };
     let mut send = false;
-    for entry in walk(
-        &root_path,
-        sorted,
-        skip_hidden,
-        max_depth,
-        filter,
-        RETURN_TYPE_FAST,
-    ) {
-        update_toc(&entry, &mut toc);
-        if tx.is_empty() {
-            if tx.send(WalkResult::Toc(toc)).is_err() {
-                return;
+    let root_path_len = root_path.len() + 1;
+    for entry in WalkDirGeneric::new(&root_path)
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .max_depth(max_depth)
+        .process_read_dir(move |_, children| {
+            match &alive {
+                Some(a) => {
+                    if !a.load(Ordering::Relaxed) {
+                        return;
+                    }
+                }
+                None => {}
             }
-            toc = Toc {
-                dirs: Vec::new(),
-                files: Vec::new(),
-                symlinks: Vec::new(),
-                other: Vec::new(),
-                errors: Vec::new(),
-            };
-            send = false;
-        } else {
-            send = true;
-        }
-        match &alive {
-            Some(a) => {
-                if !a.load(Ordering::Relaxed) {
-                    break;
+            filter_children(children, &filter, root_path_len);
+        })
+    {
+        match &entry {
+            Ok(v) => {
+                update_toc(&v, &mut toc);
+                if tx.is_empty() {
+                    if tx.send(WalkResult::Toc(toc.clone())).is_err() {
+                        return;
+                    }
+                    toc = Toc {
+                        dirs: Vec::new(),
+                        files: Vec::new(),
+                        symlinks: Vec::new(),
+                        other: Vec::new(),
+                        errors: Vec::new(),
+                    };
+                    send = false;
+                } else {
+                    send = true;
                 }
             }
-            None => {}
+            Err(e) => toc.errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere
         }
     }
     if send {
-        let _ = tx.send(WalkResult::Toc(toc));
+        let _ = tx.send(WalkResult::Toc(toc.clone()));
     }
     match &duration {
         Some(d) => {
@@ -173,17 +176,26 @@ pub fn rs_walk_iter(
     let mut list: Vec<String> = Vec::new();
     let mut map: HashMap<String, Toc> = HashMap::new();
     let mut errors: Vec<String> = Vec::new();
-    for entry in walk(
-        &root_path,
-        sorted,
-        skip_hidden,
-        max_depth,
-        filter,
-        RETURN_TYPE_BASE,
-    ) {
+    let root_path_len = root_path.len() + 1;
+    for entry in WalkDirGeneric::new(&root_path)
+        .skip_hidden(skip_hidden)
+        .sort(sorted)
+        .max_depth(max_depth)
+        .process_read_dir(move |_, children| {
+            match &alive {
+                Some(a) => {
+                    if !a.load(Ordering::Relaxed) {
+                        return;
+                    }
+                }
+                None => {}
+            }
+            filter_children(children, &filter, root_path_len);
+        })
+    {
         match &entry {
             Ok(v) => {
-                let file_type = v.file_type_result.as_ref().unwrap();
+                let file_type = v.file_type;
                 let dir = v.parent_path.to_str().unwrap().to_string();
                 let file_name = v.file_name.clone().into_string().unwrap();
                 if file_type.is_symlink() {
@@ -212,14 +224,6 @@ pub fn rs_walk_iter(
                 }
             }
             Err(e) => errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere
-        }
-        match &alive {
-            Some(a) => {
-                if !a.load(Ordering::Relaxed) {
-                    break;
-                }
-            }
-            None => {}
         }
     }
     match &duration {
@@ -427,7 +431,6 @@ impl Walk {
 impl Walk {
     #[new]
     fn __new__(
-        obj: &PyRawObject,
         root_path: &str,
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
@@ -438,7 +441,7 @@ impl Walk {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<u8>,
-    ) {
+    ) -> Self {
         let filter = match create_filter(
             dir_include,
             dir_exclude,
@@ -454,7 +457,7 @@ impl Walk {
                 None
             }
         };
-        obj.init(Walk {
+        Walk {
             root_path: String::from(root_path),
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
@@ -473,7 +476,7 @@ impl Walk {
             alive: None,
             rx: None,
             has_results: false,
-        });
+        }
     }
 
     #[getter]

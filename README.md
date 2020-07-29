@@ -183,7 +183,7 @@ results to os.walk.
 | 0.260    | scandir_rs.scandir.entries (RETURN_TYPE_FULL)       |
 | 0.210    | scandir_rs.scandir.entries (iter, RETURN_TYPE_FULL) |
 
-Up to **~5 times faster** on Linux.
+**~5 times faster** on Linux.
 
 ### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
 
@@ -239,4 +239,4 @@ Up to **~5 times faster** on Linux.
 | 3.301    | scandir_rs.scandir.entries (RETURN_TYPE_FULL)       |
 | 3.149    | scandir_rs.scandir.entries (iter, RETURN_TYPE_FULL) |
 
-Up to **6 times faster** on Windows 10.
+**~6 times faster** on Windows 10.

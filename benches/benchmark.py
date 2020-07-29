@@ -23,15 +23,14 @@ def CreateTestData(tmpDirName=None):
             F.write(chunk)
     print("Extracting linux-5.5.5.tar.gz...")
     with tarfile.open(tempZipPath, "r:gz") as Z:
-        Z.extractall()
+        Z.extractall(tempDir.name)
+    os.remove(tempZipPath)
     return tempDir
 
 
 def RunBenchmarks(dirName: str):
-    print("scandir_rs.walk.Walk (iter): %.3f" % timeit.timeit(f"""
-for result in scandir.walk.Walk('{dirName}', return_type=scandir.RETURN_TYPE_WALK):
-    pass
-    """, setup="import scandir_rs as scandir", number=3))
+    print(f"Benchmarking directory: {dirName}")
+    print(scandir.count.count(dirName, extended=True))
 
     print(f"os.walk: %.3f" % timeit.timeit(f"""
 for root, dirs, files in os.walk('{dirName}'):
@@ -105,14 +104,11 @@ for result in scandir.scandir.Scandir('{dirName}', return_type=scandir.RETURN_TY
 
 if __name__ == "__main__":
     if os.name == 'nt':
-        print(f"Benchmarking directory: C:/Windows")
         RunBenchmarks("C:/Windows")
     else:
-        print(f"Benchmarking directory: /usr")
         RunBenchmarks("/usr")
     tempDir = CreateTestData(None if len(sys.argv) < 2 else sys.argv[1])
     try:
-        print(f"Benchmarking directory: {tempDir.name}")
         RunBenchmarks(tempDir.name)
     finally:
         print("Cleanup...")

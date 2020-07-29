@@ -1,9 +1,12 @@
 use std::collections::HashSet;
 use std::fs;
+use std::fs::Metadata;
+use std::io::{Error, ErrorKind};
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::prelude::*;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
@@ -16,8 +19,7 @@ use pyo3::{wrap_pyfunction, PyContextProtocol, Python};
 
 use jwalk::WalkDirGeneric;
 
-#[cfg(unix)]
-use crate::common::expand_path;
+use crate::common::check_and_expand_path;
 use crate::common::{create_filter, filter_children};
 use crate::def::*;
 
@@ -93,7 +95,7 @@ impl pyo3::class::PyObjectProtocol for Statistics {
 }
 
 fn rs_count(
-    root_path: &String,
+    root_path: PathBuf,
     skip_hidden: bool,
     extended: bool, // If true: Count also hardlinks, devices, pipes, size and usage
     mut max_depth: usize,
@@ -101,8 +103,6 @@ fn rs_count(
     statistics: Option<Arc<Mutex<Statistics>>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
-    #[cfg(unix)]
-    let root_path = expand_path(&root_path);
     let mut dirs: u32 = 0;
     let mut files: u32 = 0;
     let mut slinks: u32 = 0;
@@ -121,8 +121,8 @@ fn rs_count(
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    let root_path_len = root_path.len() + 1;
-    for entry in WalkDirGeneric::new(&root_path)
+    let root_path_len = root_path.to_string_lossy().len() + 1;
+    for entry in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>::new(&root_path)
         .skip_hidden(skip_hidden)
         .sort(false)
         .max_depth(max_depth)
@@ -136,6 +136,13 @@ fn rs_count(
                 None => {}
             }
             filter_children(children, &filter, root_path_len);
+            children.iter_mut().for_each(|dir_entry_result| {
+                if let Ok(dir_entry) = dir_entry_result {
+                    if extended {
+                        dir_entry.client_state = Some(fs::metadata(dir_entry.path()));
+                    }
+                }
+            });
         })
     {
         match &entry {
@@ -148,8 +155,8 @@ fn rs_count(
                 } else if file_type.is_symlink() {
                     slinks += 1;
                 }
-                if extended {
-                    if let Ok(metadata) = fs::metadata(v.path()) {
+                if let Some(cs) = &v.client_state {
+                    if let Ok(metadata) = cs {
                         #[cfg(unix)]
                         {
                             if metadata.nlink() > 1 {
@@ -287,9 +294,18 @@ pub fn count(
         duration: 0.0,
     }));
     let stats_cloned = statistics.clone();
-    let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
+    let root_path = match check_and_expand_path(&root_path) {
+        Ok(p) => p,
+        Err(e) => match e.kind() {
+            ErrorKind::NotFound => {
+                return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+            }
+            _ => return Err(exceptions::Exception::py_err(e.to_string())),
+        },
+    };
+    let rc: Result<(), Error> = py.allow_threads(|| {
         rs_count(
-            &root_path,
+            root_path,
             skip_hidden.unwrap_or(false),
             extended.unwrap_or(false),
             max_depth.unwrap_or(::std::usize::MAX),
@@ -299,9 +315,8 @@ pub fn count(
         );
         Ok(())
     });
-    match rc {
-        Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
-        _ => (),
+    if let Err(e) = rc {
+        return Err(exceptions::RuntimeError::py_err(e.to_string()));
     }
     let stats_cloned = statistics.lock().unwrap().clone();
     Ok(stats_cloned.into())
@@ -311,7 +326,7 @@ pub fn count(
 #[derive(Debug)]
 pub struct Count {
     // Options
-    root_path: String,
+    root_path: PathBuf,
     skip_hidden: bool,
     extended: bool,
     max_depth: usize,
@@ -348,7 +363,7 @@ impl Count {
         if self.has_results {
             self.rs_init();
         }
-        let root_path = String::from(&self.root_path);
+        let root_path = self.root_path.clone();
         let skip_hidden = self.skip_hidden;
         let extended = self.extended;
         let max_depth = self.max_depth;
@@ -358,7 +373,7 @@ impl Count {
         self.alive = Some(Arc::downgrade(&alive));
         self.thr = Some(thread::spawn(move || {
             rs_count(
-                &root_path,
+                root_path,
                 skip_hidden,
                 extended,
                 max_depth,
@@ -395,9 +410,18 @@ impl Count {
         skip_hidden: Option<bool>,
         extended: Option<bool>,
         max_depth: Option<usize>,
-    ) -> Self {
-        Count {
-            root_path: String::from(root_path),
+    ) -> PyResult<Self> {
+        let root_path = match check_and_expand_path(&root_path) {
+            Ok(p) => p,
+            Err(e) => match e.kind() {
+                ErrorKind::NotFound => {
+                    return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                }
+                _ => return Err(exceptions::Exception::py_err(e.to_string())),
+            },
+        };
+        Ok(Count {
+            root_path: root_path,
             skip_hidden: skip_hidden.unwrap_or(false),
             extended: extended.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
@@ -417,7 +441,7 @@ impl Count {
             thr: None,
             alive: None,
             has_results: false,
-        }
+        })
     }
 
     #[getter]
@@ -435,9 +459,9 @@ impl Count {
 
     fn collect(&mut self) -> PyResult<Statistics> {
         let gil = GILGuard::acquire();
-        let rc: std::result::Result<(), std::io::Error> = gil.python().allow_threads(|| {
+        let rc: Result<(), Error> = gil.python().allow_threads(|| {
             rs_count(
-                &self.root_path,
+                self.root_path.clone(),
                 self.skip_hidden,
                 self.extended,
                 self.max_depth,

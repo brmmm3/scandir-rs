@@ -1,8 +1,11 @@
 use std::fs;
+use std::fs::Metadata;
+use std::io::{Error, ErrorKind};
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::prelude::*;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
@@ -17,8 +20,7 @@ use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
 
 use jwalk::WalkDirGeneric;
 
-#[cfg(unix)]
-use crate::common::expand_path;
+use crate::common::check_and_expand_path;
 use crate::common::{create_filter, filter_children};
 use crate::def::*;
 
@@ -98,7 +100,7 @@ impl pyo3::class::PyObjectProtocol for Entries {
 fn create_entry(
     root_path_len: usize,
     return_type: u8,
-    dir_entry: &jwalk::DirEntry<((), ())>,
+    dir_entry: &jwalk::DirEntry<((), Option<Result<Metadata, Error>>)>,
 ) -> Entry {
     let file_type = dir_entry.file_type;
     let mut st_ctime: f64 = 0.0;
@@ -226,7 +228,7 @@ fn create_entry(
 }
 
 fn rs_entries(
-    root_path: String,
+    root_path: PathBuf,
     sorted: bool,
     skip_hidden: bool,
     mut max_depth: usize,
@@ -235,27 +237,17 @@ fn rs_entries(
     result: Arc<Mutex<Entries>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
-    #[cfg(unix)]
-    let root_path = expand_path(&root_path);
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     };
-    let root_path_len = root_path.len() + 1;
+    let root_path_len = root_path.to_string_lossy().len() + 1;
     let result_clone = result.clone();
-    WalkDirGeneric::new(&root_path)
+    for _ in WalkDirGeneric::new(&root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
         .process_read_dir(move |_, children| {
-            match &alive {
-                Some(a) => {
-                    if !a.load(Ordering::Relaxed) {
-                        return;
-                    }
-                }
-                None => {}
-            }
             filter_children(children, &filter, root_path_len);
             children.iter_mut().for_each(|dir_entry_result| {
                 match &alive {
@@ -270,15 +262,15 @@ fn rs_entries(
                     let entry = create_entry(root_path_len, return_type, dir_entry);
                     let mut result_locked = result_clone.lock().unwrap();
                     result_locked.entries.push(entry);
-                    result_locked.duration = start_time.elapsed().as_millis() as f64 * 0.001;
                 }
             });
-        });
+        })
+    {}
     result.lock().unwrap().duration = start_time.elapsed().as_millis() as f64 * 0.001;
 }
 
 fn rs_entries_iter(
-    root_path: String,
+    root_path: PathBuf,
     sorted: bool,
     skip_hidden: bool,
     mut max_depth: usize,
@@ -287,15 +279,13 @@ fn rs_entries_iter(
     alive: Option<Arc<AtomicBool>>,
     tx: Option<channel::Sender<Entry>>,
 ) {
-    #[cfg(unix)]
-    let root_path = expand_path(&root_path);
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
-    let root_path_len = root_path.len() + 1;
+    let root_path_len = root_path.to_string_lossy().len() + 1;
     let tx_clone = tx.clone();
-    WalkDirGeneric::new(&root_path)
+    for _ in WalkDirGeneric::new(&root_path)
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
@@ -322,7 +312,8 @@ fn rs_entries_iter(
                     }
                 }
             });
-        });
+        })
+    {}
     match &tx {
         Some(tx) => {
             let _ = tx.send(Entry {
@@ -354,6 +345,15 @@ pub fn entries<'a>(
             "Invalid return type".to_string(),
         ));
     }
+    let root_path = match check_and_expand_path(&root_path) {
+        Ok(p) => p,
+        Err(e) => match e.kind() {
+            ErrorKind::NotFound => {
+                return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+            }
+            _ => return Err(exceptions::Exception::py_err(e.to_string())),
+        },
+    };
     let filter = match create_filter(
         dir_include,
         dir_exclude,
@@ -369,7 +369,7 @@ pub fn entries<'a>(
         duration: 0.0,
     }));
     let result_cloned = result.clone();
-    let rc: std::result::Result<(), std::io::Error> = py.allow_threads(|| {
+    let rc: Result<(), Error> = py.allow_threads(|| {
         rs_entries(
             root_path,
             sorted.unwrap_or(false),
@@ -395,7 +395,7 @@ pub fn entries<'a>(
 #[derive(Debug)]
 pub struct Scandir {
     // Options
-    root_path: String,
+    root_path: PathBuf,
     sorted: bool,
     skip_hidden: bool,
     max_depth: usize,
@@ -423,7 +423,7 @@ impl Scandir {
         if self.has_results {
             self.rs_init();
         }
-        let root_path = String::from(&self.root_path);
+        let root_path = self.root_path.clone();
         let sorted = self.sorted;
         let skip_hidden = self.skip_hidden;
         let max_depth = self.max_depth;
@@ -488,7 +488,22 @@ impl Scandir {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<u8>,
-    ) -> Self {
+    ) -> PyResult<Self> {
+        let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
+        if return_type > RETURN_TYPE_FULL {
+            return Err(exceptions::ValueError::py_err(
+                "Parameter return_type has invalid value",
+            ));
+        }
+        let root_path = match check_and_expand_path(&root_path) {
+            Ok(p) => p,
+            Err(e) => match e.kind() {
+                ErrorKind::NotFound => {
+                    return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                }
+                _ => return Err(exceptions::Exception::py_err(e.to_string())),
+            },
+        };
         let filter = match create_filter(
             dir_include,
             dir_exclude,
@@ -498,18 +513,15 @@ impl Scandir {
         ) {
             Ok(f) => f,
             Err(e) => {
-                let gil = Python::acquire_gil();
-                let py = gil.python();
-                PyErr::new::<exceptions::ValueError, _>(e.to_string()).restore(py);
-                None
+                return Err(exceptions::ValueError::py_err(e.to_string()));
             }
         };
-        Scandir {
-            root_path: String::from(root_path),
+        Ok(Scandir {
+            root_path: root_path,
             sorted: sorted.unwrap_or(false),
             skip_hidden: skip_hidden.unwrap_or(false),
             max_depth: max_depth.unwrap_or(::std::usize::MAX),
-            return_type: return_type.unwrap_or(RETURN_TYPE_BASE),
+            return_type: return_type,
             filter: filter,
             entries: Arc::new(Mutex::new(Entries {
                 entries: Vec::new(),
@@ -519,7 +531,7 @@ impl Scandir {
             alive: None,
             rx: None,
             has_results: false,
-        }
+        })
     }
 
     #[getter]

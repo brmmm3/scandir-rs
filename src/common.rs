@@ -1,3 +1,8 @@
+use std::fs;
+use std::fs::Metadata;
+use std::io::{Error, ErrorKind};
+use std::path::PathBuf;
+
 #[cfg(unix)]
 use expanduser::expanduser;
 
@@ -5,10 +10,23 @@ use glob::{MatchOptions, Pattern};
 
 use crate::def::*;
 
-#[cfg(unix)]
-pub fn expand_path(path: &str) -> String {
-    let path = expanduser(path).unwrap();
-    path.to_string_lossy().into_owned()
+pub fn check_and_expand_path(path_str: &str) -> Result<PathBuf, Error> {
+    #[cfg(unix)]
+    let path_result = fs::canonicalize(expanduser(path_str).unwrap());
+    #[cfg(not(unix))]
+    let path_result = fs::canonicalize(path_str);
+    let path = match path_result {
+        Ok(p) => {
+            if !p.exists() {
+                return Err(Error::new(ErrorKind::NotFound, String::from(path_str)));
+            }
+            p
+        }
+        Err(e) => {
+            return Err(Error::new(ErrorKind::Other, e.to_string()));
+        }
+    };
+    Ok(path)
 }
 
 pub fn create_filter(
@@ -127,7 +145,7 @@ pub fn filter_direntry(
 
 pub fn filter_dir(
     root_path_len: usize,
-    dir_entry: &jwalk::DirEntry<((), ())>,
+    dir_entry: &jwalk::DirEntry<((), Option<Result<Metadata, Error>>)>,
     filter_ref: &Filter,
 ) -> bool {
     let mut key = dir_entry.parent_path.to_path_buf();
@@ -147,7 +165,9 @@ pub fn filter_dir(
 }
 
 pub fn filter_children(
-    children: &mut Vec<Result<jwalk::DirEntry<((), ())>, jwalk::Error>>,
+    children: &mut Vec<
+        Result<jwalk::DirEntry<((), Option<Result<Metadata, Error>>)>, jwalk::Error>,
+    >,
     filter: &Option<Filter>,
     root_path_len: usize,
 ) {

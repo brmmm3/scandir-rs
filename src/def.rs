@@ -14,6 +14,15 @@ pub const RETURN_TYPE_EXT: u8 = 2;
 pub const RETURN_TYPE_FULL: u8 = 3;
 pub const RETURN_TYPE_WALK: u8 = 4;
 
+#[derive(Debug, Clone)]
+pub struct Filter {
+    pub dir_include: Vec<Pattern>,
+    pub dir_exclude: Vec<Pattern>,
+    pub file_include: Vec<Pattern>,
+    pub file_exclude: Vec<Pattern>,
+    pub options: Option<MatchOptions>,
+}
+
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct DirEntry {
@@ -348,6 +357,35 @@ impl ToPyObject for WalkEntry {
                 self.path.to_object(py),
                 self.toc.dirs.to_object(py),
                 self.toc.files.to_object(py),
+            ],
+        )
+        .into()
+    }
+}
+
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct WalkEntryExt {
+    pub path: String,
+    pub toc: Toc,
+}
+
+#[pyproto]
+impl pyo3::class::PyObjectProtocol for WalkEntryExt {
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+}
+
+impl ToPyObject for WalkEntryExt {
+    #[inline]
+    fn to_object(&self, py: Python) -> PyObject {
+        PyTuple::new(
+            py,
+            &[
+                self.path.to_object(py),
+                self.toc.dirs.to_object(py),
+                self.toc.files.to_object(py),
                 self.toc.symlinks.to_object(py),
                 self.toc.other.to_object(py),
                 self.toc.errors.to_object(py),
@@ -361,13 +399,5 @@ impl ToPyObject for WalkEntry {
 pub enum WalkResult {
     Toc(Toc),
     WalkEntry(WalkEntry),
-}
-
-#[derive(Debug, Clone)]
-pub struct Filter {
-    pub dir_include: Vec<Pattern>,
-    pub dir_exclude: Vec<Pattern>,
-    pub file_include: Vec<Pattern>,
-    pub file_exclude: Vec<Pattern>,
-    pub options: Option<MatchOptions>,
+    WalkEntryExt(WalkEntryExt),
 }

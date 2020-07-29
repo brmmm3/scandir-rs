@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2020-07-27
+
+### Added
+
+- Improved pytest test cases.
+
+### Changed
+
+- In benchmark.py:
+  - Use Linux kernel 5.5.5 as platform independent a reference.
+  - Accept optional parameter for temporary directory base.
+  - Benchmark directory C:\Windows on Windows and /usr on other platforms.
+
+### Fixed
+
+- scandir didn't execute.
+- Fix performance issue with Walk.
+- Correctly return Python exceptions.
+- Make build_wheels.sh version independent.
+- Make examples platform independent.
+- Fix typo in README.md.
+
 ## [0.9.2] - 2020-07-26
 
 ### Changed

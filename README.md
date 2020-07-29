@@ -1,11 +1,11 @@
 # `scandir-rs`
 
-``scandir_rs`` is a directory iteration module like ``os.walk()``,
-but with more features and higher speed. Depending on the function call
+``scandir_rs`` is a directory iteration module like ``os.walk()``, but with more features and higher speed. Depending on the function call
 it yields a list of paths, tuple of lists grouped by their entry type or ``DirEntry`` objects that include file type and stat information along
-with the name. Using ``scandir_rs`` is about **2-17 times faster** than ``os.walk()`` (depending on the platform, file system and file tree structure) by parallelizing the iteration in background.
+with the name. Using ``scandir_rs`` is about **2-17 times faster** than ``os.walk()`` (depending on the platform, file system and file tree structure)
+by parallelizing the iteration in background.
 
-If your are just interested in directory statistics you can use the submodule ``count``.
+If you are just interested in directory statistics you can use the submodule ``count``.
 
 ``scandir_rs`` contains following submodules:
 

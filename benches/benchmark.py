@@ -12,15 +12,16 @@ import requests
 import scandir_rs as scandir
 
 
-def CreateTestData(tmpDirName=None):
-    url = "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.5.5.tar.gz"
-    r = requests.get(url, stream=True)
+def CreateTestData(tmpDirName=None, tempZipPath=None):
     tempDir = tempfile.TemporaryDirectory(prefix="scandir_rs_", dir=tmpDirName)
-    tempZipPath = f"{tempDir.name}/linux-5.5.5.tar.gz"
-    print("Downloading linux-5.5.5.tar.gz...")
-    with open(tempZipPath, 'wb') as F:
-        for chunk in r.iter_content(chunk_size=4096):
-            F.write(chunk)
+    if not tempZipPath:
+        url = "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.5.5.tar.gz"
+        r = requests.get(url, stream=True)
+        tempZipPath = f"{tempDir.name}/linux-5.5.5.tar.gz"
+        print("Downloading linux-5.5.5.tar.gz...")
+        with open(tempZipPath, 'wb') as F:
+            for chunk in r.iter_content(chunk_size=4096):
+                F.write(chunk)
     print("Extracting linux-5.5.5.tar.gz...")
     with tarfile.open(tempZipPath, "r:gz") as Z:
         Z.extractall(tempDir.name)
@@ -103,11 +104,19 @@ for result in scandir.scandir.Scandir('{dirName}', return_type=scandir.RETURN_TY
 
 
 if __name__ == "__main__":
+    try:
+        tmpDirName = sys.argv[sys.argv.index("--tmpdir") + 1]
+    except:
+        tmpDirName = None
+    try:
+        tempZipPath = sys.argv[sys.argv.index("--archive") + 1]
+    except:
+        tempZipPath = None
     if os.name == 'nt':
         RunBenchmarks("C:/Windows")
     else:
         RunBenchmarks("/usr")
-    tempDir = CreateTestData(None if len(sys.argv) < 2 else sys.argv[1])
+    tempDir = CreateTestData(tmpDirName, tempZipPath)
     try:
         RunBenchmarks(tempDir.name)
     finally:

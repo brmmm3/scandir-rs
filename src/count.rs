@@ -12,10 +12,10 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::Instant;
 
-use pyo3::exceptions::{self, ValueError};
+use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
-use pyo3::{wrap_pyfunction, PyContextProtocol, Python};
+use pyo3::{wrap_pyfunction, Python};
 
 use jwalk::WalkDirGeneric;
 
@@ -51,7 +51,7 @@ pub struct Statistics {
 #[pymethods]
 impl Statistics {
     fn as_dict(&self, duration: Option<bool>) -> PyResult<PyObject> {
-        let gil = GILGuard::acquire();
+        let gil = Python::acquire_gil();
         let pyresult = PyDict::new(gil.python());
         if self.dirs > 0 {
             pyresult.set_item("dirs", self.dirs).unwrap();
@@ -126,7 +126,7 @@ fn rs_count(
         .skip_hidden(skip_hidden)
         .sort(false)
         .max_depth(max_depth)
-        .process_read_dir(move |_, children| {
+        .process_read_dir(move |_, _, _, children| {
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
@@ -279,7 +279,7 @@ pub fn count(
         case_sensitive,
     ) {
         Ok(f) => f,
-        Err(e) => return Err(exceptions::ValueError::py_err(e.to_string())),
+        Err(e) => return Err(exceptions::PyValueError::new_err(e.to_string())),
     };
     let statistics = Arc::new(Mutex::new(Statistics {
         dirs: 0,
@@ -298,9 +298,9 @@ pub fn count(
         Ok(p) => p,
         Err(e) => match e.kind() {
             ErrorKind::NotFound => {
-                return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
             }
-            _ => return Err(exceptions::Exception::py_err(e.to_string())),
+            _ => return Err(exceptions::PyException::new_err(e.to_string())),
         },
     };
     let rc: Result<(), Error> = py.allow_threads(|| {
@@ -316,7 +316,7 @@ pub fn count(
         Ok(())
     });
     if let Err(e) = rc {
-        return Err(exceptions::RuntimeError::py_err(e.to_string()));
+        return Err(exceptions::PyRuntimeError::new_err(e.to_string()));
     }
     let stats_cloned = statistics.lock().unwrap().clone();
     Ok(stats_cloned.into())
@@ -415,9 +415,9 @@ impl Count {
             Ok(p) => p,
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => {
-                    return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                    return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
                 }
-                _ => return Err(exceptions::Exception::py_err(e.to_string())),
+                _ => return Err(exceptions::PyException::new_err(e.to_string())),
             },
         };
         Ok(Count {
@@ -444,6 +444,27 @@ impl Count {
         })
     }
 
+    fn __enter__(&mut self) -> PyResult<()> {
+        self.rs_start();
+        Ok(())
+    }
+
+    fn __exit__(
+        &mut self,
+        ty: Option<&PyType>,
+        _value: Option<&PyAny>,
+        _traceback: Option<&PyAny>,
+    ) -> PyResult<bool> {
+        if !self.rs_stop() {
+            return Ok(false);
+        }
+        if ty == Some(Python::acquire_gil().python().get_type::<exceptions::PyValueError>()) {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     #[getter]
     fn statistics(&self) -> PyResult<Statistics> {
         Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
@@ -458,7 +479,7 @@ impl Count {
     }
 
     fn collect(&mut self) -> PyResult<Statistics> {
-        let gil = GILGuard::acquire();
+        let gil = Python::acquire_gil();
         let rc: Result<(), Error> = gil.python().allow_threads(|| {
             rs_count(
                 self.root_path.clone(),
@@ -472,7 +493,7 @@ impl Count {
             Ok(())
         });
         match rc {
-            Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
+            Err(e) => return Err(exceptions::PyRuntimeError::new_err(e.to_string())),
             _ => (),
         }
         self.has_results = true;
@@ -481,14 +502,14 @@ impl Count {
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start() {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
         }
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::RuntimeError::py_err("Thread not running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread not running"));
         }
         Ok(true)
     }
@@ -511,31 +532,8 @@ impl pyo3::class::PyObjectProtocol for Count {
     }
 }
 
-#[pyproto]
-impl<'p> PyContextProtocol<'p> for Count {
-    fn __enter__(&'p mut self) -> PyResult<()> {
-        self.rs_start();
-        Ok(())
-    }
-
-    fn __exit__(
-        &mut self,
-        ty: Option<&'p PyType>,
-        _value: Option<&'p PyAny>,
-        _traceback: Option<&'p PyAny>,
-    ) -> PyResult<bool> {
-        if !self.rs_stop() {
-            return Ok(false);
-        }
-        if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-}
-
-#[pymodule(count)]
+#[pymodule]
+#[pyo3(name="count")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Count>()?;
     m.add_wrapped(wrap_pyfunction!(count))?;

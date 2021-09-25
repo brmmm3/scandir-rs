@@ -10,10 +10,10 @@ use std::time::Instant;
 
 use crossbeam_channel as channel;
 
-use pyo3::exceptions::{self, ValueError};
+use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
-use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
+use pyo3::{wrap_pyfunction, PyIterProtocol, Python};
 
 use jwalk::WalkDirGeneric;
 
@@ -58,7 +58,7 @@ pub fn rs_toc(
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
-        .process_read_dir(move |_, children| {
+        .process_read_dir(move |_, _, _, children| {
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
@@ -108,7 +108,7 @@ pub fn rs_toc_iter(
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
-        .process_read_dir(move |_, children| {
+        .process_read_dir(move |_, _, _, children| {
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
@@ -182,7 +182,7 @@ pub fn rs_walk_iter(
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
-        .process_read_dir(move |_, children| {
+        .process_read_dir(move |_, _, _, children| {
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
@@ -267,9 +267,9 @@ pub fn toc(
         Ok(p) => p,
         Err(e) => match e.kind() {
             ErrorKind::NotFound => {
-                return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
             }
-            _ => return Err(exceptions::Exception::py_err(e.to_string())),
+            _ => return Err(exceptions::PyException::new_err(e.to_string())),
         },
     };
     let filter = match create_filter(
@@ -280,7 +280,7 @@ pub fn toc(
         case_sensitive,
     ) {
         Ok(f) => f,
-        Err(e) => return Err(exceptions::ValueError::py_err(e.to_string())),
+        Err(e) => return Err(exceptions::PyValueError::new_err(e.to_string())),
     };
     let toc = Arc::new(Mutex::new(Toc {
         dirs: Vec::new(),
@@ -304,7 +304,7 @@ pub fn toc(
         Ok(())
     });
     match rc {
-        Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
+        Err(e) => return Err(exceptions::PyRuntimeError::new_err(e.to_string())),
         _ => (),
     }
     let toc_cloned = toc.lock().unwrap().clone();
@@ -446,9 +446,9 @@ impl Walk {
             Ok(p) => p,
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => {
-                    return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                    return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
                 }
-                _ => return Err(exceptions::Exception::py_err(e.to_string())),
+                _ => return Err(exceptions::PyException::new_err(e.to_string())),
             },
         };
         let filter = match create_filter(
@@ -460,7 +460,7 @@ impl Walk {
         ) {
             Ok(f) => f,
             Err(e) => {
-                return Err(exceptions::ValueError::py_err(e.to_string()));
+                return Err(exceptions::PyValueError::new_err(e.to_string()));
             }
         };
         Ok(Walk {
@@ -485,6 +485,29 @@ impl Walk {
         })
     }
 
+    fn __enter__(&mut self) -> PyResult<()> {
+        if !self.rs_start(None) {
+            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+        }
+        Ok(())
+    }
+
+    fn __exit__(
+        &mut self,
+        ty: Option<&PyType>,
+        _value: Option<&PyAny>,
+        _traceback: Option<&PyAny>,
+    ) -> PyResult<bool> {
+        if !self.rs_stop() {
+            return Ok(false);
+        }
+        if ty == Some(Python::acquire_gil().python().get_type::<exceptions::PyValueError>()) {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     #[getter]
     fn toc(&self) -> PyResult<Toc> {
         let mut toc_locked = self.toc.lock().unwrap();
@@ -503,7 +526,7 @@ impl Walk {
     }
 
     fn as_dict(&self) -> PyResult<PyObject> {
-        let gil = GILGuard::acquire();
+        let gil = Python::acquire_gil();
         let mut toc_locked = self.toc.lock().unwrap();
         let pyresult = PyDict::new(gil.python());
         if !toc_locked.dirs.is_empty() {
@@ -540,14 +563,14 @@ impl Walk {
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
         }
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::RuntimeError::py_err("Thread not running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread not running"));
         }
         Ok(true)
     }
@@ -565,36 +588,10 @@ impl pyo3::class::PyObjectProtocol for Walk {
 }
 
 #[pyproto]
-impl<'p> PyContextProtocol<'p> for Walk {
-    fn __enter__(&'p mut self) -> PyResult<()> {
-        if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"));
-        }
-        Ok(())
-    }
-
-    fn __exit__(
-        &mut self,
-        ty: Option<&'p PyType>,
-        _value: Option<&'p PyAny>,
-        _traceback: Option<&'p PyAny>,
-    ) -> PyResult<bool> {
-        if !self.rs_stop() {
-            return Ok(false);
-        }
-        if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-}
-
-#[pyproto]
 impl<'p> PyIterProtocol for Walk {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Walk>> {
         if slf.thr.is_some() {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
         }
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);
@@ -603,7 +600,7 @@ impl<'p> PyIterProtocol for Walk {
     }
 
     fn __next__(slf: PyRefMut<Self>) -> PyResult<Option<PyObject>> {
-        let gil = GILGuard::acquire();
+        let gil = Python::acquire_gil();
         match &slf.rx {
             Some(rx) => match rx.recv() {
                 Ok(val) => match val {
@@ -618,7 +615,8 @@ impl<'p> PyIterProtocol for Walk {
     }
 }
 
-#[pymodule(walk)]
+#[pymodule]
+#[pyo3(name="walk")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Walk>()?;
     m.add_wrapped(wrap_pyfunction!(toc))?;

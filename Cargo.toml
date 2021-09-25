@@ -1,6 +1,6 @@
 [package]
 name = "scandir-rs"
-version = "0.9.3"
+version = "0.9.4"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2018"
@@ -42,17 +42,17 @@ classifier = [
 ]
 
 [dependencies]
-jwalk = "0.5.1" #{ git = "https://github.com/jessegrosjean/jwalk" }
+jwalk = "0.6.0" #{ git = "https://github.com/jessegrosjean/jwalk" }
 rayon = "1.3.1"
-crossbeam = "0.7.3"
-crossbeam-channel = "0.4.3"
+crossbeam = "0.8.1"
+crossbeam-channel = "0.5.1"
 glob = { git = "https://github.com/brmmm3/glob.git", tag = "0.4.0" }
 
 [target.'cfg(unix)'.dependencies]
 expanduser = "1.2.1"
 
 [dependencies.pyo3]
-version = "0.11.1"
+version = "0.14.5"
 features = ["extension-module"]
 
 [profile.release]

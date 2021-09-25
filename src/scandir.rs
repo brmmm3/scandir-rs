@@ -13,10 +13,10 @@ use std::time::{Instant, UNIX_EPOCH};
 
 use crossbeam_channel as channel;
 
-use pyo3::exceptions::{self, ValueError};
+use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
-use pyo3::{wrap_pyfunction, PyContextProtocol, PyIterProtocol, Python};
+use pyo3::{wrap_pyfunction, PyIterProtocol, Python};
 
 use jwalk::WalkDirGeneric;
 
@@ -86,7 +86,7 @@ pub struct Entries {
 impl Entries {
     #[getter]
     fn entries(&self) -> PyResult<PyObject> {
-        Ok(PyTuple::new(GILGuard::acquire().python(), &self.entries).into())
+        Ok(PyTuple::new(Python::acquire_gil().python(), &self.entries).into())
     }
 }
 
@@ -117,24 +117,18 @@ fn create_entry(
     let mut st_gid: u32 = 0;
     let mut st_rdev: u64 = 0;
     if let Ok(metadata) = fs::metadata(dir_entry.path()) {
-        let duration = metadata
-            .created()
-            .unwrap()
-            .duration_since(UNIX_EPOCH)
-            .unwrap();
-        st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        let duration = metadata
-            .modified()
-            .unwrap()
-            .duration_since(UNIX_EPOCH)
-            .unwrap();
-        st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        let duration = metadata
-            .accessed()
-            .unwrap()
-            .duration_since(UNIX_EPOCH)
-            .unwrap();
-        st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        if let Ok(created) = metadata.created() {
+            let duration = created.duration_since(UNIX_EPOCH).unwrap();
+            st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        }
+        if let Ok(modified) = metadata.modified() {
+            let duration = modified.duration_since(UNIX_EPOCH).unwrap();
+            st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        }
+        if let Ok(accessed) = metadata.accessed() {
+            let duration = accessed.duration_since(UNIX_EPOCH).unwrap();
+            st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        }
         if return_type > RETURN_TYPE_BASE {
             #[cfg(unix)]
             {
@@ -249,7 +243,7 @@ fn rs_entries(
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
-        .process_read_dir(move |_, children| {
+        .process_read_dir(move |_, _, _, children| {
             filter_children(children, &filter, root_path_len);
             children.iter_mut().for_each(|dir_entry_result| {
                 match &alive {
@@ -291,7 +285,7 @@ fn rs_entries_iter(
         .skip_hidden(skip_hidden)
         .sort(sorted)
         .max_depth(max_depth)
-        .process_read_dir(move |_, children| {
+        .process_read_dir(move |_, _, _, children| {
             filter_children(children, &filter, root_path_len);
             children.iter_mut().for_each(|dir_entry_result| {
                 match &alive {
@@ -343,7 +337,7 @@ pub fn entries<'a>(
 ) -> PyResult<Entries> {
     let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
     if return_type > RETURN_TYPE_FULL {
-        return Err(exceptions::ValueError::py_err(
+        return Err(exceptions::PyValueError::new_err(
             "Invalid return type".to_string(),
         ));
     }
@@ -351,9 +345,9 @@ pub fn entries<'a>(
         Ok(p) => p,
         Err(e) => match e.kind() {
             ErrorKind::NotFound => {
-                return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
             }
-            _ => return Err(exceptions::Exception::py_err(e.to_string())),
+            _ => return Err(exceptions::PyException::new_err(e.to_string())),
         },
     };
     let filter = match create_filter(
@@ -364,7 +358,7 @@ pub fn entries<'a>(
         case_sensitive,
     ) {
         Ok(f) => f,
-        Err(e) => return Err(exceptions::ValueError::py_err(e.to_string())),
+        Err(e) => return Err(exceptions::PyValueError::new_err(e.to_string())),
     };
     let result = Arc::new(Mutex::new(Entries {
         entries: Vec::new(),
@@ -385,7 +379,7 @@ pub fn entries<'a>(
         Ok(())
     });
     match rc {
-        Err(e) => return Err(exceptions::RuntimeError::py_err(e.to_string())),
+        Err(e) => return Err(exceptions::PyRuntimeError::new_err(e.to_string())),
         _ => (),
     }
     let result_cloned = result.lock().unwrap().clone();
@@ -493,7 +487,7 @@ impl Scandir {
     ) -> PyResult<Self> {
         let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
         if return_type > RETURN_TYPE_FULL {
-            return Err(exceptions::ValueError::py_err(
+            return Err(exceptions::PyValueError::new_err(
                 "Parameter return_type has invalid value",
             ));
         }
@@ -501,9 +495,9 @@ impl Scandir {
             Ok(p) => p,
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => {
-                    return Err(exceptions::FileNotFoundError::py_err(e.to_string()))
+                    return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
                 }
-                _ => return Err(exceptions::Exception::py_err(e.to_string())),
+                _ => return Err(exceptions::PyException::new_err(e.to_string())),
             },
         };
         let filter = match create_filter(
@@ -515,7 +509,7 @@ impl Scandir {
         ) {
             Ok(f) => f,
             Err(e) => {
-                return Err(exceptions::ValueError::py_err(e.to_string()));
+                return Err(exceptions::PyValueError::new_err(e.to_string()));
             }
         };
         Ok(Scandir {
@@ -536,6 +530,29 @@ impl Scandir {
         })
     }
 
+    fn __enter__(&mut self) -> PyResult<()> {
+        if !self.rs_start(None) {
+            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+        }
+        Ok(())
+    }
+
+    fn __exit__(
+        &mut self,
+        ty: Option<&PyType>,
+        _value: Option<&PyAny>,
+        _traceback: Option<&PyAny>,
+    ) -> PyResult<bool> {
+        if !self.rs_stop() {
+            return Ok(false);
+        }
+        if ty == Some(Python::acquire_gil().python().get_type::<exceptions::PyValueError>()) {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     #[getter]
     fn entries(&self) -> PyResult<Entries> {
         Ok(Arc::clone(&self.entries).lock().unwrap().clone())
@@ -547,7 +564,7 @@ impl Scandir {
 
     fn as_dict(&self) -> PyResult<PyObject> {
         let entries_locked = self.entries.lock().unwrap();
-        let gil = GILGuard::acquire();
+        let gil = Python::acquire_gil();
         let py = gil.python();
         let pyresult = PyDict::new(py);
         for entry in &entries_locked.entries {
@@ -592,14 +609,14 @@ impl Scandir {
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
         }
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::RuntimeError::py_err("Thread not running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread not running"));
         }
         Ok(true)
     }
@@ -623,36 +640,10 @@ impl pyo3::class::PyObjectProtocol for Scandir {
 }
 
 #[pyproto]
-impl<'p> PyContextProtocol<'p> for Scandir {
-    fn __enter__(&'p mut self) -> PyResult<()> {
-        if !self.rs_start(None) {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"));
-        }
-        Ok(())
-    }
-
-    fn __exit__(
-        &mut self,
-        ty: Option<&'p PyType>,
-        _value: Option<&'p PyAny>,
-        _traceback: Option<&'p PyAny>,
-    ) -> PyResult<bool> {
-        if !self.rs_stop() {
-            return Ok(false);
-        }
-        if ty == Some(GILGuard::acquire().python().get_type::<ValueError>()) {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-}
-
-#[pyproto]
 impl<'p> PyIterProtocol for Scandir {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Scandir>> {
         if slf.thr.is_some() {
-            return Err(exceptions::RuntimeError::py_err("Thread already running"));
+            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
         }
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);
@@ -661,7 +652,7 @@ impl<'p> PyIterProtocol for Scandir {
     }
 
     fn __next__(slf: PyRefMut<Self>) -> PyResult<Option<PyObject>> {
-        let gil = GILGuard::acquire();
+        let gil = Python::acquire_gil();
         let py = gil.python();
         match &slf.rx {
             Some(rx) => match rx.recv() {
@@ -681,7 +672,8 @@ impl<'p> PyIterProtocol for Scandir {
     }
 }
 
-#[pymodule(scandir)]
+#[pymodule]
+#[pyo3(name="scandir")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Scandir>()?;
     m.add_wrapped(wrap_pyfunction!(entries))?;

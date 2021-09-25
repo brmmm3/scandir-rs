@@ -19,7 +19,8 @@ use scandir::*;
 /// it yields a list of paths, tuple of lists grouped by their entry type or DirEntry objects that include file type and stat information along
 /// with the name. Using scandir_rs is about 2-17 times faster than os.walk() (depending on the platform, file system and file tree structure)
 /// by parallelizing the iteration in background.
-#[pymodule(scandir_rs)]
+#[pymodule]
+#[pyo3(name="scandir_rs")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add("RETURN_TYPE_FAST", RETURN_TYPE_FAST)?;

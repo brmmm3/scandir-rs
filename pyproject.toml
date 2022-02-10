@@ -3,8 +3,8 @@ name = "scandir-rs"
 repository = "https://github.com/brmmm3/scandir-rs"
 
 [build-system]
-requires = ["maturin"]
+requires = ["maturin>=0.12,<0.13"]
 build-backend = "maturin"
 
 [tool.maturin]
-strip = "on"
+strip = true

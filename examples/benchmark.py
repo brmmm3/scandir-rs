@@ -55,16 +55,6 @@ dt = time.time() - t1
 print(f"scandir_rs.scandir.entries: {dt:.3f}")
 
 t1 = time.time()
-entries = r.scandir.entries(dirName, metadata=True)
-dt = time.time() - t1
-print(f"scandir_rs.scandir.entries(metadata=True): {dt:.3f}")
-
-t1 = time.time()
-entries = r.scandir.entries(dirName, metadata_ext=True)
-dt = time.time() - t1
-print(f"scandir_rs.scandir.entries(metadata_ext=True): {dt:.3f}")
-
-t1 = time.time()
 entries = r.scandir.Scandir(dirName).collect()
 dt = time.time() - t1
 print(f"scandir_rs.scandir.Scandir.collect: {dt:.3f}")
@@ -75,10 +65,3 @@ for entry in S:
     pass
 dt = time.time() - t1
 print(f"scandir_rs.scandir.Scandir.iter: {dt:.3f}")
-
-t1 = time.time()
-S = r.scandir.Scandir(dirName, metadata_ext=True)
-for entry in S:
-    pass
-dt = time.time() - t1
-print(f"scandir_rs.scandir.Scandir.iter(metadata_ext=True): {dt:.3f}")

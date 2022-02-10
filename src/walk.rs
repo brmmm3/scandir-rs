@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use crossbeam_channel as channel;
 
-use pyo3::exceptions;
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
 use pyo3::{wrap_pyfunction, PyIterProtocol, Python};
@@ -19,7 +19,15 @@ use jwalk::WalkDirGeneric;
 
 use crate::common::check_and_expand_path;
 use crate::common::{create_filter, filter_children};
+use crate::cst::*;
 use crate::def::*;
+
+static BUSY: AtomicBool = AtomicBool::new(false);
+
+#[pyfunction]
+pub fn is_busy() -> bool {
+    BUSY.load(Ordering::Relaxed)
+}
 
 fn update_toc(
     dir_entry: &jwalk::DirEntry<((), Option<Result<fs::Metadata, Error>>)>,
@@ -266,10 +274,8 @@ pub fn toc(
     let root_path = match check_and_expand_path(&root_path) {
         Ok(p) => p,
         Err(e) => match e.kind() {
-            ErrorKind::NotFound => {
-                return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
-            }
-            _ => return Err(exceptions::PyException::new_err(e.to_string())),
+            ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+            _ => return Err(PyException::new_err(e.to_string())),
         },
     };
     let filter = match create_filter(
@@ -280,7 +286,7 @@ pub fn toc(
         case_sensitive,
     ) {
         Ok(f) => f,
-        Err(e) => return Err(exceptions::PyValueError::new_err(e.to_string())),
+        Err(e) => return Err(PyValueError::new_err(e.to_string())),
     };
     let toc = Arc::new(Mutex::new(Toc {
         dirs: Vec::new(),
@@ -304,7 +310,7 @@ pub fn toc(
         Ok(())
     });
     match rc {
-        Err(e) => return Err(exceptions::PyRuntimeError::new_err(e.to_string())),
+        Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
         _ => (),
     }
     let toc_cloned = toc.lock().unwrap().clone();
@@ -430,7 +436,7 @@ impl Walk {
 #[pymethods]
 impl Walk {
     #[new]
-    fn __new__(
+    fn new(
         root_path: &str,
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
@@ -445,10 +451,8 @@ impl Walk {
         let root_path = match check_and_expand_path(&root_path) {
             Ok(p) => p,
             Err(e) => match e.kind() {
-                ErrorKind::NotFound => {
-                    return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
-                }
-                _ => return Err(exceptions::PyException::new_err(e.to_string())),
+                ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+                _ => return Err(PyException::new_err(e.to_string())),
             },
         };
         let filter = match create_filter(
@@ -460,7 +464,7 @@ impl Walk {
         ) {
             Ok(f) => f,
             Err(e) => {
-                return Err(exceptions::PyValueError::new_err(e.to_string()));
+                return Err(PyValueError::new_err(e.to_string()));
             }
         };
         Ok(Walk {
@@ -487,8 +491,9 @@ impl Walk {
 
     fn __enter__(&mut self) -> PyResult<()> {
         if !self.rs_start(None) {
-            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+            return Err(PyRuntimeError::new_err("Thread already running"));
         }
+        BUSY.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -499,9 +504,11 @@ impl Walk {
         _traceback: Option<&PyAny>,
     ) -> PyResult<bool> {
         if !self.rs_stop() {
+            BUSY.store(false, Ordering::Relaxed);
             return Ok(false);
         }
-        if ty == Some(Python::acquire_gil().python().get_type::<exceptions::PyValueError>()) {
+        BUSY.store(false, Ordering::Relaxed);
+        if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
             Ok(true)
         } else {
             Ok(false)
@@ -517,15 +524,15 @@ impl Walk {
     }
 
     #[getter]
-    fn duration(&self) -> PyResult<f64> {
-        Ok(f64::from_bits(self.duration.load(Ordering::Relaxed)) * 0.001)
+    fn duration(&self) -> f64 {
+        f64::from_bits(self.duration.load(Ordering::Relaxed)) * 0.001
     }
 
-    fn has_results(&self) -> PyResult<bool> {
-        Ok(self.has_results)
+    fn has_results(&self) -> bool {
+        self.has_results
     }
 
-    fn as_dict(&self) -> PyResult<PyObject> {
+    fn as_dict(&self) -> PyObject {
         let gil = Python::acquire_gil();
         let mut toc_locked = self.toc.lock().unwrap();
         let pyresult = PyDict::new(gil.python());
@@ -553,30 +560,47 @@ impl Walk {
                 .unwrap();
         }
         toc_locked.deref_mut().clear();
-        Ok(pyresult.into())
+        pyresult.into()
     }
 
     fn collect(&mut self) -> PyResult<Toc> {
-        self.rs_collect();
+        BUSY.store(true, Ordering::Relaxed);
+        let alive = Arc::new(AtomicBool::new(true));
+        self.alive = Some(Arc::downgrade(&alive));
+        let gil = Python::acquire_gil();
+        let rc: Result<(), Error> = gil.python().allow_threads(|| {
+            self.rs_collect();
+            Ok(())
+        });
+        self.alive = None;
+        BUSY.store(false, Ordering::Relaxed);
+        match rc {
+            Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
+            _ => (),
+        }
+        self.has_results = true;
         Ok(Arc::clone(&self.toc).lock().unwrap().clone())
     }
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start(None) {
-            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+            return Err(PyRuntimeError::new_err("Thread already running"));
         }
+        BUSY.store(true, Ordering::Relaxed);
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::PyRuntimeError::new_err("Thread not running"));
+            BUSY.store(false, Ordering::Relaxed);
+            return Err(PyRuntimeError::new_err("Thread not running"));
         }
+        BUSY.store(false, Ordering::Relaxed);
         Ok(true)
     }
 
-    fn busy(&self) -> PyResult<bool> {
-        Ok(self.rs_busy())
+    fn busy(&self) -> bool {
+        self.rs_busy()
     }
 }
 
@@ -591,11 +615,12 @@ impl pyo3::class::PyObjectProtocol for Walk {
 impl<'p> PyIterProtocol for Walk {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Walk>> {
         if slf.thr.is_some() {
-            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+            return Err(PyRuntimeError::new_err("Thread already running"));
         }
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);
         slf.rs_start(Some(tx));
+        BUSY.store(true, Ordering::Relaxed);
         Ok(slf.into())
     }
 
@@ -608,17 +633,24 @@ impl<'p> PyIterProtocol for Walk {
                     WalkResult::WalkEntry(entry) => Ok(Some(entry.to_object(gil.python()))),
                     WalkResult::WalkEntryExt(entry) => Ok(Some(entry.to_object(gil.python()))),
                 },
-                Err(_) => Ok(None),
+                Err(_) => {
+                    BUSY.store(false, Ordering::Relaxed);
+                    Ok(None)
+                }
             },
-            None => Ok(None),
+            None => {
+                BUSY.store(false, Ordering::Relaxed);
+                Ok(None)
+            }
         }
     }
 }
 
 #[pymodule]
-#[pyo3(name="walk")]
+#[pyo3(name = "walk")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Walk>()?;
     m.add_wrapped(wrap_pyfunction!(toc))?;
+    m.add_wrapped(wrap_pyfunction!(is_busy))?;
     Ok(())
 }

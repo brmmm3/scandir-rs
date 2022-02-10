@@ -5,15 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.4] - 2021-09-25
+## [0.9.5] - 2022-01-31
 
-### Fixed
+### Added
 
-Do not fail if filesystem does not support creation/access/modification time
+- Thread safe is_busy method for each sub-module.
 
 ### Changed
 
-Update dependencies to latest versions.
+- Update dependencies.
+- Add support for Python 3.10.
+- Improve example ex_scandir for showing usage of thread safe is_busy method.
+
+
+## [0.9.4] - 2021-02-16
+
+### Changed
+
+- Update dependencies.
 
 ## [0.9.3] - 2020-07-27
 

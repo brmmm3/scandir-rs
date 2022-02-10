@@ -6,6 +6,7 @@ import time
 import tempfile
 import timeit
 import tarfile
+import traceback
 
 import requests
 
@@ -14,7 +15,9 @@ import scandir_rs as scandir
 
 def CreateTestData(tmpDirName=None, tempZipPath=None):
     tempDir = tempfile.TemporaryDirectory(prefix="scandir_rs_", dir=tmpDirName)
-    if not tempZipPath:
+    if tempZipPath:
+        bRemove = False
+    else:
         url = "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.5.5.tar.gz"
         r = requests.get(url, stream=True)
         tempZipPath = f"{tempDir.name}/linux-5.5.5.tar.gz"
@@ -22,10 +25,15 @@ def CreateTestData(tmpDirName=None, tempZipPath=None):
         with open(tempZipPath, 'wb') as F:
             for chunk in r.iter_content(chunk_size=4096):
                 F.write(chunk)
+        bRemove = True
     print("Extracting linux-5.5.5.tar.gz...")
-    with tarfile.open(tempZipPath, "r:gz") as Z:
-        Z.extractall(tempDir.name)
-    os.remove(tempZipPath)
+    try:
+        with tarfile.open(tempZipPath, "r:gz") as Z:
+            Z.extractall(tempDir.name)
+    except:
+        traceback.print_exc()
+    if bRemove:
+        os.remove(tempZipPath)
     return tempDir
 
 
@@ -104,6 +112,8 @@ for result in scandir.scandir.Scandir('{dirName}', return_type=scandir.RETURN_TY
 
 
 if __name__ == "__main__":
+    RunBenchmarks("C:/Workspace/linux-5.5.5")
+    sys.exit(0)
     try:
         tmpDirName = sys.argv[sys.argv.index("--tmpdir") + 1]
     except:
@@ -112,10 +122,10 @@ if __name__ == "__main__":
         tempZipPath = sys.argv[sys.argv.index("--archive") + 1]
     except:
         tempZipPath = None
-    if os.name == 'nt':
-        RunBenchmarks("C:/Windows")
-    else:
-        RunBenchmarks("/usr")
+    # if os.name == 'nt':
+    #    RunBenchmarks("C:/Windows")
+    # else:
+    #    RunBenchmarks("/usr")
     tempDir = CreateTestData(tmpDirName, tempZipPath)
     try:
         RunBenchmarks(tempDir.name)

@@ -13,7 +13,7 @@ use std::time::{Instant, UNIX_EPOCH};
 
 use crossbeam_channel as channel;
 
-use pyo3::exceptions;
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{wrap_pyfunction, PyIterProtocol, Python};
@@ -22,7 +22,15 @@ use jwalk::WalkDirGeneric;
 
 use crate::common::check_and_expand_path;
 use crate::common::{create_filter, filter_children};
+use crate::cst::*;
 use crate::def::*;
+
+static BUSY: AtomicBool = AtomicBool::new(false);
+
+#[pyfunction]
+pub fn is_busy() -> bool {
+    BUSY.load(Ordering::Relaxed)
+}
 
 #[derive(Debug, Clone)]
 pub enum Stats {
@@ -85,8 +93,8 @@ pub struct Entries {
 #[pymethods]
 impl Entries {
     #[getter]
-    fn entries(&self) -> PyResult<PyObject> {
-        Ok(PyTuple::new(Python::acquire_gil().python(), &self.entries).into())
+    fn entries(&self) -> PyObject {
+        PyTuple::new(Python::acquire_gil().python(), &self.entries).into()
     }
 }
 
@@ -94,6 +102,13 @@ impl Entries {
 impl pyo3::class::PyObjectProtocol for Entries {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
+    }
+}
+
+#[pyproto]
+impl pyo3::class::PySequenceProtocol for Entries {
+    fn __len__(&self) -> PyResult<usize> {
+        Ok(self.entries.len())
     }
 }
 
@@ -113,22 +128,37 @@ fn create_entry(
     let mut st_size: u64 = 0;
     let mut st_blksize: u64 = 4096;
     let mut st_blocks: u64 = 0;
+    #[cfg(unix)]
     let mut st_uid: u32 = 0;
+    #[cfg(windows)]
+    let st_uid: u32 = 0;
+    #[cfg(unix)]
     let mut st_gid: u32 = 0;
+    #[cfg(windows)]
+    let st_gid: u32 = 0;
+    #[cfg(unix)]
     let mut st_rdev: u64 = 0;
+    #[cfg(windows)]
+    let st_rdev: u64 = 0;
     if let Ok(metadata) = fs::metadata(dir_entry.path()) {
-        if let Ok(created) = metadata.created() {
-            let duration = created.duration_since(UNIX_EPOCH).unwrap();
-            st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        }
-        if let Ok(modified) = metadata.modified() {
-            let duration = modified.duration_since(UNIX_EPOCH).unwrap();
-            st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        }
-        if let Ok(accessed) = metadata.accessed() {
-            let duration = accessed.duration_since(UNIX_EPOCH).unwrap();
-            st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        }
+        let duration = metadata
+            .created()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap();
+        st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        let duration = metadata
+            .modified()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap();
+        st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        let duration = metadata
+            .accessed()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap();
+        st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         if return_type > RETURN_TYPE_BASE {
             #[cfg(unix)]
             {
@@ -337,17 +367,13 @@ pub fn entries<'a>(
 ) -> PyResult<Entries> {
     let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
     if return_type > RETURN_TYPE_FULL {
-        return Err(exceptions::PyValueError::new_err(
-            "Invalid return type".to_string(),
-        ));
+        return Err(PyValueError::new_err("Invalid return type".to_string()));
     }
     let root_path = match check_and_expand_path(&root_path) {
         Ok(p) => p,
         Err(e) => match e.kind() {
-            ErrorKind::NotFound => {
-                return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
-            }
-            _ => return Err(exceptions::PyException::new_err(e.to_string())),
+            ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+            _ => return Err(PyException::new_err(e.to_string())),
         },
     };
     let filter = match create_filter(
@@ -358,8 +384,9 @@ pub fn entries<'a>(
         case_sensitive,
     ) {
         Ok(f) => f,
-        Err(e) => return Err(exceptions::PyValueError::new_err(e.to_string())),
+        Err(e) => return Err(PyValueError::new_err(e.to_string())),
     };
+    BUSY.store(true, Ordering::Relaxed);
     let result = Arc::new(Mutex::new(Entries {
         entries: Vec::new(),
         duration: 0.0,
@@ -378,8 +405,9 @@ pub fn entries<'a>(
         );
         Ok(())
     });
+    BUSY.store(false, Ordering::Relaxed);
     match rc {
-        Err(e) => return Err(exceptions::PyRuntimeError::new_err(e.to_string())),
+        Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
         _ => (),
     }
     let result_cloned = result.lock().unwrap().clone();
@@ -473,7 +501,7 @@ impl Scandir {
 #[pymethods]
 impl Scandir {
     #[new]
-    fn __new__(
+    pub fn new(
         root_path: &str,
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
@@ -487,17 +515,15 @@ impl Scandir {
     ) -> PyResult<Self> {
         let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
         if return_type > RETURN_TYPE_FULL {
-            return Err(exceptions::PyValueError::new_err(
+            return Err(PyValueError::new_err(
                 "Parameter return_type has invalid value",
             ));
         }
         let root_path = match check_and_expand_path(&root_path) {
             Ok(p) => p,
             Err(e) => match e.kind() {
-                ErrorKind::NotFound => {
-                    return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
-                }
-                _ => return Err(exceptions::PyException::new_err(e.to_string())),
+                ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+                _ => return Err(PyException::new_err(e.to_string())),
             },
         };
         let filter = match create_filter(
@@ -509,7 +535,7 @@ impl Scandir {
         ) {
             Ok(f) => f,
             Err(e) => {
-                return Err(exceptions::PyValueError::new_err(e.to_string()));
+                return Err(PyValueError::new_err(e.to_string()));
             }
         };
         Ok(Scandir {
@@ -532,8 +558,9 @@ impl Scandir {
 
     fn __enter__(&mut self) -> PyResult<()> {
         if !self.rs_start(None) {
-            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+            return Err(PyRuntimeError::new_err("Thread already running"));
         }
+        BUSY.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -544,9 +571,11 @@ impl Scandir {
         _traceback: Option<&PyAny>,
     ) -> PyResult<bool> {
         if !self.rs_stop() {
+            BUSY.store(false, Ordering::Relaxed);
             return Ok(false);
         }
-        if ty == Some(Python::acquire_gil().python().get_type::<exceptions::PyValueError>()) {
+        BUSY.store(false, Ordering::Relaxed);
+        if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
             Ok(true)
         } else {
             Ok(false)
@@ -554,15 +583,15 @@ impl Scandir {
     }
 
     #[getter]
-    fn entries(&self) -> PyResult<Entries> {
-        Ok(Arc::clone(&self.entries).lock().unwrap().clone())
+    pub fn entries(&self) -> Entries {
+        Arc::clone(&self.entries).lock().unwrap().clone()
     }
 
-    fn has_results(&self) -> PyResult<bool> {
-        Ok(self.has_results)
+    pub fn has_results(&self) -> bool {
+        self.has_results
     }
 
-    fn as_dict(&self) -> PyResult<PyObject> {
+    pub fn as_dict(&self) -> PyObject {
         let entries_locked = self.entries.lock().unwrap();
         let gil = Python::acquire_gil();
         let py = gil.python();
@@ -590,44 +619,61 @@ impl Scandir {
                 Stats::Duration(_) => {}
             }
         }
-        Ok(pyresult.into())
+        pyresult.into()
     }
 
-    fn collect(&self) -> PyResult<Entries> {
-        rs_entries(
-            self.root_path.clone(),
-            self.sorted,
-            self.skip_hidden,
-            self.max_depth,
-            self.filter.clone(),
-            self.return_type,
-            self.entries.clone(),
-            None,
-        );
+    pub fn collect(&mut self) -> PyResult<Entries> {
+        BUSY.store(true, Ordering::Relaxed);
+        let alive = Arc::new(AtomicBool::new(true));
+        self.alive = Some(Arc::downgrade(&alive));
+        let gil = Python::acquire_gil();
+        let rc: Result<(), Error> = gil.python().allow_threads(|| {
+            rs_entries(
+                self.root_path.clone(),
+                self.sorted,
+                self.skip_hidden,
+                self.max_depth,
+                self.filter.clone(),
+                self.return_type,
+                self.entries.clone(),
+                None,
+            );
+            Ok(())
+        });
+        self.alive = None;
+        BUSY.store(false, Ordering::Relaxed);
+        match rc {
+            Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
+            _ => (),
+        }
+        self.has_results = true;
         Ok(Arc::clone(&self.entries).lock().unwrap().clone())
     }
 
-    fn start(&mut self) -> PyResult<bool> {
+    pub fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start(None) {
-            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+            return Err(PyRuntimeError::new_err("Thread already running"));
         }
+        BUSY.store(true, Ordering::Relaxed);
         Ok(true)
     }
 
-    fn stop(&mut self) -> PyResult<bool> {
+    pub fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            return Err(exceptions::PyRuntimeError::new_err("Thread not running"));
+            BUSY.store(false, Ordering::Relaxed);
+            return Err(PyRuntimeError::new_err("Thread not running"));
         }
+        BUSY.store(false, Ordering::Relaxed);
         Ok(true)
     }
 
-    fn busy(&self) -> PyResult<bool> {
+    pub fn busy(&self) -> bool {
         match &self.alive {
             Some(alive) => match alive.upgrade() {
-                Some(_) => Ok(true),
-                None => return Ok(false),
+                Some(_) => true,
+                None => return false,
             },
-            None => Ok(false),
+            None => false,
         }
     }
 }
@@ -643,11 +689,12 @@ impl pyo3::class::PyObjectProtocol for Scandir {
 impl<'p> PyIterProtocol for Scandir {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Scandir>> {
         if slf.thr.is_some() {
-            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+            return Err(PyRuntimeError::new_err("Thread already running"));
         }
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);
         slf.rs_start(Some(tx));
+        BUSY.store(true, Ordering::Relaxed);
         Ok(slf.into())
     }
 
@@ -662,20 +709,28 @@ impl<'p> PyIterProtocol for Scandir {
                     Stats::Duration(d) => {
                         let mut entries_locked = slf.entries.lock().unwrap();
                         entries_locked.duration = *d;
+                        BUSY.store(false, Ordering::Relaxed);
                         Ok(None)
                     }
                 },
-                Err(_) => Ok(None),
+                Err(_) => {
+                    BUSY.store(false, Ordering::Relaxed);
+                    Ok(None)
+                }
             },
-            None => Ok(None),
+            None => {
+                BUSY.store(false, Ordering::Relaxed);
+                Ok(None)
+            }
         }
     }
 }
 
 #[pymodule]
-#[pyo3(name="scandir")]
+#[pyo3(name = "scandir")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Scandir>()?;
     m.add_wrapped(wrap_pyfunction!(entries))?;
+    m.add_wrapped(wrap_pyfunction!(is_busy))?;
     Ok(())
 }

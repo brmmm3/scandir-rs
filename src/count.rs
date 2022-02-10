@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::Instant;
 
-use pyo3::exceptions;
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
 use pyo3::{wrap_pyfunction, Python};
@@ -22,6 +22,13 @@ use jwalk::WalkDirGeneric;
 use crate::common::check_and_expand_path;
 use crate::common::{create_filter, filter_children};
 use crate::def::*;
+
+static BUSY: AtomicBool = AtomicBool::new(false);
+
+#[pyfunction]
+pub fn is_busy() -> bool {
+    BUSY.load(Ordering::Relaxed)
+}
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -279,7 +286,7 @@ pub fn count(
         case_sensitive,
     ) {
         Ok(f) => f,
-        Err(e) => return Err(exceptions::PyValueError::new_err(e.to_string())),
+        Err(e) => return Err(PyValueError::new_err(e.to_string())),
     };
     let statistics = Arc::new(Mutex::new(Statistics {
         dirs: 0,
@@ -297,10 +304,8 @@ pub fn count(
     let root_path = match check_and_expand_path(&root_path) {
         Ok(p) => p,
         Err(e) => match e.kind() {
-            ErrorKind::NotFound => {
-                return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
-            }
-            _ => return Err(exceptions::PyException::new_err(e.to_string())),
+            ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+            _ => return Err(PyException::new_err(e.to_string())),
         },
     };
     let rc: Result<(), Error> = py.allow_threads(|| {
@@ -316,7 +321,7 @@ pub fn count(
         Ok(())
     });
     if let Err(e) = rc {
-        return Err(exceptions::PyRuntimeError::new_err(e.to_string()));
+        return Err(PyRuntimeError::new_err(e.to_string()));
     }
     let stats_cloned = statistics.lock().unwrap().clone();
     Ok(stats_cloned.into())
@@ -405,7 +410,7 @@ impl Count {
 #[pymethods]
 impl Count {
     #[new]
-    fn __new__(
+    fn new(
         root_path: &str,
         skip_hidden: Option<bool>,
         extended: Option<bool>,
@@ -414,10 +419,8 @@ impl Count {
         let root_path = match check_and_expand_path(&root_path) {
             Ok(p) => p,
             Err(e) => match e.kind() {
-                ErrorKind::NotFound => {
-                    return Err(exceptions::PyFileNotFoundError::new_err(e.to_string()))
-                }
-                _ => return Err(exceptions::PyException::new_err(e.to_string())),
+                ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+                _ => return Err(PyException::new_err(e.to_string())),
             },
         };
         Ok(Count {
@@ -446,6 +449,7 @@ impl Count {
 
     fn __enter__(&mut self) -> PyResult<()> {
         self.rs_start();
+        BUSY.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -455,10 +459,11 @@ impl Count {
         _value: Option<&PyAny>,
         _traceback: Option<&PyAny>,
     ) -> PyResult<bool> {
+        BUSY.store(false, Ordering::Relaxed);
         if !self.rs_stop() {
             return Ok(false);
         }
-        if ty == Some(Python::acquire_gil().python().get_type::<exceptions::PyValueError>()) {
+        if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
             Ok(true)
         } else {
             Ok(false)
@@ -466,12 +471,12 @@ impl Count {
     }
 
     #[getter]
-    fn statistics(&self) -> PyResult<Statistics> {
-        Ok(Arc::clone(&self.statistics).lock().unwrap().clone())
+    fn statistics(&self) -> Statistics {
+        Arc::clone(&self.statistics).lock().unwrap().clone()
     }
 
-    fn has_results(&self) -> PyResult<bool> {
-        Ok(self.has_results)
+    fn has_results(&self) -> bool {
+        self.has_results
     }
 
     fn as_dict(&self, duration: Option<bool>) -> PyResult<PyObject> {
@@ -479,6 +484,9 @@ impl Count {
     }
 
     fn collect(&mut self) -> PyResult<Statistics> {
+        BUSY.store(true, Ordering::Relaxed);
+        let alive = Arc::new(AtomicBool::new(true));
+        self.alive = Some(Arc::downgrade(&alive));
         let gil = Python::acquire_gil();
         let rc: Result<(), Error> = gil.python().allow_threads(|| {
             rs_count(
@@ -492,8 +500,10 @@ impl Count {
             );
             Ok(())
         });
+        self.alive = None;
+        BUSY.store(false, Ordering::Relaxed);
         match rc {
-            Err(e) => return Err(exceptions::PyRuntimeError::new_err(e.to_string())),
+            Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
             _ => (),
         }
         self.has_results = true;
@@ -502,25 +512,27 @@ impl Count {
 
     fn start(&mut self) -> PyResult<bool> {
         if !self.rs_start() {
-            return Err(exceptions::PyRuntimeError::new_err("Thread already running"));
+            return Err(PyRuntimeError::new_err("Thread already running"));
         }
+        BUSY.store(true, Ordering::Relaxed);
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
+        BUSY.store(false, Ordering::Relaxed);
         if !self.rs_stop() {
-            return Err(exceptions::PyRuntimeError::new_err("Thread not running"));
+            return Err(PyRuntimeError::new_err("Thread not running"));
         }
         Ok(true)
     }
 
-    fn busy(&self) -> PyResult<bool> {
+    fn busy(&self) -> bool {
         match &self.alive {
             Some(alive) => match alive.upgrade() {
-                Some(_) => Ok(true),
-                None => return Ok(false),
+                Some(_) => true,
+                None => return false,
             },
-            None => Ok(false),
+            None => false,
         }
     }
 }
@@ -533,9 +545,10 @@ impl pyo3::class::PyObjectProtocol for Count {
 }
 
 #[pymodule]
-#[pyo3(name="count")]
+#[pyo3(name = "count")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Count>()?;
     m.add_wrapped(wrap_pyfunction!(count))?;
+    m.add_wrapped(wrap_pyfunction!(is_busy))?;
     Ok(())
 }

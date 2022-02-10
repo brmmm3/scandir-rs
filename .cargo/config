@@ -1,2 +1,2 @@
 [build]
-target-dir = "build/temp.linux-x86_64-3.7/scandir-rs"
+target-dir = "build/temp.linux-x86_64/scandir-rs"

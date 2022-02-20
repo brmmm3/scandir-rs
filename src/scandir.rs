@@ -6,7 +6,7 @@ use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::{Instant, UNIX_EPOCH};
@@ -26,10 +26,16 @@ use crate::cst::*;
 use crate::def::*;
 
 static BUSY: AtomicBool = AtomicBool::new(false);
+static COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[pyfunction]
-pub fn is_busy() -> bool {
+pub fn ts_busy() -> bool {
     BUSY.load(Ordering::Relaxed)
+}
+
+#[pyfunction]
+pub fn ts_count() -> u32 {
+    COUNT.load(Ordering::Relaxed)
 }
 
 #[derive(Debug, Clone)]
@@ -43,9 +49,9 @@ pub enum Stats {
 #[derive(Debug, Clone)]
 pub struct Entry {
     /// Absolute path
-    path: String,
+    pub path: String,
     /// File stats
-    entry: Stats,
+    pub entry: Stats,
 }
 
 impl ToPyObject for Entry {
@@ -116,7 +122,7 @@ fn create_entry(
     root_path_len: usize,
     return_type: u8,
     dir_entry: &jwalk::DirEntry<((), Option<Result<Metadata, Error>>)>,
-) -> Entry {
+) -> (bool, Entry) {
     let file_type = dir_entry.file_type;
     let mut st_ctime: f64 = 0.0;
     let mut st_mtime: f64 = 0.0;
@@ -143,19 +149,19 @@ fn create_entry(
     if let Ok(metadata) = fs::metadata(dir_entry.path()) {
         let duration = metadata
             .created()
-            .unwrap()
+            .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap();
         st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         let duration = metadata
             .modified()
-            .unwrap()
+            .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap();
         st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         let duration = metadata
             .accessed()
-            .unwrap()
+            .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap();
         st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
@@ -198,11 +204,12 @@ fn create_entry(
     let file_name = dir_entry.file_name.clone().into_string().unwrap();
     key.push(&file_name);
     let key = key.to_str().unwrap().to_string();
+    let is_file = file_type.is_file();
     let entry: ScandirResult = match return_type {
         RETURN_TYPE_FAST | RETURN_TYPE_BASE => ScandirResult::DirEntry(DirEntry {
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
-            is_file: file_type.is_file(),
+            is_file,
             st_ctime: st_ctime,
             st_mtime: st_mtime,
             st_atime: st_atime,
@@ -210,7 +217,7 @@ fn create_entry(
         RETURN_TYPE_EXT => ScandirResult::DirEntryExt(DirEntryExt {
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
-            is_file: file_type.is_file(),
+            is_file,
             st_ctime: st_ctime,
             st_mtime: st_mtime,
             st_atime: st_atime,
@@ -230,7 +237,7 @@ fn create_entry(
             path: key.get(root_path_len..).unwrap_or("").to_string(),
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
-            is_file: file_type.is_file(),
+            is_file,
             st_ctime: st_ctime,
             st_mtime: st_mtime,
             st_atime: st_atime,
@@ -247,10 +254,13 @@ fn create_entry(
         }),
         _ => ScandirResult::Error("Wrong return type!".to_string()),
     };
-    Entry {
-        path: key,
-        entry: Stats::ScandirResult(entry),
-    }
+    (
+        is_file,
+        Entry {
+            path: key,
+            entry: Stats::ScandirResult(entry),
+        },
+    )
 }
 
 fn rs_entries(
@@ -263,6 +273,7 @@ fn rs_entries(
     result: Arc<Mutex<Entries>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
+    BUSY.store(true, Ordering::Relaxed);
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
@@ -279,20 +290,25 @@ fn rs_entries(
                 match &alive {
                     Some(a) => {
                         if !a.load(Ordering::Relaxed) {
+                            BUSY.store(false, Ordering::Relaxed);
                             return;
                         }
                     }
                     None => {}
                 }
                 if let Ok(dir_entry) = dir_entry_result {
-                    let entry = create_entry(root_path_len, return_type, dir_entry);
+                    let (is_file, entry) = create_entry(root_path_len, return_type, dir_entry);
                     let mut result_locked = result_clone.lock().unwrap();
                     result_locked.entries.push(entry);
+                    if is_file {
+                        COUNT.store(COUNT.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
+                    }
                 }
             });
         })
     {}
     result.lock().unwrap().duration = start_time.elapsed().as_millis() as f64 * 0.001;
+    BUSY.store(false, Ordering::Relaxed);
 }
 
 fn rs_entries_iter(
@@ -305,6 +321,7 @@ fn rs_entries_iter(
     alive: Option<Arc<AtomicBool>>,
     tx: Option<channel::Sender<Entry>>,
 ) {
+    BUSY.store(true, Ordering::Relaxed);
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
@@ -321,20 +338,25 @@ fn rs_entries_iter(
                 match &alive {
                     Some(a) => {
                         if !a.load(Ordering::Relaxed) {
+                            BUSY.store(false, Ordering::Relaxed);
                             return;
                         }
                     }
                     None => {}
                 }
                 if let Ok(dir_entry) = dir_entry_result {
-                    let entry = create_entry(root_path_len, return_type, dir_entry);
+                    let (is_file, entry) = create_entry(root_path_len, return_type, dir_entry);
                     match &tx_clone {
                         Some(tx_clone) => {
                             if tx_clone.send(entry).is_err() {
+                                BUSY.store(false, Ordering::Relaxed);
                                 return;
                             }
                         }
                         None => {}
+                    }
+                    if is_file {
+                        COUNT.store(COUNT.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
                     }
                 }
             });
@@ -349,6 +371,7 @@ fn rs_entries_iter(
         }
         None => {}
     }
+    BUSY.store(false, Ordering::Relaxed);
 }
 
 #[pyfunction]
@@ -386,7 +409,6 @@ pub fn entries<'a>(
         Ok(f) => f,
         Err(e) => return Err(PyValueError::new_err(e.to_string())),
     };
-    BUSY.store(true, Ordering::Relaxed);
     let result = Arc::new(Mutex::new(Entries {
         entries: Vec::new(),
         duration: 0.0,
@@ -405,7 +427,6 @@ pub fn entries<'a>(
         );
         Ok(())
     });
-    BUSY.store(false, Ordering::Relaxed);
     match rc {
         Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
         _ => (),
@@ -426,7 +447,7 @@ pub struct Scandir {
     return_type: u8,
     filter: Option<Filter>,
     // Results
-    entries: Arc<Mutex<Entries>>,
+    pub entries: Arc<Mutex<Entries>>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     alive: Option<Weak<AtomicBool>>,
@@ -560,7 +581,6 @@ impl Scandir {
         if !self.rs_start(None) {
             return Err(PyRuntimeError::new_err("Thread already running"));
         }
-        BUSY.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -571,10 +591,8 @@ impl Scandir {
         _traceback: Option<&PyAny>,
     ) -> PyResult<bool> {
         if !self.rs_stop() {
-            BUSY.store(false, Ordering::Relaxed);
             return Ok(false);
         }
-        BUSY.store(false, Ordering::Relaxed);
         if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
             Ok(true)
         } else {
@@ -623,7 +641,6 @@ impl Scandir {
     }
 
     pub fn collect(&mut self) -> PyResult<Entries> {
-        BUSY.store(true, Ordering::Relaxed);
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
         let gil = Python::acquire_gil();
@@ -641,7 +658,6 @@ impl Scandir {
             Ok(())
         });
         self.alive = None;
-        BUSY.store(false, Ordering::Relaxed);
         match rc {
             Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
             _ => (),
@@ -654,16 +670,13 @@ impl Scandir {
         if !self.rs_start(None) {
             return Err(PyRuntimeError::new_err("Thread already running"));
         }
-        BUSY.store(true, Ordering::Relaxed);
         Ok(true)
     }
 
     pub fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            BUSY.store(false, Ordering::Relaxed);
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
-        BUSY.store(false, Ordering::Relaxed);
         Ok(true)
     }
 
@@ -694,7 +707,6 @@ impl<'p> PyIterProtocol for Scandir {
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);
         slf.rs_start(Some(tx));
-        BUSY.store(true, Ordering::Relaxed);
         Ok(slf.into())
     }
 
@@ -709,19 +721,12 @@ impl<'p> PyIterProtocol for Scandir {
                     Stats::Duration(d) => {
                         let mut entries_locked = slf.entries.lock().unwrap();
                         entries_locked.duration = *d;
-                        BUSY.store(false, Ordering::Relaxed);
                         Ok(None)
                     }
                 },
-                Err(_) => {
-                    BUSY.store(false, Ordering::Relaxed);
-                    Ok(None)
-                }
+                Err(_) => Ok(None),
             },
-            None => {
-                BUSY.store(false, Ordering::Relaxed);
-                Ok(None)
-            }
+            None => Ok(None),
         }
     }
 }
@@ -731,6 +736,7 @@ impl<'p> PyIterProtocol for Scandir {
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Scandir>()?;
     m.add_wrapped(wrap_pyfunction!(entries))?;
-    m.add_wrapped(wrap_pyfunction!(is_busy))?;
+    m.add_wrapped(wrap_pyfunction!(ts_busy))?;
+    m.add_wrapped(wrap_pyfunction!(ts_count))?;
     Ok(())
 }

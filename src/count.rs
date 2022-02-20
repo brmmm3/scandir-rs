@@ -7,7 +7,7 @@ use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::Instant;
@@ -24,10 +24,16 @@ use crate::common::{create_filter, filter_children};
 use crate::def::*;
 
 static BUSY: AtomicBool = AtomicBool::new(false);
+static COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[pyfunction]
-pub fn is_busy() -> bool {
+pub fn ts_busy() -> bool {
     BUSY.load(Ordering::Relaxed)
+}
+
+#[pyfunction]
+pub fn ts_count() -> u32 {
+    COUNT.load(Ordering::Relaxed)
 }
 
 #[pyclass]
@@ -129,6 +135,8 @@ fn rs_count(
         max_depth = ::std::usize::MAX;
     }
     let root_path_len = root_path.to_string_lossy().len() + 1;
+    COUNT.store(0, Ordering::Relaxed);
+    BUSY.store(true, Ordering::Relaxed);
     for entry in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>::new(&root_path)
         .skip_hidden(skip_hidden)
         .sort(false)
@@ -137,6 +145,7 @@ fn rs_count(
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
+                        BUSY.store(false, Ordering::Relaxed);
                         return;
                     }
                 }
@@ -158,6 +167,7 @@ fn rs_count(
                 if file_type.is_dir() {
                     dirs += 1;
                 } else if file_type.is_file() {
+                    COUNT.store(COUNT.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
                     files += 1;
                 } else if file_type.is_symlink() {
                     slinks += 1;
@@ -263,6 +273,7 @@ fn rs_count(
         }
         None => {}
     }
+    BUSY.store(false, Ordering::Relaxed);
 }
 
 #[pyfunction]
@@ -449,7 +460,6 @@ impl Count {
 
     fn __enter__(&mut self) -> PyResult<()> {
         self.rs_start();
-        BUSY.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -459,7 +469,6 @@ impl Count {
         _value: Option<&PyAny>,
         _traceback: Option<&PyAny>,
     ) -> PyResult<bool> {
-        BUSY.store(false, Ordering::Relaxed);
         if !self.rs_stop() {
             return Ok(false);
         }
@@ -484,7 +493,6 @@ impl Count {
     }
 
     fn collect(&mut self) -> PyResult<Statistics> {
-        BUSY.store(true, Ordering::Relaxed);
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
         let gil = Python::acquire_gil();
@@ -501,7 +509,6 @@ impl Count {
             Ok(())
         });
         self.alive = None;
-        BUSY.store(false, Ordering::Relaxed);
         match rc {
             Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
             _ => (),
@@ -514,12 +521,10 @@ impl Count {
         if !self.rs_start() {
             return Err(PyRuntimeError::new_err("Thread already running"));
         }
-        BUSY.store(true, Ordering::Relaxed);
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
-        BUSY.store(false, Ordering::Relaxed);
         if !self.rs_stop() {
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
@@ -549,6 +554,7 @@ impl pyo3::class::PyObjectProtocol for Count {
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Count>()?;
     m.add_wrapped(wrap_pyfunction!(count))?;
-    m.add_wrapped(wrap_pyfunction!(is_busy))?;
+    m.add_wrapped(wrap_pyfunction!(ts_busy))?;
+    m.add_wrapped(wrap_pyfunction!(ts_count))?;
     Ok(())
 }

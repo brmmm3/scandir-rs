@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{Error, ErrorKind};
 use std::ops::DerefMut;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 use std::time::Instant;
@@ -22,11 +22,20 @@ use crate::common::{create_filter, filter_children};
 use crate::cst::*;
 use crate::def::*;
 
+
 static BUSY: AtomicBool = AtomicBool::new(false);
+static COUNT: AtomicU32 = AtomicU32::new(0);
+
 
 #[pyfunction]
-pub fn is_busy() -> bool {
+pub fn ts_busy() -> bool {
     BUSY.load(Ordering::Relaxed)
+}
+
+
+#[pyfunction]
+pub fn ts_count() -> u32 {
+    COUNT.load(Ordering::Relaxed)
 }
 
 fn update_toc(
@@ -41,6 +50,7 @@ fn update_toc(
     } else if file_type.is_dir() {
         toc.dirs.push(key.to_str().unwrap().to_string());
     } else if file_type.is_file() {
+        COUNT.store(COUNT.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
         toc.files.push(key.to_str().unwrap().to_string());
     } else {
         toc.other.push(key.to_str().unwrap().to_string());
@@ -57,6 +67,7 @@ pub fn rs_toc(
     duration: Option<Arc<AtomicU64>>,
     alive: Option<Arc<AtomicBool>>,
 ) {
+    BUSY.store(true, Ordering::Relaxed);
     let start_time = Instant::now();
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
@@ -70,6 +81,7 @@ pub fn rs_toc(
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
+                        BUSY.store(false, Ordering::Relaxed);
                         return;
                     }
                 }
@@ -93,6 +105,7 @@ pub fn rs_toc(
         }
         None => {}
     }
+    BUSY.store(false, Ordering::Relaxed);
 }
 
 pub fn rs_toc_iter(
@@ -105,6 +118,7 @@ pub fn rs_toc_iter(
     alive: Option<Arc<AtomicBool>>,
     tx: channel::Sender<WalkResult>,
 ) {
+    BUSY.store(true, Ordering::Relaxed);
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
@@ -120,6 +134,7 @@ pub fn rs_toc_iter(
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
+                        BUSY.store(false, Ordering::Relaxed);
                         return;
                     }
                 }
@@ -167,6 +182,7 @@ pub fn rs_toc_iter(
         }
         None => {}
     }
+    BUSY.store(false, Ordering::Relaxed);
 }
 
 pub fn rs_walk_iter(
@@ -180,6 +196,7 @@ pub fn rs_walk_iter(
     alive: Option<Arc<AtomicBool>>,
     tx: channel::Sender<WalkResult>,
 ) {
+    BUSY.store(true, Ordering::Relaxed);
     if max_depth == 0 {
         max_depth = ::std::usize::MAX;
     }
@@ -194,6 +211,7 @@ pub fn rs_walk_iter(
             match &alive {
                 Some(a) => {
                     if !a.load(Ordering::Relaxed) {
+                        BUSY.store(false, Ordering::Relaxed);
                         return;
                     }
                 }
@@ -201,6 +219,7 @@ pub fn rs_walk_iter(
             }
             filter_children(children, &filter, root_path_len);
             if children.is_empty() {
+                BUSY.store(false, Ordering::Relaxed);
                 return;
             }
             let mut path: Option<String> = None;
@@ -256,6 +275,7 @@ pub fn rs_walk_iter(
         }
         None => {}
     }
+    BUSY.store(false, Ordering::Relaxed);
 }
 
 #[pyfunction]
@@ -274,7 +294,9 @@ pub fn toc(
     let root_path = match check_and_expand_path(&root_path) {
         Ok(p) => p,
         Err(e) => match e.kind() {
-            ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+            ErrorKind::NotFound => {
+                return Err(PyFileNotFoundError::new_err(e.to_string()))
+            }
             _ => return Err(PyException::new_err(e.to_string())),
         },
     };
@@ -451,7 +473,9 @@ impl Walk {
         let root_path = match check_and_expand_path(&root_path) {
             Ok(p) => p,
             Err(e) => match e.kind() {
-                ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+                ErrorKind::NotFound => {
+                    return Err(PyFileNotFoundError::new_err(e.to_string()))
+                }
                 _ => return Err(PyException::new_err(e.to_string())),
             },
         };
@@ -493,7 +517,6 @@ impl Walk {
         if !self.rs_start(None) {
             return Err(PyRuntimeError::new_err("Thread already running"));
         }
-        BUSY.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -504,10 +527,8 @@ impl Walk {
         _traceback: Option<&PyAny>,
     ) -> PyResult<bool> {
         if !self.rs_stop() {
-            BUSY.store(false, Ordering::Relaxed);
             return Ok(false);
         }
-        BUSY.store(false, Ordering::Relaxed);
         if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
             Ok(true)
         } else {
@@ -564,7 +585,6 @@ impl Walk {
     }
 
     fn collect(&mut self) -> PyResult<Toc> {
-        BUSY.store(true, Ordering::Relaxed);
         let alive = Arc::new(AtomicBool::new(true));
         self.alive = Some(Arc::downgrade(&alive));
         let gil = Python::acquire_gil();
@@ -573,7 +593,6 @@ impl Walk {
             Ok(())
         });
         self.alive = None;
-        BUSY.store(false, Ordering::Relaxed);
         match rc {
             Err(e) => return Err(PyRuntimeError::new_err(e.to_string())),
             _ => (),
@@ -586,16 +605,13 @@ impl Walk {
         if !self.rs_start(None) {
             return Err(PyRuntimeError::new_err("Thread already running"));
         }
-        BUSY.store(true, Ordering::Relaxed);
         Ok(true)
     }
 
     fn stop(&mut self) -> PyResult<bool> {
         if !self.rs_stop() {
-            BUSY.store(false, Ordering::Relaxed);
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
-        BUSY.store(false, Ordering::Relaxed);
         Ok(true)
     }
 
@@ -620,7 +636,6 @@ impl<'p> PyIterProtocol for Walk {
         let (tx, rx) = channel::unbounded();
         slf.rx = Some(rx);
         slf.rs_start(Some(tx));
-        BUSY.store(true, Ordering::Relaxed);
         Ok(slf.into())
     }
 
@@ -628,29 +643,30 @@ impl<'p> PyIterProtocol for Walk {
         let gil = Python::acquire_gil();
         match &slf.rx {
             Some(rx) => match rx.recv() {
-                Ok(val) => match val {
-                    WalkResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
-                    WalkResult::WalkEntry(entry) => Ok(Some(entry.to_object(gil.python()))),
-                    WalkResult::WalkEntryExt(entry) => Ok(Some(entry.to_object(gil.python()))),
+                Ok(val) => {
+                    match val {
+                        WalkResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
+                        WalkResult::WalkEntry(entry) => Ok(Some(entry.to_object(gil.python()))),
+                        WalkResult::WalkEntryExt(entry) => Ok(Some(entry.to_object(gil.python()))),
+                    }
                 },
                 Err(_) => {
-                    BUSY.store(false, Ordering::Relaxed);
                     Ok(None)
-                }
+                },
             },
             None => {
-                BUSY.store(false, Ordering::Relaxed);
                 Ok(None)
-            }
+            },
         }
     }
 }
 
 #[pymodule]
-#[pyo3(name = "walk")]
+#[pyo3(name="walk")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Walk>()?;
     m.add_wrapped(wrap_pyfunction!(toc))?;
-    m.add_wrapped(wrap_pyfunction!(is_busy))?;
+    m.add_wrapped(wrap_pyfunction!(ts_busy))?;
+    m.add_wrapped(wrap_pyfunction!(ts_count))?;
     Ok(())
 }

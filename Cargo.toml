@@ -1,6 +1,6 @@
 [package]
 name = "scandir-rs"
-version = "0.9.6"
+version = "0.9.7"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -53,7 +53,7 @@ glob = { git = "https://github.com/brmmm3/glob.git", tag = "0.4.0" }
 expanduser = "1.2.2"
 
 [dependencies.pyo3]
-version = "0.15.1"
+version = "0.16.1"
 features = ["extension-module"]
 
 [profile.release]

@@ -9,7 +9,7 @@ pub mod cst;
 pub use cst::*;
 pub mod def;
 pub use def::*;
-mod common;
+pub mod common;
 pub mod count;
 pub use count::*;
 pub mod walk;
@@ -22,7 +22,7 @@ pub use scandir::*;
 /// with the name. Using scandir_rs is about 2-17 times faster than os.walk() (depending on the platform, file system and file tree structure)
 /// by parallelizing the iteration in background.
 #[pymodule]
-#[pyo3(name="scandir_rs")]
+#[pyo3(name = "scandir_rs")]
 fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add("RETURN_TYPE_FAST", RETURN_TYPE_FAST)?;
@@ -30,8 +30,8 @@ fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("RETURN_TYPE_WALK", RETURN_TYPE_WALK)?;
     m.add("RETURN_TYPE_EXT", RETURN_TYPE_EXT)?;
     m.add("RETURN_TYPE_FULL", RETURN_TYPE_FULL)?;
-    m.add_wrapped(wrap_pymodule!(count))?;
-    m.add_wrapped(wrap_pymodule!(walk))?;
-    m.add_wrapped(wrap_pymodule!(scandir))?;
+    m.add_wrapped(wrap_pymodule!(count::init))?;
+    m.add_wrapped(wrap_pymodule!(walk::init))?;
+    m.add_wrapped(wrap_pymodule!(scandir::init))?;
     Ok(())
 }

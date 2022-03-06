@@ -2,7 +2,6 @@ use glob::{MatchOptions, Pattern};
 
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
-use pyo3::PyObjectProtocol;
 
 #[derive(Debug, Clone)]
 pub struct Filter {
@@ -59,10 +58,7 @@ impl DirEntry {
     fn is_file(&self) -> PyResult<bool> {
         Ok(self.is_file.into())
     }
-}
 
-#[pyproto]
-impl<'p> PyObjectProtocol<'p> for DirEntry {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:#?}", self))
     }
@@ -154,10 +150,7 @@ impl DirEntryExt {
     fn is_file(&self) -> PyResult<bool> {
         Ok(self.is_file.into())
     }
-}
 
-#[pyproto]
-impl<'p> PyObjectProtocol<'p> for DirEntryExt {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:#?}", self))
     }
@@ -257,10 +250,7 @@ impl DirEntryFull {
     fn is_file(&self) -> PyResult<bool> {
         Ok(self.is_file.into())
     }
-}
 
-#[pyproto]
-impl<'p> PyObjectProtocol<'p> for DirEntryFull {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:#?}", self))
     }
@@ -289,15 +279,12 @@ pub struct Toc {
     pub errors: Vec<String>,
 }
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Toc {
+#[pymethods]
+impl Toc {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
-}
 
-#[pymethods]
-impl Toc {
     pub fn clear(&mut self) {
         self.dirs.clear();
         self.files.clear();
@@ -331,8 +318,8 @@ pub struct WalkEntry {
     pub toc: Toc,
 }
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for WalkEntry {
+#[pymethods]
+impl WalkEntry {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
@@ -360,8 +347,8 @@ pub struct WalkEntryExt {
     pub toc: Toc,
 }
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for WalkEntryExt {
+#[pymethods]
+impl WalkEntryExt {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }

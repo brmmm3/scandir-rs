@@ -13,7 +13,7 @@ use crossbeam_channel as channel;
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyType};
-use pyo3::{wrap_pyfunction, PyIterProtocol, Python};
+use pyo3::{wrap_pyfunction, Python};
 
 use jwalk::WalkDirGeneric;
 
@@ -22,16 +22,13 @@ use crate::common::{create_filter, filter_children};
 use crate::cst::*;
 use crate::def::*;
 
-
 static BUSY: AtomicBool = AtomicBool::new(false);
 static COUNT: AtomicU32 = AtomicU32::new(0);
-
 
 #[pyfunction]
 pub fn ts_busy() -> bool {
     BUSY.load(Ordering::Relaxed)
 }
-
 
 #[pyfunction]
 pub fn ts_count() -> u32 {
@@ -294,9 +291,7 @@ pub fn toc(
     let root_path = match check_and_expand_path(&root_path) {
         Ok(p) => p,
         Err(e) => match e.kind() {
-            ErrorKind::NotFound => {
-                return Err(PyFileNotFoundError::new_err(e.to_string()))
-            }
+            ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
             _ => return Err(PyException::new_err(e.to_string())),
         },
     };
@@ -473,9 +468,7 @@ impl Walk {
         let root_path = match check_and_expand_path(&root_path) {
             Ok(p) => p,
             Err(e) => match e.kind() {
-                ErrorKind::NotFound => {
-                    return Err(PyFileNotFoundError::new_err(e.to_string()))
-                }
+                ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
                 _ => return Err(PyException::new_err(e.to_string())),
             },
         };
@@ -529,10 +522,18 @@ impl Walk {
         if !self.rs_stop() {
             return Ok(false);
         }
-        if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
-            Ok(true)
-        } else {
-            Ok(false)
+        match ty {
+            Some(ty) => {
+                if ty
+                    .eq(Python::acquire_gil().python().get_type::<PyValueError>())
+                    .unwrap()
+                {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            None => Ok(false),
         }
     }
 
@@ -618,17 +619,11 @@ impl Walk {
     fn busy(&self) -> bool {
         self.rs_busy()
     }
-}
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Walk {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
-}
 
-#[pyproto]
-impl<'p> PyIterProtocol for Walk {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Walk>> {
         if slf.thr.is_some() {
             return Err(PyRuntimeError::new_err("Thread already running"));
@@ -643,27 +638,21 @@ impl<'p> PyIterProtocol for Walk {
         let gil = Python::acquire_gil();
         match &slf.rx {
             Some(rx) => match rx.recv() {
-                Ok(val) => {
-                    match val {
-                        WalkResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
-                        WalkResult::WalkEntry(entry) => Ok(Some(entry.to_object(gil.python()))),
-                        WalkResult::WalkEntryExt(entry) => Ok(Some(entry.to_object(gil.python()))),
-                    }
+                Ok(val) => match val {
+                    WalkResult::Toc(toc) => Ok(Some(toc.to_object(gil.python()))),
+                    WalkResult::WalkEntry(entry) => Ok(Some(entry.to_object(gil.python()))),
+                    WalkResult::WalkEntryExt(entry) => Ok(Some(entry.to_object(gil.python()))),
                 },
-                Err(_) => {
-                    Ok(None)
-                },
+                Err(_) => Ok(None),
             },
-            None => {
-                Ok(None)
-            },
+            None => Ok(None),
         }
     }
 }
 
 #[pymodule]
-#[pyo3(name="walk")]
-fn init(_py: Python, m: &PyModule) -> PyResult<()> {
+#[pyo3(name = "walk")]
+pub fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Walk>()?;
     m.add_wrapped(wrap_pyfunction!(toc))?;
     m.add_wrapped(wrap_pyfunction!(ts_busy))?;

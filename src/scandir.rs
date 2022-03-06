@@ -16,7 +16,7 @@ use crossbeam_channel as channel;
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
-use pyo3::{wrap_pyfunction, PyIterProtocol, Python};
+use pyo3::{wrap_pyfunction, Python};
 
 use jwalk::WalkDirGeneric;
 
@@ -102,17 +102,11 @@ impl Entries {
     fn entries(&self) -> PyObject {
         PyTuple::new(Python::acquire_gil().python(), &self.entries).into()
     }
-}
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Entries {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
-}
 
-#[pyproto]
-impl pyo3::class::PySequenceProtocol for Entries {
     fn __len__(&self) -> PyResult<usize> {
         Ok(self.entries.len())
     }
@@ -456,12 +450,63 @@ pub struct Scandir {
 }
 
 impl Scandir {
-    fn rs_init(&self) {
+    pub fn new(
+        root_path: &str,
+        sorted: Option<bool>,
+        skip_hidden: Option<bool>,
+        max_depth: Option<usize>,
+        dir_include: Option<Vec<String>>,
+        dir_exclude: Option<Vec<String>>,
+        file_include: Option<Vec<String>>,
+        file_exclude: Option<Vec<String>>,
+        case_sensitive: Option<bool>,
+        return_type: Option<u8>,
+    ) -> Result<Self, Error> {
+        let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
+        if return_type > RETURN_TYPE_FULL {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Parameter return_type has invalid value",
+            ));
+        }
+        let root_path = match check_and_expand_path(&root_path) {
+            Ok(p) => p,
+            Err(e) => return Err(e),
+        };
+        let filter = match create_filter(
+            dir_include,
+            dir_exclude,
+            file_include,
+            file_exclude,
+            case_sensitive,
+        ) {
+            Ok(f) => f,
+            Err(e) => return Err(Error::new(ErrorKind::InvalidInput, e.to_string())),
+        };
+        Ok(Scandir {
+            root_path: root_path,
+            sorted: sorted.unwrap_or(false),
+            skip_hidden: skip_hidden.unwrap_or(false),
+            max_depth: max_depth.unwrap_or(::std::usize::MAX),
+            return_type: return_type,
+            filter: filter,
+            entries: Arc::new(Mutex::new(Entries {
+                entries: Vec::new(),
+                duration: 0.0,
+            })),
+            thr: None,
+            alive: None,
+            rx: None,
+            has_results: false,
+        })
+    }
+
+    pub fn rs_init(&self) {
         let mut entries_locked = self.entries.lock().unwrap();
         entries_locked.entries.clear();
     }
 
-    fn rs_start(&mut self, tx: Option<channel::Sender<Entry>>) -> bool {
+    pub fn rs_start(&mut self, tx: Option<channel::Sender<Entry>>) -> bool {
         if self.thr.is_some() {
             return false;
         }
@@ -505,7 +550,7 @@ impl Scandir {
         true
     }
 
-    fn rs_stop(&mut self) -> bool {
+    pub fn rs_stop(&mut self) -> bool {
         match &self.alive {
             Some(alive) => match alive.upgrade() {
                 Some(alive) => (*alive).store(false, Ordering::Relaxed),
@@ -522,7 +567,7 @@ impl Scandir {
 #[pymethods]
 impl Scandir {
     #[new]
-    pub fn new(
+    pub fn __new__(
         root_path: &str,
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
@@ -534,47 +579,27 @@ impl Scandir {
         case_sensitive: Option<bool>,
         return_type: Option<u8>,
     ) -> PyResult<Self> {
-        let return_type = return_type.unwrap_or(RETURN_TYPE_BASE);
-        if return_type > RETURN_TYPE_FULL {
-            return Err(PyValueError::new_err(
-                "Parameter return_type has invalid value",
-            ));
-        }
-        let root_path = match check_and_expand_path(&root_path) {
-            Ok(p) => p,
-            Err(e) => match e.kind() {
-                ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
-                _ => return Err(PyException::new_err(e.to_string())),
+        Ok(
+            match Scandir::new(
+                root_path,
+                sorted,
+                skip_hidden,
+                max_depth,
+                dir_include,
+                dir_exclude,
+                file_include,
+                file_exclude,
+                case_sensitive,
+                return_type,
+            ) {
+                Ok(s) => s,
+                Err(e) => match e.kind() {
+                    ErrorKind::InvalidInput => return Err(PyValueError::new_err(e.to_string())),
+                    ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
+                    _ => return Err(PyException::new_err(e.to_string())),
+                },
             },
-        };
-        let filter = match create_filter(
-            dir_include,
-            dir_exclude,
-            file_include,
-            file_exclude,
-            case_sensitive,
-        ) {
-            Ok(f) => f,
-            Err(e) => {
-                return Err(PyValueError::new_err(e.to_string()));
-            }
-        };
-        Ok(Scandir {
-            root_path: root_path,
-            sorted: sorted.unwrap_or(false),
-            skip_hidden: skip_hidden.unwrap_or(false),
-            max_depth: max_depth.unwrap_or(::std::usize::MAX),
-            return_type: return_type,
-            filter: filter,
-            entries: Arc::new(Mutex::new(Entries {
-                entries: Vec::new(),
-                duration: 0.0,
-            })),
-            thr: None,
-            alive: None,
-            rx: None,
-            has_results: false,
-        })
+        )
     }
 
     fn __enter__(&mut self) -> PyResult<()> {
@@ -593,10 +618,18 @@ impl Scandir {
         if !self.rs_stop() {
             return Ok(false);
         }
-        if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
-            Ok(true)
-        } else {
-            Ok(false)
+        match ty {
+            Some(ty) => {
+                if ty
+                    .eq(Python::acquire_gil().python().get_type::<PyValueError>())
+                    .unwrap()
+                {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            None => Ok(false),
         }
     }
 
@@ -689,17 +722,11 @@ impl Scandir {
             None => false,
         }
     }
-}
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Scandir {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
-}
 
-#[pyproto]
-impl<'p> PyIterProtocol for Scandir {
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<Py<Scandir>> {
         if slf.thr.is_some() {
             return Err(PyRuntimeError::new_err("Thread already running"));
@@ -733,7 +760,7 @@ impl<'p> PyIterProtocol for Scandir {
 
 #[pymodule]
 #[pyo3(name = "scandir")]
-fn init(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Scandir>()?;
     m.add_wrapped(wrap_pyfunction!(entries))?;
     m.add_wrapped(wrap_pyfunction!(ts_busy))?;

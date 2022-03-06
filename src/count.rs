@@ -98,10 +98,7 @@ impl Statistics {
         }
         Ok(pyresult.to_object(gil.python()))
     }
-}
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Statistics {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
@@ -472,10 +469,18 @@ impl Count {
         if !self.rs_stop() {
             return Ok(false);
         }
-        if ty == Some(Python::acquire_gil().python().get_type::<PyValueError>()) {
-            Ok(true)
-        } else {
-            Ok(false)
+        match ty {
+            Some(ty) => {
+                if ty
+                    .eq(Python::acquire_gil().python().get_type::<PyValueError>())
+                    .unwrap()
+                {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            None => Ok(false),
         }
     }
 
@@ -540,10 +545,7 @@ impl Count {
             None => false,
         }
     }
-}
 
-#[pyproto]
-impl pyo3::class::PyObjectProtocol for Count {
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
@@ -551,7 +553,7 @@ impl pyo3::class::PyObjectProtocol for Count {
 
 #[pymodule]
 #[pyo3(name = "count")]
-fn init(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn init(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Count>()?;
     m.add_wrapped(wrap_pyfunction!(count))?;
     m.add_wrapped(wrap_pyfunction!(ts_busy))?;

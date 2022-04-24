@@ -34,14 +34,14 @@ pub fn create_filter(
     dir_exclude: Option<Vec<String>>,
     file_include: Option<Vec<String>>,
     file_exclude: Option<Vec<String>>,
-    case_sensitive: Option<bool>,
-) -> Result<Option<Filter>, glob::PatternError> {
+    case_sensitive: bool,
+) -> Result<Option<Filter>, Error> {
     let mut filter = Filter {
         dir_include: Vec::new(),
         dir_exclude: Vec::new(),
         file_include: Vec::new(),
         file_exclude: Vec::new(),
-        options: match case_sensitive.unwrap_or(false) {
+        options: match case_sensitive {
             true => None,
             false => Some(MatchOptions {
                 case_sensitive: false,
@@ -54,7 +54,16 @@ pub fn create_filter(
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+                .collect::<Result<Vec<_>, glob::PatternError>>();
+            let f = match f {
+                Ok(f) => f,
+                Err(e) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("dir_include: {}", e.to_string()),
+                    ))
+                }
+            };
             filter.dir_include.append(f);
         }
         None => {}
@@ -64,7 +73,16 @@ pub fn create_filter(
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+                .collect::<Result<Vec<_>, glob::PatternError>>();
+            let f = match f {
+                Ok(f) => f,
+                Err(e) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("dir_exclude: {}", e.to_string()),
+                    ))
+                }
+            };
             filter.dir_exclude.append(f);
         }
         None => {}
@@ -74,7 +92,16 @@ pub fn create_filter(
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+                .collect::<Result<Vec<_>, glob::PatternError>>();
+            let f = match f {
+                Ok(f) => f,
+                Err(e) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("file_include: {}", e.to_string()),
+                    ))
+                }
+            };
             filter.file_include.append(f);
         }
         None => {}
@@ -84,7 +111,16 @@ pub fn create_filter(
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>()?;
+                .collect::<Result<Vec<_>, glob::PatternError>>();
+            let f = match f {
+                Ok(f) => f,
+                Err(e) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("file_exclude: {}", e.to_string()),
+                    ))
+                }
+            };
             filter.file_exclude.append(f);
         }
         None => {}

@@ -4,7 +4,7 @@ import os
 import sys
 import time
 
-import scandir_rs as r
+from scandir_rs import Count, Walk, Scandir
 
 if os.name == 'nt':
     dirName = "C:/Windows"
@@ -13,7 +13,7 @@ else:
 print(f"Benchmarking directory: {dirName}")
 if os.name != 'nt':
     dirName = os.path.expanduser(dirName)
-print(r.count.count(dirName, extended=True))
+print(Count(dirName, extended=True).collect())
 print()
 
 t1 = time.time()
@@ -23,44 +23,44 @@ dt = time.time() - t1
 print(f"os.walk: {dt:.3f}")
 
 t1 = time.time()
-toc = r.count.count(dirName)
+toc = Count(dirName).collect()
 dt = time.time() - t1
 print(f"scandir_rs.count.count: {dt:.3f}")
 
 t1 = time.time()
-toc = r.count.Count(dirName).collect()
+toc = Count(dirName).collect()
 dt = time.time() - t1
 print(f"scandir_rs.count.Count: {dt:.3f}")
 
 t1 = time.time()
-for result in r.walk.Walk(dirName, return_type=r.RETURN_TYPE_WALK):
+for result in Walk(dirName):
     pass
 dt = time.time() - t1
 print(f"scandir_rs.walk.Walk: {dt:.3f}")
 
 t1 = time.time()
-toc = r.walk.toc(dirName)
+toc = Walk(dirName).collect()
 dt = time.time() - t1
 print(f"scandir_rs.walk.toc: {dt:.3f}")
 
 t1 = time.time()
-W = r.walk.Walk(dirName)
+W = Walk(dirName)
 toc = W.collect()
 dt = time.time() - t1
-print(f"scandir_rs.walk.collect: {dt:.3f}, internal={W.duration}")
+print(f"scandir_rs.walk.collect: {dt:.3f}, internal={W.duration()}")
 
 t1 = time.time()
-entries = r.scandir.entries(dirName)
+entries = Scandir(dirName)
 dt = time.time() - t1
 print(f"scandir_rs.scandir.entries: {dt:.3f}")
 
 t1 = time.time()
-entries = r.scandir.Scandir(dirName).collect()
+entries = Scandir(dirName).collect()
 dt = time.time() - t1
 print(f"scandir_rs.scandir.Scandir.collect: {dt:.3f}")
 
 t1 = time.time()
-S = r.scandir.Scandir(dirName)
+S = Scandir(dirName)
 for entry in S:
     pass
 dt = time.time() - t1

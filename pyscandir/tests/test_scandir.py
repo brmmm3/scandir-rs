@@ -5,7 +5,7 @@ import time
 import tempfile
 
 import pytest
-import scandir_rs as scandir
+from scandir_rs import Count, Walk, Scandir, ReturnType
 
 
 def CreateTempFileTree(dircnt: int, depth: int, filecnt: int):
@@ -32,84 +32,82 @@ def tempDir():
 
 
 def test_count(tempDir):
-    count = scandir.count.count(tempDir.name)
+    count = Count(tempDir.name)
+    count.start()
+    count.join()
     assert count.as_dict() == {'dirs': 7, 'files': 180}
 
 
 def test_count_extended(tempDir):
-    count = scandir.count.count(tempDir.name, extended=True)
+    count = Count(tempDir.name, extended=True).collect()
     assert count.as_dict() == {'dirs': 7, 'files': 180,
                                'size': 28672, 'usage': 28672}
 
 
 def test_count_extended_file_exclude(tempDir):
-    count = scandir.count.count(
-        tempDir.name, extended=True, file_exclude=["*.bin"])
+    count = Count(tempDir.name, extended=True,
+                  file_exclude=["*.bin"]).collect()
     assert count.as_dict() == {'dirs': 7, 'files': 120,
                                'size': 28672, 'usage': 28672}
 
 
 def test_count_extended_file_include(tempDir):
-    count = scandir.count.count(
-        tempDir.name, extended=True, file_include=["*.bin"])
+    count = Count(tempDir.name, extended=True,
+                  file_include=["*.bin"]).collect()
     assert count.as_dict() == {'dirs': 7, 'files': 60,
                                'size': 28672, 'usage': 28672}
 
 
 def test_count_extended_dir_include(tempDir):
-    count = scandir.count.count(
-        tempDir.name, extended=True, dir_include=["dir0/**"])
+    count = Count(tempDir.name, extended=True,
+                  dir_include=["dir0/**"]).collect()
     assert count.as_dict() == {'dirs': 4, 'files': 90,
                                'size': 16384, 'usage': 16384}
 
 
 def test_count_extended_dir_exclude(tempDir):
-    count = scandir.count.count(
-        tempDir.name, extended=True, dir_exclude=["dir0", "dir1"])
+    count = Count(tempDir.name, extended=True,
+                  dir_exclude=["dir0", "dir1"]).collect()
     assert count.as_dict() == {'dirs': 2, 'files': 30,
                                'size': 8192, 'usage': 8192}
 
 
 def test_walk_toc(tempDir):
-    sd = scandir.walk.Walk(tempDir.name,
-                           return_type=scandir.RETURN_TYPE_WALK)
+    sd = Walk(tempDir.name, return_type=ReturnType.Walk)
     toc = sd.collect()
     assert not toc.errors
     assert not toc.other
     assert not toc.symlinks
-    assert len(toc.dirs) == 7
+    assert len(toc.dirs) == 6
     assert len(toc.files) == 180
 
 
 def test_walk_toc_iter(tempDir):
-    sd = scandir.walk.Walk(tempDir.name,
-                           return_type=scandir.RETURN_TYPE_BASE)
+    sd = Walk(tempDir.name, return_type=ReturnType.Base)
     sd.start()
     while sd.busy():
         time.sleep(0.01)
-    toc = sd.toc
+    toc = sd.collect()
     assert not toc.errors
     assert not toc.other
     assert not toc.symlinks
-    assert len(toc.dirs) == 7
+    assert len(toc.dirs) == 6
     assert len(toc.files) == 180
 
 
 def test_walk_walk(tempDir):
-    sd = scandir.walk.Walk(tempDir.name,
-                           return_type=scandir.RETURN_TYPE_WALK)
+    sd = Walk(tempDir.name, return_type=ReturnType.Walk)
     allDirs = []
     allFiles = []
     for root, dirs, files in sd:
         allDirs.extend(dirs)
         allFiles.extend(files)
-    assert len(allDirs) == 7
+    assert len(allDirs) == 6
     assert len(allFiles) == 180
 
 
 def test_walk_walk_ext(tempDir):
-    sd = scandir.walk.Walk(tempDir.name,
-                           return_type=scandir.RETURN_TYPE_EXT)
+    sd = Walk(tempDir.name, return_type=ReturnType.Ext)
     allDirs = []
     allFiles = []
     allSymlinks = []
@@ -124,51 +122,35 @@ def test_walk_walk_ext(tempDir):
     assert not allErrors
     assert not allOther
     assert not allSymlinks
-    assert len(allDirs) == 7
+    assert len(allDirs) == 6
     assert len(allFiles) == 180
 
 
 def test_scandir_invalid(tempDir):
     with pytest.raises(Exception) as exc:
-        scandir.scandir.Scandir(tempDir.name,
-                                return_type=scandir.RETURN_TYPE_WALK)
+        Scandir(tempDir.name, return_type=ReturnType.Walk)
     assert "Parameter return_type has invalid value" in str(exc.value)
 
 
 def test_scandir_fast(tempDir):
-    sd = scandir.scandir.Scandir(tempDir.name,
-                                 return_type=scandir.RETURN_TYPE_FAST)
+    sd = Scandir(tempDir.name, return_type=ReturnType.Fast)
     contents = {}
-    for pathName, dirEntry in sd:
+    for dirEntry in sd:
         assert dirEntry.st_atime > 0.0
         assert dirEntry.st_ctime > 0.0
         assert dirEntry.st_mtime > 0.0
         assert not hasattr(dirEntry, "st_mode")
-        contents[pathName] = dirEntry
+        contents[dirEntry.path] = dirEntry
     assert len(contents) == 187
 
 
 def test_scandir_ext(tempDir):
-    sd = scandir.scandir.Scandir(tempDir.name,
-                                 return_type=scandir.RETURN_TYPE_EXT)
+    sd = Scandir(tempDir.name, return_type=ReturnType.Ext)
     contents = {}
-    for pathName, dirEntry in sd:
+    for dirEntry in sd:
         assert dirEntry.st_atime > 0.0
         assert dirEntry.st_ctime > 0.0
         assert dirEntry.st_mtime > 0.0
         assert hasattr(dirEntry, "st_mode")
-        contents[pathName] = dirEntry
-    assert len(contents) == 187
-
-
-def test_scandir_full(tempDir):
-    sd = scandir.scandir.Scandir(tempDir.name,
-                                 return_type=scandir.RETURN_TYPE_FULL)
-    contents = {}
-    for pathName, dirEntry in sd:
-        assert dirEntry.st_atime > 0.0
-        assert dirEntry.st_ctime > 0.0
-        assert dirEntry.st_mtime > 0.0
-        assert hasattr(dirEntry, "st_mode")
-        contents[pathName] = dirEntry
+        contents[dirEntry.path] = dirEntry
     assert len(contents) == 187

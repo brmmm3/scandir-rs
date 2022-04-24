@@ -171,7 +171,7 @@ fn entries_thread(
     max_file_cnt: i32,
     filter: Option<Filter>,
     return_type: ReturnType,
-    tx: Sender<Vec<Entry>>,
+    tx: Sender<Entry>,
     stop: Arc<AtomicBool>,
 ) {
     if max_depth == 0 {
@@ -195,20 +195,20 @@ fn entries_thread(
                 return;
             }
             let mut local_file_cnt: i32 = 0;
-            let mut entries = Vec::new();
             children.iter_mut().for_each(|dir_entry_result| {
                 if stop_cloned.load(Ordering::Relaxed) {
                     return;
                 }
                 if let Ok(dir_entry) = dir_entry_result {
                     let (is_file, entry) = create_entry(root_path_len, &return_type, dir_entry);
-                    entries.push(entry);
+                    if tx_cloned.send(entry).is_err() {
+                        return;
+                    }
                     if is_file {
                         local_file_cnt += 1;
                     }
                 }
             });
-            let _ = tx_cloned.send(entries);
             if local_file_cnt > 0 {
                 file_cnt_cloned.store(
                     file_cnt_cloned.load(Ordering::Relaxed) + local_file_cnt,
@@ -245,7 +245,7 @@ pub struct Scandir {
     thr: Option<thread::JoinHandle<()>>,
     alive: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
-    rx: Option<Receiver<Vec<Entry>>>,
+    rx: Option<Receiver<Entry>>,
 }
 
 impl Scandir {
@@ -365,23 +365,19 @@ impl Scandir {
         if let Some(ref rx) = self.rx {
             loop {
                 match rx.try_recv() {
-                    Ok(new_entries) => {
-                        for entry in new_entries {
-                            match entry.entry {
-                                Stats::ScandirResult(ref r) => match r {
-                                    ScandirResult::DirEntry(_) => entries.push(r.clone()),
-                                    ScandirResult::DirEntryExt(_) => entries.push(r.clone()),
-                                    ScandirResult::Error((path, e)) => {
-                                        errors.push((path.to_owned(), e.to_owned()));
-                                    }
-                                },
-                                Stats::Error(e) => {
-                                    errors.push((entry.path, e));
-                                }
-                                Stats::Duration(d) => *self.duration.lock().unwrap() = d,
+                    Ok(entry) => match entry.entry {
+                        Stats::ScandirResult(ref r) => match r {
+                            ScandirResult::DirEntry(_) => entries.push(r.clone()),
+                            ScandirResult::DirEntryExt(_) => entries.push(r.clone()),
+                            ScandirResult::Error((path, e)) => {
+                                errors.push((path.to_owned(), e.to_owned()));
                             }
+                        },
+                        Stats::Error(e) => {
+                            errors.push((entry.path, e));
                         }
-                    }
+                        Stats::Duration(d) => *self.duration.lock().unwrap() = d,
+                    },
                     Err(_) => break,
                 }
             }

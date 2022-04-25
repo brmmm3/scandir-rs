@@ -4,16 +4,16 @@ import os
 import sys
 import time
 
-from scandir_rs import Count, Walk, Scandir
+from scandir_rs import Count, Walk, Scandir, ReturnType
 
 if os.name == 'nt':
     dirName = "C:/Windows"
 else:
-    dirName = "~/workspace"
+    dirName = "/usr"
 print(f"Benchmarking directory: {dirName}")
 if os.name != 'nt':
     dirName = os.path.expanduser(dirName)
-print(Count(dirName, extended=True).collect())
+print(Count(dirName, return_type=ReturnType.Ext).collect())
 print()
 
 t1 = time.time()
@@ -25,43 +25,54 @@ print(f"os.walk: {dt:.3f}")
 t1 = time.time()
 toc = Count(dirName).collect()
 dt = time.time() - t1
-print(f"scandir_rs.count.count: {dt:.3f}")
+print(f"Count.collect: {dt:.3f}")
 
 t1 = time.time()
-toc = Count(dirName).collect()
+toc = Count(dirName, return_type=ReturnType.Ext).collect()
 dt = time.time() - t1
-print(f"scandir_rs.count.Count: {dt:.3f}")
+print(f"Count(ReturnType=Ext).collect: {dt:.3f}")
 
 t1 = time.time()
 for result in Walk(dirName):
     pass
 dt = time.time() - t1
-print(f"scandir_rs.walk.Walk: {dt:.3f}")
+print(f"Walk.iter: {dt:.3f}")
 
 t1 = time.time()
 toc = Walk(dirName).collect()
 dt = time.time() - t1
-print(f"scandir_rs.walk.toc: {dt:.3f}")
+print(f"Walk.collect: {dt:.3f}")
 
 t1 = time.time()
-W = Walk(dirName)
-toc = W.collect()
+instance = Walk(dirName)
+toc = instance.collect()
 dt = time.time() - t1
-print(f"scandir_rs.walk.collect: {dt:.3f}, internal={W.duration()}")
+print(f"Walk.collect: {dt:.3f}, Walk().duration={instance.duration()}")
 
 t1 = time.time()
-entries = Scandir(dirName)
+toc = Walk(dirName, return_type=ReturnType.Ext).collect()
 dt = time.time() - t1
-print(f"scandir_rs.scandir.entries: {dt:.3f}")
+print(f"Walk(ReturnType=Ext).collect: {dt:.3f}")
 
 t1 = time.time()
 entries = Scandir(dirName).collect()
 dt = time.time() - t1
-print(f"scandir_rs.scandir.Scandir.collect: {dt:.3f}")
+print(f"Scandir.collect: {dt:.3f}")
 
 t1 = time.time()
-S = Scandir(dirName)
-for entry in S:
+instance = Scandir(dirName)
+for entry in instance:
     pass
 dt = time.time() - t1
-print(f"scandir_rs.scandir.Scandir.iter: {dt:.3f}")
+print(f"Scandir.iter: {dt:.3f}")
+
+t1 = time.time()
+instance = Scandir(dirName)
+toc = instance.collect()
+dt = time.time() - t1
+print(f"Scandir.collect: {dt:.3f}, Scandir().duration={instance.duration()}")
+
+t1 = time.time()
+entries = Scandir(dirName, return_type=ReturnType.Ext).collect()
+dt = time.time() - t1
+print(f"Scandir(ReturnType=Ext).collect: {dt:.3f}")

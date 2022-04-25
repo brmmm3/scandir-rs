@@ -5,19 +5,19 @@ it yields a list of paths, tuple of lists grouped by their entry type or ``DirEn
 with the name. Using ``scandir_rs`` is about **2-17 times faster** than ``os.walk()`` (depending on the platform, file system and file tree structure)
 by parallelizing the iteration in background.
 
-If you are just interested in directory statistics you can use the submodule ``count``.
+If you are just interested in directory statistics you can use the ``Count``.
 
-``scandir_rs`` contains following submodules:
+``scandir_rs`` contains following classes:
 
-- ``count`` for determining statistics of a directory.
-- ``walk`` for getting names of directory entries.
-- ``scandir`` for getting detailed stats of directory entries.
+- ``Count`` for determining statistics of a directory.
+- ``Walk`` for getting names of directory entries.
+- ``Scandir`` for getting detailed stats of directory entries.
 
 For the API see:
 
-- Submodule ``count`` [doc/count.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/count.md)
-- Submodule ``walk`` [doc/walk.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/walk.md)
-- Submodule ``scandir`` [doc/scandir.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/scandir.md)
+- Class ``Count`` [doc/count.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/count.md)
+- Class ``Walk`` [doc/walk.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/walk.md)
+- Class ``Scandir`` [doc/scandir.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/scandir.md)
 
 ## Installation
 
@@ -63,62 +63,60 @@ Instruction how to install ``pyenv`` can be found [here](https://github.com/pyen
 Get statistics of a directory:
 
 ```python
-import scandir_rs as scandir
+from scandir_rs import Count, ReturnType
 
-print(scandir.count.count("~/workspace", extended=True))
+print(Count("/usr", return_type=ReturnType.Ext).collect())
 ```
 
 The same, but asynchronously in background using a class instance:
 
 ```python
-import scandir_rs as scandir
+from scandir_rs import Count, ReturnType
 
-scanner = scandir.count.Count("~/workspace", extended=True))
-scanner.start())  # Start background thread pool
+instance = Count("/usr", return_type=ReturnType.Ext))
+instance.start())  # Start background thread pool
 ...
-value = scanner.statistics  # Can be read at any time
+values = instance.results()  # Can be read at any time
 ...
-scanner.stop()  # If you want to cancel the scanner
+instance.stop()  # If you want to cancel the scanner
 ```
 
 and with a context manager:
 
 ```python
-import scandir_rs as scandir
+from scandir_rs import Count, ReturnType
 
-C = scandir.count.Count("~/workspace", extended=True))
-with C:
-    while C.busy():
-        statistics = C.statistics
+instance = Count("/usr", return_type=ReturnType.Ext))
+with instance:
+    while instance.busy():
+        statistics = instance.results()
         # Do something
 ```
 
 ``os.walk()`` example:
 
 ```python
-import scandir_rs as scandir
+from scandir_rs import Walk
 
-for root, dirs, files in scandir.walk.Walk("~/workspace"):
+for root, dirs, files in Walk("/usr"):
     # Do something
 ```
 
 with extended data:
 
 ```python
-import scandir_rs as scandir
+from scandir_rs import Walk, ReturnType
 
-for root, dirs, files, symlinks, other, errors in scandir.walk.Walk("~/workspace",
-        return_type=scandir.RETURN_TYPE_EXT):
+for root, dirs, files, symlinks, other, errors in Walk("/usr", return_type=ReturnType.Ext):
     # Do something
 ```
 
 ``os.scandir()`` example:
 
 ```python
-import scandir_rs as scandir
+from scandir_rs import Scandir, ReturnType
 
-for path, entry in scandir.scandir.Scandir("~/workspace",
-        return_type=scandir.RETURN_TYPE_EXT):
+for path, entry in Scandir("~/workspace", return_type=ReturnType.Ext):
     # entry is a custom DirEntry object
 ```
 
@@ -126,37 +124,34 @@ for path, entry in scandir.scandir.Scandir("~/workspace",
 
 See [examples/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/examples/benchmark.py)
 
-In the below table the line **scandir_rs.walk.Walk** returns comparable
+In the below table the line **Walk.iter** returns comparable
 results to os.walk.
 
 ### Linux with Ryzen 5 2400G and SSD
 
-#### Directory *~/workspace* with
+#### Directory */usr* with
 
-- 22845 directories
-- 321354 files
-- 130 symlinks
-- 22849 hardlinks
-- 4 devices
-- 1 pipes
-- 4.6GB size and 5.4GB usage on disk
+- 105521 directories
+- 841030 files
+- 47753 symlinks
+- 1215 hardlinks
+- 12 devices
+- 0 pipes
+- 41.3GB size and 43.3GB usage on disk
 
-| Time [s] | Method                                             |
-| -------- | -------------------------------------------------- |
-| 0.547    | os.walk (Python 3.7)                               |
-| 0.132    | scandir_rs.count.count                             |
-| 0.142    | scandir_rs.count.Count                             |
-| 0.237    | scandir_rs.walk.Walk                               |
-| 0.224    | scandir_rs.walk.toc                                |
-| 0.242    | scandir_rs.walk.collect                            |
-| 0.262    | scandir_rs.scandir.entries                         |
-| 0.344    | scandir_rs.scandir.entries(metadata=True)          |
-| 0.336    | scandir_rs.scandir.entries(metadata_ext=True)      |
-| 0.280    | scandir_rs.scandir.Scandir.collect                 |
-| 0.262    | scandir_rs.scandir.Scandir.iter                    |
-| 0.330    | scandir_rs.scandir.Scandir.iter(metadata_ext=True) |
+| Time [s] | Method                          |
+| -------- | ------------------------------- |
+| 2.487    | os.walk (Python 3.10)           |
+| 0.425    | Count.collect                   |
+| 0.777    | Count(ReturnType=Ext).collect   |
+| 0.655    | Walk.iter                       |
+| 0.879    | Walk.collect                    |
+| 0.812    | Walk(ReturnType=Ext).collect    |
+| 1.528    | Scandir.collect                 |
+| 1.591    | Scandir.iter                    |
+| 1.751    | Scandir(ReturnType=Ext).collect |
 
-Up to **2 times faster** on Linux.
+Around **3.8 times faster** on Linux (os.walk compared to Walk.iter).
 
 ### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
 

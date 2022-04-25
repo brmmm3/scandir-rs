@@ -75,8 +75,9 @@ impl Walk {
         Ok(true)
     }
 
-    pub fn join(&mut self) -> PyResult<bool> {
-        if !self.instance.join() {
+    pub fn join(&mut self, py: Python) -> PyResult<bool> {
+        let result = py.allow_threads(|| self.instance.join());
+        if !result {
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
         Ok(true)
@@ -89,8 +90,9 @@ impl Walk {
         Ok(true)
     }
 
-    pub fn collect(&mut self) -> PyResult<Toc> {
-        Ok(Toc::new(Some(self.instance.collect())))
+    pub fn collect(&mut self, py: Python) -> Toc {
+        let results = py.allow_threads(|| self.instance.collect());
+        Toc::new(Some(results))
     }
 
     pub fn results(&mut self, return_all: Option<bool>, py: Python) -> Vec<(String, PyObject)> {

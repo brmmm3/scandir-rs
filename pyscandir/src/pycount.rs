@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyType};
 use pyo3::Python;
 
-use crate::def::Statistics;
+use crate::def::{ReturnType, Statistics};
 
 #[pyclass]
 #[derive(Debug)]
@@ -19,7 +19,6 @@ impl Count {
     #[new]
     fn new(
         root_path: &str,
-        extended: Option<bool>,
         skip_hidden: Option<bool>,
         max_depth: Option<usize>,
         max_file_cnt: Option<usize>,
@@ -28,11 +27,12 @@ impl Count {
         file_include: Option<Vec<String>>,
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
+        return_type: Option<ReturnType>,
     ) -> PyResult<Self> {
         Ok(Count {
             instance: match scandir::Count::new(
                 root_path,
-                extended.unwrap_or(false),
+                return_type.unwrap_or(ReturnType::Fast) == ReturnType::Ext,
                 skip_hidden.unwrap_or(false),
                 max_depth.unwrap_or(0) as i32,
                 max_file_cnt.unwrap_or(0) as i32,
@@ -64,8 +64,9 @@ impl Count {
         Ok(true)
     }
 
-    pub fn join(&mut self) -> PyResult<bool> {
-        if !self.instance.join() {
+    pub fn join(&mut self, py: Python) -> PyResult<bool> {
+        let result = py.allow_threads(|| self.instance.join());
+        if !result {
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
         Ok(true)
@@ -78,12 +79,11 @@ impl Count {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<PyObject> {
-        Ok(
-            PyCell::new(py, Statistics::new(Some(self.instance.collect())))
-                .unwrap()
-                .to_object(py),
-        )
+    pub fn collect(&mut self, py: Python) -> PyObject {
+        let results = py.allow_threads(|| self.instance.collect());
+        PyCell::new(py, Statistics::new(Some(results)))
+            .unwrap()
+            .to_object(py)
     }
 
     pub fn results(&mut self, py: Python) -> PyObject {

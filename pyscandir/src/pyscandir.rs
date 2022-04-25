@@ -83,8 +83,9 @@ impl Scandir {
         Ok(true)
     }
 
-    pub fn join(&mut self) -> PyResult<bool> {
-        if !self.instance.join() {
+    pub fn join(&mut self, py: Python) -> PyResult<bool> {
+        let result = py.allow_threads(|| self.instance.join());
+        if !result {
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
         Ok(true)
@@ -98,7 +99,7 @@ impl Scandir {
     }
 
     pub fn collect(&mut self, py: Python) -> (Vec<PyObject>, Vec<(String, String)>) {
-        let (entries, errors) = self.instance.collect();
+        let (entries, errors) = py.allow_threads(|| self.instance.collect());
         let results = entries.iter().map(|e| result2py(e, py)).collect();
         (results, errors)
     }
@@ -113,16 +114,16 @@ impl Scandir {
         (results, errors)
     }
 
-    pub fn entries(&mut self, return_all: bool, py: Python) -> Vec<PyObject> {
+    pub fn entries(&mut self, return_all: Option<bool>, py: Python) -> Vec<PyObject> {
         self.instance
-            .entries(return_all)
+            .entries(return_all.unwrap_or(false))
             .iter()
             .map(|e| result2py(e, py))
             .collect()
     }
 
-    pub fn errors(&mut self, return_all: bool) -> Vec<(String, String)> {
-        self.instance.errors(return_all)
+    pub fn errors(&mut self, return_all: Option<bool>) -> Vec<(String, String)> {
+        self.instance.errors(return_all.unwrap_or(false))
     }
 
     pub fn duration(&mut self) -> f64 {

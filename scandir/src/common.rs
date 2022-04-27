@@ -29,6 +29,20 @@ pub fn check_and_expand_path(path_str: &str) -> Result<PathBuf, Error> {
     Ok(path)
 }
 
+pub fn get_root_path_len(root_path: &PathBuf) -> usize {
+    let root_path = root_path.to_str().unwrap();
+    let mut root_path_len = root_path.len();
+    #[cfg(unix)]
+    if root_path.ends_with("/") {
+        root_path_len += 1;
+    }
+    #[cfg(windows)]
+    if !root_path.ends_with("\\") {
+        root_path_len += 1;
+    }
+    root_path_len
+}
+
 pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
     let mut filter = Filter {
         dir_include: Vec::new(),

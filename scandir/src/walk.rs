@@ -9,8 +9,7 @@ use std::time::Instant;
 use flume::{unbounded, Receiver, Sender};
 use jwalk::WalkDirGeneric;
 
-use crate::common::check_and_expand_path;
-use crate::common::{create_filter, filter_children};
+use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::*;
 
 #[inline]
@@ -37,7 +36,7 @@ pub fn toc_thread(
     tx: Sender<(String, Toc)>,
     stop: Arc<AtomicBool>,
 ) {
-    let root_path_len = options.root_path.to_string_lossy().len();
+    let root_path_len = get_root_path_len(&options.root_path);
     let max_file_cnt = options.max_file_cnt;
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
@@ -55,7 +54,7 @@ pub fn toc_thread(
             if root_dir.len() < root_path_len {
                 return;
             }
-            filter_children(children, &filter, root_path_len + 1);
+            filter_children(children, &filter, root_path_len);
             if children.is_empty() {
                 return;
             }
@@ -67,7 +66,7 @@ pub fn toc_thread(
             });
             if !toc.is_empty() {
                 if root_dir.len() > root_path_len {
-                    let _ = tx_cloned.send((root_dir[root_path_len + 1..].to_owned(), toc));
+                    let _ = tx_cloned.send((root_dir[root_path_len..].to_owned(), toc));
                 } else {
                     let _ = tx_cloned.send(("".to_owned(), toc));
                 }

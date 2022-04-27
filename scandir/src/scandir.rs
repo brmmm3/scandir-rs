@@ -9,9 +9,8 @@ use flume::{unbounded, Receiver, Sender};
 
 use jwalk::WalkDirGeneric;
 
-use crate::common::check_and_expand_path;
-use crate::common::{create_filter, filter_children};
-use crate::def::*;
+use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
+use crate::def::{DirEntry, DirEntryExt, Filter, Options, ReturnType, ScandirResult};
 
 #[derive(Debug, Clone)]
 pub enum Stats {
@@ -166,7 +165,7 @@ fn entries_thread(
     tx: Sender<Entry>,
     stop: Arc<AtomicBool>,
 ) {
-    let root_path_len = options.root_path.to_string_lossy().len() + 1;
+    let root_path_len = get_root_path_len(&options.root_path);
     let max_file_cnt = options.max_file_cnt;
     let return_type = options.return_type.clone();
     let file_cnt = Arc::new(AtomicUsize::new(0));

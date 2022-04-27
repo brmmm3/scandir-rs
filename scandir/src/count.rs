@@ -9,7 +9,7 @@ use std::time::Instant;
 use flume::{unbounded, Receiver, Sender};
 use jwalk::WalkDirGeneric;
 
-use crate::common::{check_and_expand_path, create_filter, filter_children};
+use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::{Filter, Options, ReturnType};
 
 #[derive(Debug, Clone)]
@@ -77,7 +77,7 @@ fn count_thread(
     let mut update_time = start_time;
     let mut file_indexes: HashSet<u64> = HashSet::new();
     let mut statistics = Statistics::new();
-    let root_path_len = options.root_path.to_string_lossy().len() + 1;
+    let root_path_len = get_root_path_len(&options.root_path);
     let max_file_cnt = options.max_file_cnt;
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();

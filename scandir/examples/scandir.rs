@@ -2,14 +2,15 @@ use std::env;
 use std::io::Error;
 use std::result::Result;
 
-use scandir::{self, Scandir};
+use scandir::{self, ReturnType, Scandir};
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
-    //let args: Vec<String> = vec!["".to_owned(), "../../_Data".to_owned()];
     let mut instance = Scandir::new(&args[1])?;
-    instance.start()?;
-    instance.join();
+    if args.len() > 2 {
+        instance = instance.return_type(ReturnType::Ext);
+    }
+    instance.collect()?;
     println!("{}", &format!("{:#?}", instance.results(true))[..2000]);
     println!("{:?}", instance.finished());
     println!("{:?}", instance.has_entries());

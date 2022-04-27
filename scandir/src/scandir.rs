@@ -1,11 +1,6 @@
-use std::fs::{self, Metadata};
+use std::fs::Metadata;
 use std::io::{Error, ErrorKind};
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
-#[cfg(windows)]
-use std::os::windows::prelude::*;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Instant, UNIX_EPOCH};
@@ -49,7 +44,10 @@ fn create_entry(
     let mut st_dev: u64 = 0;
     let mut st_nlink: u64 = 0;
     let mut st_size: u64 = 0;
+    #[cfg(unix)]
     let mut st_blksize: u64 = 4096;
+    #[cfg(windows)]
+    let st_blksize: u64 = 4096;
     let mut st_blocks: u64 = 0;
     #[cfg(unix)]
     let mut st_uid: u32 = 0;
@@ -63,56 +61,54 @@ fn create_entry(
     let mut st_rdev: u64 = 0;
     #[cfg(windows)]
     let st_rdev: u64 = 0;
-    if let Ok(metadata) = fs::metadata(dir_entry.path()) {
+    if let Some(ref metadata) = dir_entry.metadata {
         let duration = metadata
-            .created()
+            .created
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap();
         st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         let duration = metadata
-            .modified()
+            .modified
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap();
         st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         let duration = metadata
-            .accessed()
+            .accessed
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap();
         st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        if return_type > &ReturnType::Base {
+        st_size = metadata.size;
+        if let Some(ref metadata) = dir_entry.metadata_ext {
             #[cfg(unix)]
             {
-                st_mode = metadata.mode();
-                st_ino = metadata.ino();
-                st_dev = metadata.dev() as u64;
-                st_nlink = metadata.nlink() as u64;
-                st_size = metadata.size();
-                st_blksize = metadata.blksize();
-                st_blocks = metadata.blocks();
-                st_uid = metadata.uid();
-                st_gid = metadata.gid();
-                st_rdev = metadata.rdev();
+                st_mode = metadata.st_mode;
+                st_ino = metadata.st_ino;
+                st_dev = metadata.st_dev;
+                st_nlink = metadata.st_nlink;
+                st_blksize = metadata.st_blksize;
+                st_blocks = metadata.st_blocks;
+                st_uid = metadata.st_uid;
+                st_gid = metadata.st_gid;
+                st_rdev = metadata.st_rdev;
             }
             #[cfg(windows)]
             {
-                st_mode = metadata.file_attributes();
-                if let Some(ino) = metadata.file_index() {
-                    st_ino = ino;
-                }
-                if let Some(dev) = metadata.volume_serial_number() {
-                    st_dev = dev as u64;
-                }
-                if let Some(nlink) = metadata.number_of_links() {
-                    st_nlink = nlink as u64;
-                }
-                st_size = metadata.file_size();
-                st_blksize = 4096;
+                st_mode = metadata.file_attributes;
                 st_blocks = st_size >> 12;
                 if st_blocks << 12 < st_size {
                     st_blocks += 1;
+                }
+                if let Some(ino) = metadata.file_index {
+                    st_ino = ino;
+                }
+                if let Some(dev) = metadata.volume_serial_number {
+                    st_dev = dev as u64;
+                }
+                if let Some(nlink) = metadata.number_of_links {
+                    st_nlink = nlink as u64;
                 }
             }
         }
@@ -129,28 +125,29 @@ fn create_entry(
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
             is_file,
-            st_ctime: st_ctime,
-            st_mtime: st_mtime,
-            st_atime: st_atime,
+            st_ctime,
+            st_mtime,
+            st_atime,
+            st_size,
         }),
         ReturnType::Ext => ScandirResult::DirEntryExt(DirEntryExt {
             path,
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
             is_file,
-            st_ctime: st_ctime,
-            st_mtime: st_mtime,
-            st_atime: st_atime,
-            st_mode: st_mode,
-            st_ino: st_ino,
-            st_dev: st_dev,
-            st_nlink: st_nlink,
-            st_size: st_size,
-            st_blksize: st_blksize,
-            st_blocks: st_blocks,
-            st_uid: st_uid,
-            st_gid: st_gid,
-            st_rdev: st_rdev,
+            st_ctime,
+            st_mtime,
+            st_atime,
+            st_mode,
+            st_ino,
+            st_dev,
+            st_nlink,
+            st_size,
+            st_blksize,
+            st_blocks,
+            st_uid,
+            st_gid,
+            st_rdev,
         }),
         _ => ScandirResult::Error((path, "Wrong return type!".to_string())),
     };
@@ -164,41 +161,37 @@ fn create_entry(
 }
 
 fn entries_thread(
-    root_path: PathBuf,
-    sorted: bool,
-    skip_hidden: bool,
-    mut max_depth: i32,
-    max_file_cnt: i32,
+    options: Options,
     filter: Option<Filter>,
-    return_type: ReturnType,
     tx: Sender<Entry>,
     stop: Arc<AtomicBool>,
 ) {
-    if max_depth == 0 {
-        max_depth = std::i32::MAX;
-    };
-    let root_path_len = root_path.to_string_lossy().len() + 1;
-    let file_cnt = Arc::new(AtomicI32::new(0));
-    let stop_cloned = stop.clone();
+    let root_path_len = options.root_path.to_string_lossy().len() + 1;
+    let max_file_cnt = options.max_file_cnt;
+    let return_type = options.return_type.clone();
+    let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
+    let stop_cloned = stop.clone();
     let tx_cloned = tx.clone();
-    for _ in WalkDirGeneric::new(&root_path)
-        .skip_hidden(skip_hidden)
-        .sort(sorted)
-        .max_depth(max_depth as usize)
-        .process_read_dir(move |_, _, _, children| {
+    for _ in WalkDirGeneric::new(&options.root_path)
+        .skip_hidden(options.skip_hidden)
+        .sort(options.sorted)
+        .max_depth(options.max_depth)
+        .read_metadata(true)
+        .read_metadata_ext(options.return_type == ReturnType::Ext)
+        .process_read_dir(move |_, root_dir, _, children| {
             if stop_cloned.load(Ordering::Relaxed) {
+                return;
+            }
+            if root_dir.to_str().unwrap().len() < root_path_len {
                 return;
             }
             filter_children(children, &filter, root_path_len);
             if children.is_empty() {
                 return;
             }
-            let mut local_file_cnt: i32 = 0;
+            let mut local_file_cnt: usize = 0;
             children.iter_mut().for_each(|dir_entry_result| {
-                if stop_cloned.load(Ordering::Relaxed) {
-                    return;
-                }
                 if let Ok(dir_entry) = dir_entry_result {
                     let (is_file, entry) = create_entry(root_path_len, &return_type, dir_entry);
                     if tx_cloned.send(entry).is_err() {
@@ -230,13 +223,7 @@ fn entries_thread(
 #[derive(Debug)]
 pub struct Scandir {
     // Options
-    root_path: PathBuf,
-    sorted: bool,
-    skip_hidden: bool,
-    max_depth: i32,
-    max_file_cnt: i32,
-    return_type: ReturnType,
-    filter: Option<Filter>,
+    options: Options,
     // Results
     entries: Vec<ScandirResult>,
     errors: Vec<(String, String)>,
@@ -249,41 +236,21 @@ pub struct Scandir {
 }
 
 impl Scandir {
-    pub fn new(
-        root_path: &str,
-        sorted: bool,
-        skip_hidden: bool,
-        max_depth: i32,
-        max_file_cnt: i32,
-        dir_include: Option<Vec<String>>,
-        dir_exclude: Option<Vec<String>>,
-        file_include: Option<Vec<String>>,
-        file_exclude: Option<Vec<String>>,
-        case_sensitive: bool,
-        return_type: ReturnType,
-    ) -> Result<Self, Error> {
-        if return_type > ReturnType::Ext {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "Parameter return_type has invalid value",
-            ));
-        }
-        let root_path = check_and_expand_path(&root_path)?;
-        let filter = create_filter(
-            dir_include,
-            dir_exclude,
-            file_include,
-            file_exclude,
-            case_sensitive,
-        )?;
+    pub fn new(root_path: &str) -> Result<Self, Error> {
         Ok(Scandir {
-            root_path,
-            sorted,
-            skip_hidden,
-            max_depth,
-            max_file_cnt,
-            return_type,
-            filter,
+            options: Options {
+                root_path: check_and_expand_path(&root_path)?,
+                sorted: false,
+                skip_hidden: true,
+                max_depth: std::usize::MAX,
+                max_file_cnt: std::usize::MAX,
+                dir_include: None,
+                dir_exclude: None,
+                file_include: None,
+                file_exclude: None,
+                case_sensitive: false,
+                return_type: ReturnType::Fast,
+            },
             entries: Vec::new(),
             errors: Vec::new(),
             duration: Arc::new(Mutex::new(0.0)),
@@ -294,24 +261,99 @@ impl Scandir {
         })
     }
 
+    /// Return results in sorted order.
+    pub fn sorted(mut self, sorted: bool) -> Self {
+        self.options.sorted = sorted;
+        self
+    }
+
+    /// Skip hidden entries. Enabled by default.
+    pub fn skip_hidden(mut self, skip_hidden: bool) -> Self {
+        self.options.skip_hidden = skip_hidden;
+        self
+    }
+
+    /// Set the maximum depth of entries yield by the iterator.
+    ///
+    /// The smallest depth is `0` and always corresponds to the path given
+    /// to the `new` function on this type. Its direct descendents have depth
+    /// `1`, and their descendents have depth `2`, and so on.
+    ///
+    /// Note that this will not simply filter the entries of the iterator, but
+    /// it will actually avoid descending into directories when the depth is
+    /// exceeded.
+    pub fn max_depth(mut self, depth: usize) -> Self {
+        self.options.max_depth = match depth {
+            0 => std::usize::MAX,
+            _ => depth,
+        };
+        self
+    }
+
+    /// Set maximum number of files to collect
+    pub fn max_file_cnt(mut self, max_file_cnt: usize) -> Self {
+        self.options.max_file_cnt = match max_file_cnt {
+            0 => std::usize::MAX,
+            _ => max_file_cnt,
+        };
+        self
+    }
+
+    /// Set directory include filter
+    pub fn dir_include(mut self, dir_include: Option<Vec<String>>) -> Self {
+        self.options.dir_include = dir_include;
+        self
+    }
+
+    /// Set directory exclude filter
+    pub fn dir_exclude(mut self, dir_exclude: Option<Vec<String>>) -> Self {
+        self.options.dir_exclude = dir_exclude;
+        self
+    }
+
+    /// Set file include filter
+    pub fn file_include(mut self, file_include: Option<Vec<String>>) -> Self {
+        self.options.file_include = file_include;
+        self
+    }
+
+    /// Set file exclude filter
+    pub fn file_exclude(mut self, file_exclude: Option<Vec<String>>) -> Self {
+        self.options.file_exclude = file_exclude;
+        self
+    }
+
+    /// Set case sensitive filename filtering
+    pub fn case_sensitive(mut self, case_sensitive: bool) -> Self {
+        self.options.case_sensitive = case_sensitive;
+        self
+    }
+
+    /// Set extended file type counting
+    pub fn return_type(mut self, return_type: ReturnType) -> Self {
+        self.options.return_type = return_type;
+        self
+    }
+
     pub fn clear(&mut self) {
         self.entries.clear();
         self.errors.clear();
         *self.duration.lock().unwrap() = 0.0;
     }
 
-    pub fn start(&mut self) -> bool {
+    pub fn start(&mut self) -> Result<(), Error> {
         if self.thr.is_some() {
-            return false;
+            return Err(Error::new(ErrorKind::Other, "Busy"));
+        }
+        if self.options.return_type > ReturnType::Ext {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Parameter return_type has invalid value",
+            ));
         }
         self.clear();
-        let root_path = self.root_path.clone();
-        let sorted = self.sorted;
-        let skip_hidden = self.skip_hidden;
-        let max_depth = self.max_depth;
-        let max_file_cnt = self.max_file_cnt;
-        let filter = self.filter.clone();
-        let return_type = self.return_type.clone();
+        let options = self.options.clone();
+        let filter = create_filter(&options)?;
         let (tx, rx) = unbounded();
         self.rx = Some(rx);
         self.alive.store(true, Ordering::Relaxed);
@@ -321,21 +363,11 @@ impl Scandir {
         let duration = self.duration.clone();
         self.thr = Some(thread::spawn(move || {
             let start_time = Instant::now();
-            entries_thread(
-                root_path,
-                sorted,
-                skip_hidden,
-                max_depth,
-                max_file_cnt,
-                filter,
-                return_type,
-                tx,
-                stop,
-            );
+            entries_thread(options, filter, tx, stop);
             alive.store(false, Ordering::Relaxed);
             *duration.lock().unwrap() = start_time.elapsed().as_millis() as f64 * 0.001;
         }));
-        true
+        Ok(())
     }
 
     pub fn join(&mut self) -> bool {
@@ -385,14 +417,14 @@ impl Scandir {
         (entries, errors)
     }
 
-    pub fn collect(&mut self) -> (Vec<ScandirResult>, Vec<(String, String)>) {
+    pub fn collect(&mut self) -> Result<(Vec<ScandirResult>, Vec<(String, String)>), Error> {
         if !self.finished() {
             if !self.busy() {
-                self.start();
+                self.start()?;
             }
             self.join();
         }
-        self.results(true)
+        Ok(self.results(true))
     }
 
     pub fn results(&mut self, return_all: bool) -> (Vec<ScandirResult>, Vec<(String, String)>) {
@@ -409,8 +441,18 @@ impl Scandir {
         self.results(return_all).0
     }
 
+    pub fn entries_cnt(&mut self) -> usize {
+        self.results(true);
+        self.entries.len()
+    }
+
     pub fn errors(&mut self, return_all: bool) -> Vec<(String, String)> {
         self.results(return_all).1
+    }
+
+    pub fn errors_cnt(&mut self) -> usize {
+        self.results(true);
+        self.errors.len()
     }
 
     pub fn duration(&mut self) -> f64 {

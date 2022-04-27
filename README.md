@@ -21,13 +21,7 @@ For the API see:
 
 ## Installation
 
-For building this wheel from source you need Rust with channel ``nightly`` and the tool ``maturin``.
-
-Switch to channel ``nightly``:
-
-```sh
-rustup default nightly
-```
+For building this wheel from source you need the tool ``maturin``.
 
 Install ``maturin``:
 

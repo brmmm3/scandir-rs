@@ -44,23 +44,21 @@ impl Scandir {
         case_sensitive: Option<bool>,
         return_type: Option<ReturnType>,
     ) -> PyResult<Self> {
+        let return_type = return_type.unwrap_or(ReturnType::Base).from_object();
         Ok(Scandir {
-            instance: match scandir::Scandir::new(
-                root_path,
-                sorted.unwrap_or(false),
-                skip_hidden.unwrap_or(false),
-                max_depth.unwrap_or(0) as i32,
-                max_file_cnt.unwrap_or(0) as i32,
-                dir_include,
-                dir_exclude,
-                file_include,
-                file_exclude,
-                case_sensitive.unwrap_or(false),
-                return_type.unwrap_or(ReturnType::Base).from_object(),
-            ) {
-                Ok(s) => s,
+            instance: match scandir::Scandir::new(root_path) {
+                Ok(s) => s
+                    .sorted(sorted.unwrap_or(false))
+                    .skip_hidden(skip_hidden.unwrap_or(false))
+                    .max_depth(max_depth.unwrap_or(0))
+                    .max_file_cnt(max_file_cnt.unwrap_or(0))
+                    .dir_include(dir_include)
+                    .dir_exclude(dir_exclude)
+                    .file_include(file_include)
+                    .file_exclude(file_exclude)
+                    .case_sensitive(case_sensitive.unwrap_or(false))
+                    .return_type(return_type),
                 Err(e) => match e.kind() {
-                    ErrorKind::InvalidInput => return Err(PyValueError::new_err(e.to_string())),
                     ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
                     _ => return Err(PyException::new_err(e.to_string())),
                 },
@@ -76,11 +74,10 @@ impl Scandir {
         self.errors.clear();
     }
 
-    pub fn start(&mut self) -> PyResult<bool> {
-        if !self.instance.start() {
-            return Err(PyRuntimeError::new_err("Thread already running"));
-        }
-        Ok(true)
+    pub fn start(&mut self) -> PyResult<()> {
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -98,10 +95,10 @@ impl Scandir {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> (Vec<PyObject>, Vec<(String, String)>) {
-        let (entries, errors) = py.allow_threads(|| self.instance.collect());
+    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, Vec<(String, String)>)> {
+        let (entries, errors) = py.allow_threads(|| self.instance.collect())?;
         let results = entries.iter().map(|e| result2py(e, py)).collect();
-        (results, errors)
+        Ok((results, errors))
     }
 
     pub fn results(
@@ -167,10 +164,9 @@ impl Scandir {
     }
 
     fn __enter__(&mut self) -> PyResult<()> {
-        if !self.instance.start() {
-            return Err(PyRuntimeError::new_err("Thread already running"));
-        }
-        Ok(())
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     fn __exit__(
@@ -201,9 +197,7 @@ impl Scandir {
         if slf.instance.busy() {
             return Err(PyRuntimeError::new_err("Busy"));
         }
-        if !slf.instance.start() {
-            return Err(PyRuntimeError::new_err("Failed to start"));
-        }
+        slf.instance.start()?;
         slf.entries.clear();
         slf.errors.clear();
         Ok(slf)

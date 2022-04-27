@@ -35,7 +35,8 @@ def test_count(tempDir):
     count = Count(tempDir.name)
     count.start()
     count.join()
-    assert count.as_dict() == {'dirs': 7, 'files': 180}
+    assert count.as_dict() == {'dirs': 7, 'files': 180,
+                               'size': 28672, 'usage': 28672}
 
 
 def test_count_extended(tempDir):
@@ -61,15 +62,15 @@ def test_count_extended_file_include(tempDir):
 def test_count_extended_dir_include(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   dir_include=["dir0/**"]).collect()
-    assert count.as_dict() == {'dirs': 4, 'files': 90,
-                               'size': 16384, 'usage': 16384}
+    assert count.as_dict() == {'dirs': 6, 'files': 150,
+                               'size': 24576, 'usage': 24576}
 
 
 def test_count_extended_dir_exclude(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   dir_exclude=["dir0", "dir1"]).collect()
-    assert count.as_dict() == {'dirs': 2, 'files': 30,
-                               'size': 8192, 'usage': 8192}
+    assert count.as_dict() == {'dirs': 7, 'files': 180,
+                               'size': 28672, 'usage': 28672}
 
 
 def test_walk_toc(tempDir):
@@ -141,7 +142,7 @@ def test_scandir_fast(tempDir):
         assert dirEntry.st_mtime > 0.0
         assert not hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
-    assert len(contents) == 187
+    assert len(contents) == 183
 
 
 def test_scandir_ext(tempDir):
@@ -153,4 +154,4 @@ def test_scandir_ext(tempDir):
         assert dirEntry.st_mtime > 0.0
         assert hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
-    assert len(contents) == 187
+    assert len(contents) == 183

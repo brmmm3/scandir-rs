@@ -36,27 +36,26 @@ impl Walk {
         case_sensitive: Option<bool>,
         return_type: Option<ReturnType>,
     ) -> PyResult<Self> {
+        let return_type = return_type.unwrap_or(ReturnType::Base);
         Ok(Walk {
-            instance: match scandir::Walk::new(
-                root_path,
-                sorted.unwrap_or(false),
-                skip_hidden.unwrap_or(false),
-                max_depth.unwrap_or(0) as i32,
-                max_file_cnt.unwrap_or(0) as i32,
-                dir_include,
-                dir_exclude,
-                file_include,
-                file_exclude,
-                case_sensitive.unwrap_or(false),
-            ) {
-                Ok(s) => s,
+            instance: match scandir::Walk::new(root_path) {
+                Ok(s) => s
+                    .sorted(sorted.unwrap_or(false))
+                    .skip_hidden(skip_hidden.unwrap_or(false))
+                    .max_depth(max_depth.unwrap_or(0))
+                    .max_file_cnt(max_file_cnt.unwrap_or(0))
+                    .dir_include(dir_include)
+                    .dir_exclude(dir_exclude)
+                    .file_include(file_include)
+                    .file_exclude(file_exclude)
+                    .case_sensitive(case_sensitive.unwrap_or(false))
+                    .return_type(return_type.from_object()),
                 Err(e) => match e.kind() {
-                    ErrorKind::InvalidInput => return Err(PyValueError::new_err(e.to_string())),
                     ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
                     _ => return Err(PyException::new_err(e.to_string())),
                 },
             },
-            return_type: return_type.unwrap_or(ReturnType::Walk),
+            return_type,
             entries: Vec::new(),
             idx: std::usize::MAX,
         })
@@ -68,11 +67,10 @@ impl Walk {
         self.idx = std::usize::MAX;
     }
 
-    pub fn start(&mut self) -> PyResult<bool> {
-        if !self.instance.start() {
-            return Err(PyRuntimeError::new_err("Thread already running"));
-        }
-        Ok(true)
+    pub fn start(&mut self) -> PyResult<()> {
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -90,9 +88,10 @@ impl Walk {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> Toc {
-        let results = py.allow_threads(|| self.instance.collect());
-        Toc::new(Some(results))
+    pub fn collect(&mut self, py: Python) -> PyResult<Toc> {
+        Ok(Toc::new(Some(
+            py.allow_threads(|| self.instance.collect())?,
+        )))
     }
 
     pub fn results(&mut self, return_all: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
@@ -125,10 +124,9 @@ impl Walk {
     }
 
     fn __enter__(&mut self) -> PyResult<()> {
-        if !self.instance.start() {
-            return Err(PyRuntimeError::new_err("Thread already running"));
-        }
-        Ok(())
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     fn __exit__(
@@ -159,9 +157,7 @@ impl Walk {
         if slf.idx < std::usize::MAX {
             return Err(PyRuntimeError::new_err("Busy"));
         }
-        if !slf.instance.start() {
-            return Err(PyRuntimeError::new_err("Failed to start"));
-        }
+        slf.instance.start()?;
         slf.entries.clear();
         slf.idx = 0;
         Ok(slf)

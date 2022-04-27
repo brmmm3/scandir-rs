@@ -8,12 +8,9 @@ from scandir_rs import Scandir, ReturnType
 
 
 def Counter(sd):
-    print("Wait for busy...")
-    while not sd.busy():
-        time.sleep(0.01)
     print("Counter started...")
     x = 0
-    while sd.busy():
+    while not sd.finished():
         x += 1
     print(f"X={x}")
 

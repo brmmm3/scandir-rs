@@ -1,8 +1,7 @@
 use std::fmt::Debug;
 use std::fs;
-use std::io::Error;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::io::{Error, ErrorKind};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
@@ -33,27 +32,25 @@ fn update_toc(
 }
 
 pub fn toc_thread(
-    root_path: PathBuf,
-    sorted: bool,
-    skip_hidden: bool,
-    mut max_depth: i32,
-    max_file_cnt: i32,
+    options: Options,
     filter: Option<Filter>,
     tx: Sender<(String, Toc)>,
     stop: Arc<AtomicBool>,
 ) {
-    if max_depth == 0 {
-        max_depth = std::i32::MAX;
-    }
-    let root_path_len = root_path.to_string_lossy().len();
-    let file_cnt = Arc::new(AtomicI32::new(0));
+    let root_path_len = options.root_path.to_string_lossy().len();
+    let max_file_cnt = options.max_file_cnt;
+    let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
+    let stop_cloned = stop.clone();
     let tx_cloned = tx.clone();
-    for _ in WalkDirGeneric::new(&root_path)
-        .skip_hidden(skip_hidden)
-        .sort(sorted)
-        .max_depth(max_depth as usize)
+    for _ in WalkDirGeneric::new(&options.root_path)
+        .skip_hidden(options.skip_hidden)
+        .sort(options.sorted)
+        .max_depth(options.max_depth)
         .process_read_dir(move |_, root_dir, _, children| {
+            if stop_cloned.load(Ordering::Relaxed) {
+                return;
+            }
             let root_dir = root_dir.to_str().unwrap();
             if root_dir.len() < root_path_len {
                 return;
@@ -75,7 +72,7 @@ pub fn toc_thread(
                     let _ = tx_cloned.send(("".to_owned(), toc));
                 }
             }
-            let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len() as i32;
+            let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len();
             file_cnt_cloned.store(file_cnt_new, Ordering::Relaxed);
         })
     {
@@ -91,12 +88,7 @@ pub fn toc_thread(
 #[derive(Debug)]
 pub struct Walk {
     // Options
-    root_path: PathBuf,
-    sorted: bool,
-    skip_hidden: bool,
-    max_depth: i32,
-    max_file_cnt: i32,
-    filter: Option<Filter>,
+    options: Options,
     // Results
     entries: Vec<(String, Toc)>,
     duration: Arc<Mutex<f64>>,
@@ -109,33 +101,21 @@ pub struct Walk {
 }
 
 impl Walk {
-    pub fn new(
-        root_path: &str,
-        sorted: bool,
-        skip_hidden: bool,
-        max_depth: i32,
-        max_file_cnt: i32,
-        dir_include: Option<Vec<String>>,
-        dir_exclude: Option<Vec<String>>,
-        file_include: Option<Vec<String>>,
-        file_exclude: Option<Vec<String>>,
-        case_sensitive: bool,
-    ) -> Result<Self, Error> {
-        let root_path = check_and_expand_path(&root_path)?;
-        let filter = create_filter(
-            dir_include,
-            dir_exclude,
-            file_include,
-            file_exclude,
-            case_sensitive,
-        )?;
+    pub fn new(root_path: &str) -> Result<Self, Error> {
         Ok(Walk {
-            root_path,
-            sorted,
-            skip_hidden,
-            max_depth,
-            max_file_cnt,
-            filter,
+            options: Options {
+                root_path: check_and_expand_path(&root_path)?,
+                sorted: false,
+                skip_hidden: true,
+                max_depth: std::usize::MAX,
+                max_file_cnt: std::usize::MAX,
+                dir_include: None,
+                dir_exclude: None,
+                file_include: None,
+                file_exclude: None,
+                case_sensitive: false,
+                return_type: ReturnType::Fast,
+            },
             entries: Vec::new(),
             duration: Arc::new(Mutex::new(0.0)),
             has_errors: false,
@@ -146,23 +126,93 @@ impl Walk {
         })
     }
 
+    /// Return results in sorted order.
+    pub fn sorted(mut self, sorted: bool) -> Self {
+        self.options.sorted = sorted;
+        self
+    }
+
+    /// Skip hidden entries. Enabled by default.
+    pub fn skip_hidden(mut self, skip_hidden: bool) -> Self {
+        self.options.skip_hidden = skip_hidden;
+        self
+    }
+
+    /// Set the maximum depth of entries yield by the iterator.
+    ///
+    /// The smallest depth is `0` and always corresponds to the path given
+    /// to the `new` function on this type. Its direct descendents have depth
+    /// `1`, and their descendents have depth `2`, and so on.
+    ///
+    /// Note that this will not simply filter the entries of the iterator, but
+    /// it will actually avoid descending into directories when the depth is
+    /// exceeded.
+    pub fn max_depth(mut self, depth: usize) -> Self {
+        self.options.max_depth = match depth {
+            0 => std::usize::MAX,
+            _ => depth,
+        };
+        self
+    }
+
+    /// Set maximum number of files to collect
+    pub fn max_file_cnt(mut self, max_file_cnt: usize) -> Self {
+        self.options.max_file_cnt = match max_file_cnt {
+            0 => std::usize::MAX,
+            _ => max_file_cnt,
+        };
+        self
+    }
+
+    /// Set directory include filter
+    pub fn dir_include(mut self, dir_include: Option<Vec<String>>) -> Self {
+        self.options.dir_include = dir_include;
+        self
+    }
+
+    /// Set directory exclude filter
+    pub fn dir_exclude(mut self, dir_exclude: Option<Vec<String>>) -> Self {
+        self.options.dir_exclude = dir_exclude;
+        self
+    }
+
+    /// Set file include filter
+    pub fn file_include(mut self, file_include: Option<Vec<String>>) -> Self {
+        self.options.file_include = file_include;
+        self
+    }
+
+    /// Set file exclude filter
+    pub fn file_exclude(mut self, file_exclude: Option<Vec<String>>) -> Self {
+        self.options.file_exclude = file_exclude;
+        self
+    }
+
+    /// Set case sensitive filename filtering
+    pub fn case_sensitive(mut self, case_sensitive: bool) -> Self {
+        self.options.case_sensitive = case_sensitive;
+        self
+    }
+
+    /// Set extended file type counting
+    pub fn return_type(mut self, return_type: ReturnType) -> Self {
+        self.options.return_type = return_type;
+        self
+    }
+
     pub fn clear(&mut self) {
         self.entries.clear();
         self.has_errors = false;
         *self.duration.lock().unwrap() = 0.0;
     }
 
-    pub fn start(&mut self) -> bool {
+    pub fn start(&mut self) -> Result<(), Error> {
         if self.thr.is_some() {
-            return false;
+            return Err(Error::new(ErrorKind::Other, "Busy"));
         }
         self.clear();
-        let root_path = self.root_path.clone();
-        let sorted = self.sorted;
-        let skip_hidden = self.skip_hidden;
-        let max_depth = self.max_depth;
-        let max_file_cnt = self.max_file_cnt;
-        let filter = self.filter.clone();
+        let options = self.options.clone();
+        let filter = create_filter(&options)?;
         let (tx, rx) = unbounded();
         self.rx = Some(rx);
         self.alive.store(true, Ordering::Relaxed);
@@ -172,20 +222,11 @@ impl Walk {
         let duration = self.duration.clone();
         self.thr = Some(thread::spawn(move || {
             let start_time = Instant::now();
-            toc_thread(
-                root_path,
-                sorted,
-                skip_hidden,
-                max_depth,
-                max_file_cnt,
-                filter,
-                tx,
-                stop,
-            );
+            toc_thread(options, filter, tx, stop);
             alive.store(false, Ordering::Relaxed);
             *duration.lock().unwrap() = start_time.elapsed().as_millis() as f64 * 0.001;
         }));
-        true
+        Ok(())
     }
 
     pub fn join(&mut self) -> bool {
@@ -227,10 +268,10 @@ impl Walk {
         entries
     }
 
-    pub fn collect(&mut self) -> Toc {
+    pub fn collect(&mut self) -> Result<Toc, Error> {
         if !self.finished() {
             if !self.busy() {
-                self.start();
+                self.start()?;
             }
             self.join();
         }
@@ -238,7 +279,7 @@ impl Walk {
         for (root_dir, dir_toc) in self.results(true) {
             toc.extend(&root_dir, &dir_toc);
         }
-        toc
+        Ok(toc)
     }
 
     pub fn results(&mut self, return_all: bool) -> Vec<(String, Toc)> {

@@ -3,6 +3,21 @@ use std::path::PathBuf;
 use glob::{MatchOptions, Pattern};
 
 #[derive(Debug, Clone)]
+pub struct Options {
+    pub root_path: PathBuf,
+    pub sorted: bool,
+    pub skip_hidden: bool,
+    pub max_depth: usize,
+    pub max_file_cnt: usize,
+    pub dir_include: Option<Vec<String>>,
+    pub dir_exclude: Option<Vec<String>>,
+    pub file_include: Option<Vec<String>>,
+    pub file_exclude: Option<Vec<String>>,
+    pub case_sensitive: bool,
+    pub return_type: ReturnType,
+}
+
+#[derive(Debug, Clone)]
 pub struct Filter {
     pub dir_include: Vec<Pattern>,
     pub dir_exclude: Vec<Pattern>,
@@ -20,6 +35,7 @@ pub struct DirEntry {
     pub st_ctime: f64,
     pub st_mtime: f64,
     pub st_atime: f64,
+    pub st_size: u64,
 }
 
 #[derive(Debug, Clone)]

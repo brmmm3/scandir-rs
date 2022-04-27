@@ -30,19 +30,17 @@ impl Count {
         return_type: Option<ReturnType>,
     ) -> PyResult<Self> {
         Ok(Count {
-            instance: match scandir::Count::new(
-                root_path,
-                return_type.unwrap_or(ReturnType::Fast) == ReturnType::Ext,
-                skip_hidden.unwrap_or(false),
-                max_depth.unwrap_or(0) as i32,
-                max_file_cnt.unwrap_or(0) as i32,
-                dir_include,
-                dir_exclude,
-                file_include,
-                file_exclude,
-                case_sensitive.unwrap_or(false),
-            ) {
-                Ok(s) => s,
+            instance: match scandir::Count::new(root_path) {
+                Ok(c) => c
+                    .skip_hidden(skip_hidden.unwrap_or(false))
+                    .max_depth(max_depth.unwrap_or(0))
+                    .max_file_cnt(max_file_cnt.unwrap_or(0))
+                    .dir_include(dir_include)
+                    .dir_exclude(dir_exclude)
+                    .file_include(file_include)
+                    .file_exclude(file_exclude)
+                    .case_sensitive(case_sensitive.unwrap_or(false))
+                    .extended(return_type.unwrap_or(ReturnType::Fast) == ReturnType::Ext),
                 Err(e) => match e.kind() {
                     ErrorKind::InvalidInput => return Err(PyValueError::new_err(e.to_string())),
                     ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
@@ -57,11 +55,10 @@ impl Count {
         self.instance.clear();
     }
 
-    pub fn start(&mut self) -> PyResult<bool> {
-        if !self.instance.start() {
-            return Err(PyRuntimeError::new_err("Thread already running"));
-        }
-        Ok(true)
+    pub fn start(&mut self) -> PyResult<()> {
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -79,11 +76,11 @@ impl Count {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyObject {
-        let results = py.allow_threads(|| self.instance.collect());
-        PyCell::new(py, Statistics::new(Some(results)))
+    pub fn collect(&mut self, py: Python) -> PyResult<PyObject> {
+        let results = py.allow_threads(|| self.instance.collect())?;
+        Ok(PyCell::new(py, Statistics::new(Some(results)))
             .unwrap()
-            .to_object(py)
+            .to_object(py))
     }
 
     pub fn results(&mut self, py: Python) -> PyObject {
@@ -113,10 +110,9 @@ impl Count {
     }
 
     fn __enter__(&mut self) -> PyResult<()> {
-        if !self.instance.start() {
-            return Err(PyRuntimeError::new_err("Thread already running"));
-        }
-        Ok(())
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     fn __exit__(
@@ -147,9 +143,7 @@ impl Count {
         if slf.busy {
             return Err(PyRuntimeError::new_err("Busy"));
         }
-        if !slf.instance.start() {
-            return Err(PyRuntimeError::new_err("Failed to start"));
-        }
+        slf.instance.start()?;
         slf.busy = true;
         Ok(slf)
     }

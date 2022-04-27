@@ -16,7 +16,7 @@ name = "scandir"
 crate-type = ["lib"]
 
 [dependencies]
-jwalk = { git = "https://github.com/jessegrosjean/jwalk" }
+jwalk = { git = "https://github.com/brmmm3/jwalk", tag = "0.7.0" }
 rayon = "1.5"
 flume = "0.10"
 glob = { git = "https://github.com/brmmm3/glob.git", tag = "0.4.0" }

@@ -8,7 +8,7 @@ use expanduser::expanduser;
 
 use glob::{MatchOptions, Pattern};
 
-use crate::def::*;
+use crate::def::{Filter, Options};
 
 pub fn check_and_expand_path(path_str: &str) -> Result<PathBuf, Error> {
     #[cfg(unix)]
@@ -29,19 +29,13 @@ pub fn check_and_expand_path(path_str: &str) -> Result<PathBuf, Error> {
     Ok(path)
 }
 
-pub fn create_filter(
-    dir_include: Option<Vec<String>>,
-    dir_exclude: Option<Vec<String>>,
-    file_include: Option<Vec<String>>,
-    file_exclude: Option<Vec<String>>,
-    case_sensitive: bool,
-) -> Result<Option<Filter>, Error> {
+pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
     let mut filter = Filter {
         dir_include: Vec::new(),
         dir_exclude: Vec::new(),
         file_include: Vec::new(),
         file_exclude: Vec::new(),
-        options: match case_sensitive {
+        options: match options.case_sensitive {
             true => None,
             false => Some(MatchOptions {
                 case_sensitive: false,
@@ -49,8 +43,8 @@ pub fn create_filter(
             }),
         },
     };
-    match dir_include {
-        Some(f) => {
+    match options.dir_include {
+        Some(ref f) => {
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))
@@ -68,8 +62,8 @@ pub fn create_filter(
         }
         None => {}
     }
-    match dir_exclude {
-        Some(f) => {
+    match options.dir_exclude {
+        Some(ref f) => {
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))
@@ -87,8 +81,8 @@ pub fn create_filter(
         }
         None => {}
     }
-    match file_include {
-        Some(f) => {
+    match options.file_include {
+        Some(ref f) => {
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))
@@ -106,8 +100,8 @@ pub fn create_filter(
         }
         None => {}
     }
-    match file_exclude {
-        Some(f) => {
+    match options.file_exclude {
+        Some(ref f) => {
             let f = &mut f
                 .iter()
                 .map(|s| Pattern::new(s))

@@ -119,8 +119,16 @@ impl Scandir {
             .collect()
     }
 
+    pub fn entries_cnt(&mut self, update: Option<bool>) -> usize {
+        self.instance.entries_cnt(update.unwrap_or(false))
+    }
+
     pub fn errors(&mut self, return_all: Option<bool>) -> Vec<(String, String)> {
         self.instance.errors(return_all.unwrap_or(false))
+    }
+
+    pub fn errors_cnt(&mut self, update: Option<bool>) -> usize {
+        self.instance.errors_cnt(update.unwrap_or(false))
     }
 
     pub fn duration(&mut self) -> f64 {

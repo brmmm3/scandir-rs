@@ -440,8 +440,10 @@ impl Scandir {
         self.results(return_all).0
     }
 
-    pub fn entries_cnt(&mut self) -> usize {
-        self.results(true);
+    pub fn entries_cnt(&mut self, update: bool) -> usize {
+        if update {
+            self.results(false);
+        }
         self.entries.len()
     }
 
@@ -449,8 +451,10 @@ impl Scandir {
         self.results(return_all).1
     }
 
-    pub fn errors_cnt(&mut self) -> usize {
-        self.results(true);
+    pub fn errors_cnt(&mut self, update: bool) -> usize {
+        if update {
+            self.results(false);
+        }
         self.errors.len()
     }
 
@@ -463,6 +467,11 @@ impl Scandir {
     }
 
     pub fn has_entries(&mut self) -> bool {
+        if let Some(ref rx) = self.rx {
+            if !rx.is_empty() {
+                return true;
+            }
+        }
         !self.entries.is_empty()
     }
 

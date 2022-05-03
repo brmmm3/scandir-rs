@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Instant, UNIX_EPOCH};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flume::{unbounded, Receiver, Sender};
 
@@ -65,19 +65,19 @@ fn create_entry(
             .created
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
-            .unwrap();
+            .unwrap_or_else(|_err| Duration::new(0, 0));
         st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         let duration = metadata
             .modified
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
-            .unwrap();
+            .unwrap_or_else(|_err| Duration::new(0, 0));
         st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         let duration = metadata
             .accessed
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
-            .unwrap();
+            .unwrap_or_else(|_err| Duration::new(0, 0));
         st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
         st_size = metadata.size;
         if let Some(ref metadata) = dir_entry.metadata_ext {

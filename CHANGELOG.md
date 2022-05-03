@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed root path problem for Unix platforms.
+- Fixed metadata reading problem for some cases.
 
 ## [2.0.0] - 2022-04-24
 

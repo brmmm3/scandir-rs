@@ -112,12 +112,26 @@ fn create_entry(
             }
         }
     }
+    let is_file = file_type.is_file();
     let mut key = dir_entry.parent_path.to_path_buf();
-    let file_name = dir_entry.file_name.clone().into_string().unwrap();
+    let file_name = match dir_entry.file_name.clone().into_string() {
+        Ok(s) => s,
+        Err(_) => {
+            return (
+                is_file,
+                Entry {
+                    path: key.to_str().unwrap().to_string(), // Absolute file path
+                    entry: Stats::ScandirResult(ScandirResult::Error((
+                        format!("{:?}", dir_entry.file_name),
+                        "Invalid file name!".to_string(),
+                    ))),
+                },
+            );
+        }
+    };
     key.push(&file_name);
     let key = key.to_str().unwrap().to_string();
     let path = key.get(root_path_len..).unwrap_or(&file_name).to_string();
-    let is_file = file_type.is_file();
     let entry: ScandirResult = match return_type {
         ReturnType::Fast | ReturnType::Base => ScandirResult::DirEntry(DirEntry {
             path,

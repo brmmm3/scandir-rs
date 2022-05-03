@@ -33,7 +33,7 @@ pub fn get_root_path_len(root_path: &PathBuf) -> usize {
     let root_path = root_path.to_str().unwrap();
     let mut root_path_len = root_path.len();
     #[cfg(unix)]
-    if root_path.ends_with("/") {
+    if !root_path.ends_with("/") {
         root_path_len += 1;
     }
     #[cfg(windows)]

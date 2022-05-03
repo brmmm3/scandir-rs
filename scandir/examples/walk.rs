@@ -7,6 +7,7 @@ use scandir::{self, ReturnType, Walk};
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     let mut instance = Walk::new(&args[1])?;
+    instance = instance.max_file_cnt(100);
     if args.len() > 2 {
         instance = instance.return_type(ReturnType::Ext);
     }

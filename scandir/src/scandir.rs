@@ -482,4 +482,10 @@ impl Scandir {
     pub fn busy(&self) -> bool {
         self.alive.load(Ordering::Relaxed)
     }
+
+    // For debugging
+
+    pub fn options(&self) -> Options {
+        self.options.clone()
+    }
 }

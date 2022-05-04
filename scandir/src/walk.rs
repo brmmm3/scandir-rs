@@ -210,7 +210,7 @@ impl Walk {
     }
 
     pub fn start(&mut self) -> Result<(), Error> {
-        if self.thr.is_some() {
+        if self.busy() {
             return Err(Error::new(ErrorKind::Other, "Busy"));
         }
         self.clear();

@@ -35,42 +35,42 @@ def test_count(tempDir):
     count = Count(tempDir.name)
     count.start()
     count.join()
-    assert count.as_dict() == {'dirs': 7, 'files': 180,
-                               'size': 28672, 'usage': 28672}
+    assert count.as_dict() == {'dirs': 6, 'files': 180,
+                               'size': 24576, 'usage': 24576}
 
 
 def test_count_extended(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext).collect()
-    assert count.as_dict() == {'dirs': 7, 'files': 180,
-                               'size': 28672, 'usage': 28672}
+    assert count.as_dict() == {'dirs': 6, 'files': 180,
+                               'size': 24576, 'usage': 24576}
 
 
 def test_count_extended_file_exclude(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   file_exclude=["*.bin"]).collect()
-    assert count.as_dict() == {'dirs': 7, 'files': 120,
-                               'size': 28672, 'usage': 28672}
+    assert count.as_dict() == {'dirs': 6, 'files': 120,
+                               'size': 24576, 'usage': 24576}
 
 
 def test_count_extended_file_include(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   file_include=["*.bin"]).collect()
-    assert count.as_dict() == {'dirs': 7, 'files': 60,
-                               'size': 28672, 'usage': 28672}
+    assert count.as_dict() == {'dirs': 6, 'files': 60,
+                               'size': 24576, 'usage': 24576}
 
 
 def test_count_extended_dir_include(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   dir_include=["dir0/**"]).collect()
-    assert count.as_dict() == {'dirs': 6, 'files': 150,
-                               'size': 24576, 'usage': 24576}
+    assert count.as_dict() == {'dirs': 3, 'files': 90,
+                               'size': 12288, 'usage': 12288}
 
 
 def test_count_extended_dir_exclude(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   dir_exclude=["dir0", "dir1"]).collect()
-    assert count.as_dict() == {'dirs': 7, 'files': 180,
-                               'size': 28672, 'usage': 28672}
+    assert count.as_dict() == {'dirs': 1, 'files': 30,
+                               'size': 4096, 'usage': 4096}
 
 
 def test_walk_toc(tempDir):
@@ -129,7 +129,8 @@ def test_walk_walk_ext(tempDir):
 
 def test_scandir_invalid(tempDir):
     with pytest.raises(Exception) as exc:
-        Scandir(tempDir.name, return_type=ReturnType.Walk)
+        instance = Scandir(tempDir.name, return_type=ReturnType.Walk)
+        instance.start()
     assert "Parameter return_type has invalid value" in str(exc.value)
 
 
@@ -142,7 +143,7 @@ def test_scandir_fast(tempDir):
         assert dirEntry.st_mtime > 0.0
         assert not hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
-    assert len(contents) == 183
+    assert len(contents) == 186
 
 
 def test_scandir_ext(tempDir):
@@ -154,4 +155,4 @@ def test_scandir_ext(tempDir):
         assert dirEntry.st_mtime > 0.0
         assert hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
-    assert len(contents) == 183
+    assert len(contents) == 186

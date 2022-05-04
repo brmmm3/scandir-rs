@@ -104,13 +104,6 @@ fn count_thread(
             if children.is_empty() {
                 return;
             }
-            /*children.iter_mut().for_each(|dir_entry_result| {
-                if let Ok(dir_entry) = dir_entry_result {
-                    if extended {
-                        dir_entry.client_state = Some(dir_entry.metadata().map_err(|err| Error::other(format!("{:?}: {:?}", dir_entry.path(), err))));
-                    }
-                }
-            });*/
             let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len();
             file_cnt_cloned.store(file_cnt_new, Ordering::Relaxed);
         })
@@ -123,6 +116,9 @@ fn count_thread(
         }
         match &entry {
             Ok(v) => {
+                if v.depth == 0 {
+                    continue;
+                }
                 let file_type = v.file_type;
                 if file_type.is_dir() {
                     dirs += 1;
@@ -325,7 +321,7 @@ impl Count {
     }
 
     pub fn start(&mut self) -> Result<(), Error> {
-        if self.thr.is_some() {
+        if self.busy() {
             return Err(Error::new(ErrorKind::Other, "Busy"));
         }
         self.clear();

@@ -125,27 +125,28 @@ results to os.walk.
 
 #### Directory */usr* with
 
-- 105521 directories
-- 841030 files
-- 47753 symlinks
-- 1215 hardlinks
+- 110171 directories
+- 862634 files
+- 47804 symlinks
+- 12275 hardlinks
 - 12 devices
 - 0 pipes
-- 41.3GB size and 43.3GB usage on disk
+- 32.7GB size and 34.8GB usage on disk
 
 | Time [s] | Method                          |
 | -------- | ------------------------------- |
-| 2.487    | os.walk (Python 3.10)           |
-| 0.425    | Count.collect                   |
-| 0.777    | Count(ReturnType=Ext).collect   |
-| 0.655    | Walk.iter                       |
-| 0.879    | Walk.collect                    |
-| 0.812    | Walk(ReturnType=Ext).collect    |
-| 1.528    | Scandir.collect                 |
-| 1.591    | Scandir.iter                    |
-| 1.751    | Scandir(ReturnType=Ext).collect |
+| 3.450    | os.walk (Python 3.10)           |
+| 6.021    | scantree (Python 3.10)          |
+| 1.186    | Count.collect                   |
+| 1.416    | Count(ReturnType=Ext).collect   |
+| 1.089    | Walk.iter                       |
+| 1.350    | Walk.collect                    |
+| 1.336    | Walk(ReturnType=Ext).collect    |
+| 2.232    | Scandir.collect                 |
+| 1.839    | Scandir.iter                    |
+| 2.437    | Scandir(ReturnType=Ext).collect |
 
-Around **3.8 times faster** on Linux (os.walk compared to Walk.iter).
+Around **~3 times faster** on Linux (os.walk compared to Walk.iter).
 
 ### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
 

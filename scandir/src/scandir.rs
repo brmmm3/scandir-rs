@@ -196,7 +196,11 @@ fn entries_thread(
             if stop_cloned.load(Ordering::Relaxed) {
                 return;
             }
-            if root_dir.to_str().unwrap().len() < root_path_len {
+            if let Some(root_dir) = root_dir.to_str() {
+                if root_dir.len() + 1 < root_path_len {
+                    return;
+                }
+            } else {
                 return;
             }
             filter_children(children, &filter, root_path_len);
@@ -440,6 +444,22 @@ impl Scandir {
         Ok(self.results(true))
     }
 
+    pub fn has_results(&mut self) -> bool {
+        if let Some(ref rx) = self.rx {
+            if !rx.is_empty() {
+                return true;
+            }
+        }
+        !self.entries.is_empty() && !self.errors.is_empty()
+    }
+
+    pub fn results_cnt(&mut self, update: bool) -> usize {
+        if update {
+            self.results(false);
+        }
+        self.entries.len() + self.errors.len()
+    }
+
     pub fn results(&mut self, return_all: bool) -> (Vec<ScandirResult>, Vec<(String, String)>) {
         let (entries, errors) = self.receive_all();
         self.entries.extend_from_slice(&entries);
@@ -448,36 +468,6 @@ impl Scandir {
             return (self.entries.clone(), self.errors.clone());
         }
         (entries, errors)
-    }
-
-    pub fn entries(&mut self, return_all: bool) -> Vec<ScandirResult> {
-        self.results(return_all).0
-    }
-
-    pub fn entries_cnt(&mut self, update: bool) -> usize {
-        if update {
-            self.results(false);
-        }
-        self.entries.len()
-    }
-
-    pub fn errors(&mut self, return_all: bool) -> Vec<(String, String)> {
-        self.results(return_all).1
-    }
-
-    pub fn errors_cnt(&mut self, update: bool) -> usize {
-        if update {
-            self.results(false);
-        }
-        self.errors.len()
-    }
-
-    pub fn duration(&mut self) -> f64 {
-        *self.duration.lock().unwrap()
-    }
-
-    pub fn finished(&mut self) -> bool {
-        *self.duration.lock().unwrap() > 0.0
     }
 
     pub fn has_entries(&mut self) -> bool {
@@ -489,8 +479,38 @@ impl Scandir {
         !self.entries.is_empty()
     }
 
+    pub fn entries_cnt(&mut self, update: bool) -> usize {
+        if update {
+            self.results(false);
+        }
+        self.entries.len()
+    }
+
+    pub fn entries(&mut self, return_all: bool) -> Vec<ScandirResult> {
+        self.results(return_all).0
+    }
+
     pub fn has_errors(&mut self) -> bool {
         !self.errors.is_empty()
+    }
+
+    pub fn errors_cnt(&mut self, update: bool) -> usize {
+        if update {
+            self.results(false);
+        }
+        self.errors.len()
+    }
+
+    pub fn errors(&mut self, return_all: bool) -> Vec<(String, String)> {
+        self.results(return_all).1
+    }
+
+    pub fn duration(&mut self) -> f64 {
+        *self.duration.lock().unwrap()
+    }
+
+    pub fn finished(&mut self) -> bool {
+        *self.duration.lock().unwrap() > 0.0
     }
 
     pub fn busy(&self) -> bool {

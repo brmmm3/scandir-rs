@@ -93,7 +93,11 @@ fn count_thread(
             if stop_cloned.load(Ordering::Relaxed) {
                 return;
             }
-            if root_dir.to_str().unwrap().len() < root_path_len {
+            if let Some(root_dir) = root_dir.to_str() {
+                if root_dir.len() + 1 < root_path_len {
+                    return;
+                }
+            } else {
                 return;
             }
             filter_children(children, &filter, root_path_len);

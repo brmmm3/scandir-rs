@@ -101,6 +101,14 @@ impl Scandir {
         Ok((results, errors))
     }
 
+    pub fn has_results(&mut self) -> bool {
+        self.instance.has_results()
+    }
+
+    pub fn results_cnt(&mut self, update: Option<bool>) -> usize {
+        self.instance.results_cnt(update.unwrap_or(false))
+    }
+
     pub fn results(
         &mut self,
         return_all: Option<bool>,
@@ -111,6 +119,14 @@ impl Scandir {
         (results, errors)
     }
 
+    pub fn has_entries(&mut self) -> bool {
+        self.instance.has_entries()
+    }
+
+    pub fn entries_cnt(&mut self, update: Option<bool>) -> usize {
+        self.instance.entries_cnt(update.unwrap_or(false))
+    }
+
     pub fn entries(&mut self, return_all: Option<bool>, py: Python) -> Vec<PyObject> {
         self.instance
             .entries(return_all.unwrap_or(false))
@@ -119,16 +135,16 @@ impl Scandir {
             .collect()
     }
 
-    pub fn entries_cnt(&mut self, update: Option<bool>) -> usize {
-        self.instance.entries_cnt(update.unwrap_or(false))
-    }
-
-    pub fn errors(&mut self, return_all: Option<bool>) -> Vec<(String, String)> {
-        self.instance.errors(return_all.unwrap_or(false))
+    pub fn has_errors(&mut self) -> bool {
+        self.instance.has_errors()
     }
 
     pub fn errors_cnt(&mut self, update: Option<bool>) -> usize {
         self.instance.errors_cnt(update.unwrap_or(false))
+    }
+
+    pub fn errors(&mut self, return_all: Option<bool>) -> Vec<(String, String)> {
+        self.instance.errors(return_all.unwrap_or(false))
     }
 
     pub fn duration(&mut self) -> f64 {
@@ -137,14 +153,6 @@ impl Scandir {
 
     pub fn finished(&mut self) -> bool {
         self.instance.finished()
-    }
-
-    pub fn has_entries(&mut self) -> bool {
-        self.instance.has_entries()
-    }
-
-    pub fn has_errors(&mut self) -> bool {
-        self.instance.has_errors()
     }
 
     pub fn busy(&self) -> bool {

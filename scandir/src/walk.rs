@@ -50,8 +50,12 @@ pub fn toc_thread(
             if stop_cloned.load(Ordering::Relaxed) {
                 return;
             }
-            let root_dir = root_dir.to_str().unwrap();
-            if root_dir.len() < root_path_len {
+            let root_dir = root_dir.to_str();
+            if root_dir.is_none() {
+                return;
+            }
+            let root_dir = root_dir.unwrap();
+            if root_dir.len() + 1 < root_path_len {
                 return;
             }
             filter_children(children, &filter, root_path_len);
@@ -281,6 +285,22 @@ impl Walk {
         Ok(toc)
     }
 
+    pub fn has_results(&mut self) -> bool {
+        if let Some(ref rx) = self.rx {
+            if !rx.is_empty() {
+                return true;
+            }
+        }
+        !self.entries.is_empty()
+    }
+
+    pub fn results_cnt(&mut self, update: bool) -> usize {
+        if update {
+            self.results(false);
+        }
+        self.entries.len()
+    }
+
     pub fn results(&mut self, return_all: bool) -> Vec<(String, Toc)> {
         let entries = self.receive_all();
         self.entries.extend_from_slice(&entries);
@@ -290,16 +310,16 @@ impl Walk {
         entries
     }
 
+    pub fn has_errors(&mut self) -> bool {
+        !self.has_errors
+    }
+
     pub fn duration(&mut self) -> f64 {
         *self.duration.lock().unwrap()
     }
 
     pub fn finished(&mut self) -> bool {
         *self.duration.lock().unwrap() > 0.0
-    }
-
-    pub fn has_errors(&mut self) -> bool {
-        !self.has_errors
     }
 
     pub fn busy(&self) -> bool {

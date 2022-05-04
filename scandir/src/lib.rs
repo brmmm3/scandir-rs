@@ -10,4 +10,4 @@ pub use count::*;
 pub mod walk;
 pub use walk::*;
 pub mod scandir;
-pub use scandir::*;
+pub use crate::scandir::*;

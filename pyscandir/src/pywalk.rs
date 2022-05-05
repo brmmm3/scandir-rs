@@ -94,6 +94,14 @@ impl Walk {
         )))
     }
 
+    pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
+        self.instance.has_results(only_new.unwrap_or(false))
+    }
+
+    pub fn results_cnt(&mut self, update: Option<bool>) -> usize {
+        self.instance.results_cnt(update.unwrap_or(false))
+    }
+
     pub fn results(&mut self, return_all: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
         let mut results = Vec::new();
         for result in self.instance.results(return_all.unwrap_or(false)) {
@@ -107,16 +115,16 @@ impl Walk {
         results
     }
 
+    pub fn has_errors(&mut self) -> bool {
+        self.instance.has_errors()
+    }
+
     pub fn duration(&mut self) -> f64 {
         self.instance.duration()
     }
 
     pub fn finished(&mut self) -> bool {
         self.instance.finished()
-    }
-
-    pub fn has_errors(&mut self) -> bool {
-        self.instance.has_errors()
     }
 
     pub fn busy(&self) -> bool {

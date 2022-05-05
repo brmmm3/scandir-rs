@@ -285,11 +285,14 @@ impl Walk {
         Ok(toc)
     }
 
-    pub fn has_results(&mut self) -> bool {
+    pub fn has_results(&mut self, only_new: bool) -> bool {
         if let Some(ref rx) = self.rx {
             if !rx.is_empty() {
                 return true;
             }
+        }
+        if only_new {
+            return false;
         }
         !self.entries.is_empty()
     }

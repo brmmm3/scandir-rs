@@ -266,7 +266,7 @@ impl Scandir {
                 file_include: None,
                 file_exclude: None,
                 case_sensitive: false,
-                return_type: ReturnType::Fast,
+                return_type: ReturnType::Base,
             },
             entries: Vec::new(),
             errors: Vec::new(),
@@ -444,11 +444,14 @@ impl Scandir {
         Ok(self.results(true))
     }
 
-    pub fn has_results(&mut self) -> bool {
+    pub fn has_results(&mut self, only_new: bool) -> bool {
         if let Some(ref rx) = self.rx {
             if !rx.is_empty() {
                 return true;
             }
+        }
+        if only_new {
+            return false;
         }
         !self.entries.is_empty() && !self.errors.is_empty()
     }
@@ -470,11 +473,14 @@ impl Scandir {
         (entries, errors)
     }
 
-    pub fn has_entries(&mut self) -> bool {
+    pub fn has_entries(&mut self, only_new: bool) -> bool {
         if let Some(ref rx) = self.rx {
             if !rx.is_empty() {
                 return true;
             }
+        }
+        if only_new {
+            return false;
         }
         !self.entries.is_empty()
     }

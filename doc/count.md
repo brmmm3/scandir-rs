@@ -32,11 +32,16 @@ Creates a class instance for calculating statistics. The class instance initiall
 - ``file_include`` list of patterns for files to include.
 - ``file_exclude`` list of patterns for files to exclude.
 - ``case_sensitive`` if `True` then do case sensitive pattern matching.
-- ``return_type`` if ``ReturnType.Ext`` calculate statistcs for ``hardlinks``, ``devices`` and ``pipes``.
+- ``return_type`` defines type of data returned.
 
 For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
 
-### Example usage of the contect manager
+### Return types
+
+- ``ReturnType.Base`` calculate statistcs for ``dirs``, ``files``, ``slinks``, ``size`` and ``usage``.
+- ``ReturnType.Ext`` in addition to above calculate statistcs ``hlinks`` and on Unix platforms ``devices`` and ``pipes``.
+
+### Example usage of the context manager
 
 ```python
 import scandir_rs as scandir

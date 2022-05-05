@@ -101,8 +101,8 @@ impl Scandir {
         Ok((results, errors))
     }
 
-    pub fn has_results(&mut self) -> bool {
-        self.instance.has_results()
+    pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
+        self.instance.has_results(only_new.unwrap_or(false))
     }
 
     pub fn results_cnt(&mut self, update: Option<bool>) -> usize {
@@ -119,8 +119,8 @@ impl Scandir {
         (results, errors)
     }
 
-    pub fn has_entries(&mut self) -> bool {
-        self.instance.has_entries()
+    pub fn has_entries(&mut self, only_new: Option<bool>) -> bool {
+        self.instance.has_entries(only_new.unwrap_or(false))
     }
 
     pub fn entries_cnt(&mut self, update: Option<bool>) -> usize {

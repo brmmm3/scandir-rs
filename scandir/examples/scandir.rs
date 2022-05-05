@@ -15,7 +15,7 @@ fn main() -> Result<(), Error> {
     println!("{:#?}", instance.options());
     println!("{}", &format!("{:#?}", instance.results(true))[..2000]);
     println!("{:?}", instance.finished());
-    println!("{:?}", instance.has_entries());
+    println!("{:?}", instance.has_entries(true));
     println!("{:?}", instance.has_errors());
     println!("{:?}", instance.duration());
     Ok(())

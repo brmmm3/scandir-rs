@@ -18,8 +18,6 @@ Creates a class instance for calculating statistics. The class instance initiall
 
 ### Parameters
 
-Same as above but with one additional parameter:
-
 - ``root_path`` is directory to scan. ``~`` is allowed on Unix systems.
 - ``sorted`` if ``True`` alphabetically sort results.
 - ``skip_hidden`` if ``True`` then ignore all hidden files and directories.
@@ -29,11 +27,11 @@ Same as above but with one additional parameter:
 - ``file_include`` list of patterns for files to include.
 - ``file_exclude`` list of patterns for files to exclude.
 - ``case_sensitive`` if `True` then do case sensitive pattern matching.
-- ``return_type`` defines type of data returned by iterator.
+- ``return_type`` defines type of data returned.
 
 For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
 
-### Iteration types
+### Return types
 
 - ``ReturnType.Base`` return ``dirs`` and ``files`` as ``os.walk`` does.
 - ``ReturnType.Ext`` return additional data: ``symlinks``, ``other`` and ``errors``.
@@ -41,30 +39,46 @@ For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct
 **Please note:**
 > Due to limitations of jwalk the returned errors just contain the error message without any information to which files the errors correspond to.
 
-### ``toc``
-
-Returns a ``Toc`` object with the current results. The internal results object will be cleared after this call.
-
-### ``has_results()``
-
-Returns ``True`` after iteration has been finished.
-
-### ``as_dict()``
-
-Returns statistics as a ``dict``. Result will only contains the keys of which the values are non zero. The internal results object will be cleared after this call.
-
-### ``collect()``
-
-This does the same as the call of the ``count`` method. It returns a ``Toc`` object and in addition the results are available also within the class instance through the ``toc`` property. This method is blocking and releases the GIL.
-
 ### ``start()``
 
-Start iterating through the directory in background.
+Start parsing the directory tree in background. Raises an expception if a task is already running.
+
+### ``join()``
+
+Wait for task to finish.
 
 ### ``stop()``
 
-Stop iterating.
+Stop task.
+
+### ``collect() -> Toc``
+
+Collect directories, files, etc. and return a ``Toc`` object when the task has finished. This method is blocking and releases the GIL.
+
+### ``has_results(only_new: Optional[bool] = False) -> bool``
+
+Returns ``True`` if new entries are available and ``only_new`` is ``False`` or in case ``only_new`` is ``False`` and any entries have been collected since task start.
+
+### ``results_cnt(update: Optional[bool] = False) -> int``
+
+Returns number of results collected so far. If ``update`` is ``True`` then new results are counted too.
+
+### ``results(return_all: Optional[bool] = False) -> List[Tuple[str, Toc]]``
+
+If ``return_all`` is ``True`` then return all results collected so far else return only new results. Each result consists of root directory and ``Toc``.
+
+### ``has_errors() -> bool``
+
+Returns ``True`` if errors occured while walking through the directory tree. The error messages can be found in ``Toc`` objects returned.
+
+### ``duration() -> float``
+
+Returns the duration of the task. As long as the task is running it will return 0.
+
+### ``finished() -> bool``
+
+Returns ``True`` after the task has finished.
 
 ### ``busy()``
 
-Return ``True`` when the iteration thread is running.
+Returns ``True`` while a task is running.

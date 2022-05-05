@@ -40,7 +40,7 @@ impl Count {
                     .file_include(file_include)
                     .file_exclude(file_exclude)
                     .case_sensitive(case_sensitive.unwrap_or(false))
-                    .extended(return_type.unwrap_or(ReturnType::Fast) == ReturnType::Ext),
+                    .extended(return_type.unwrap_or(ReturnType::Base) == ReturnType::Ext),
                 Err(e) => match e.kind() {
                     ErrorKind::InvalidInput => return Err(PyValueError::new_err(e.to_string())),
                     ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),

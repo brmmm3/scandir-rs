@@ -74,7 +74,7 @@ def test_count_extended_dir_exclude(tempDir):
 
 
 def test_walk_toc(tempDir):
-    sd = Walk(tempDir.name, return_type=ReturnType.Walk)
+    sd = Walk(tempDir.name, return_type=ReturnType.Ext)
     toc = sd.collect()
     assert not toc.errors
     assert not toc.other
@@ -97,7 +97,7 @@ def test_walk_toc_iter(tempDir):
 
 
 def test_walk_walk(tempDir):
-    sd = Walk(tempDir.name, return_type=ReturnType.Walk)
+    sd = Walk(tempDir.name, return_type=ReturnType.Ext)
     allDirs = []
     allFiles = []
     for root, dirs, files in sd:
@@ -129,7 +129,7 @@ def test_walk_walk_ext(tempDir):
 
 def test_scandir_invalid(tempDir):
     with pytest.raises(Exception) as exc:
-        instance = Scandir(tempDir.name, return_type=ReturnType.Walk)
+        instance = Scandir(tempDir.name, return_type=ReturnType.Ext)
         instance.start()
     assert "Parameter return_type has invalid value" in str(exc.value)
 

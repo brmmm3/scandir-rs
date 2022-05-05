@@ -1,8 +1,8 @@
-# The API of submodule ``walk``
+# The API of class ``Walk``
 
 ## ``Toc``
 
-The ``Toc`` class is the return value of method ``toc``, also of property ``toc`` and class method ``collect`` of class ``Walk``.
+The ``Toc`` class is the return value of class method ``results`` and ``collect`` of class ``Walk``.
 
 ### ``Toc`` has following class members
 
@@ -12,11 +12,13 @@ The ``Toc`` class is the return value of method ``toc``, also of property ``toc`
 - ``other`` list of names of all other entry types.
 - ``errors`` list of access errors (list of strings).
 
-## ``toc(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True)``
+## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, max_file_cnt: int = 0, dir_include: List[str] = None, dir_exclude: List[str] = None, file_include: List[str] = None, file_exclude: List[str] = None, case_sensitive: bool = True, return_type: ReturnType = ReturnType.Base)``
 
-Scans directory provided through parameter ``root_path`` and returns a ``Toc`` object. This function is blocking and releases the GIL.
+Creates a class instance for calculating statistics. The class instance initially does nothing. To start the scan either the method ``start``  or the method ``collect`` has to be called or a context has to be created (``with Walk(...) as instance:``). When the context is closed the background thread is stopped.
 
 ### Parameters
+
+Same as above but with one additional parameter:
 
 - ``root_path`` is directory to scan. ``~`` is allowed on Unix systems.
 - ``sorted`` if ``True`` alphabetically sort results.
@@ -27,24 +29,14 @@ Scans directory provided through parameter ``root_path`` and returns a ``Toc`` o
 - ``file_include`` list of patterns for files to include.
 - ``file_exclude`` list of patterns for files to exclude.
 - ``case_sensitive`` if `True` then do case sensitive pattern matching.
+- ``return_type`` defines type of data returned by iterator.
 
 For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
 
-## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True, return_type: int = RETURN_TYPE_WALK)``
-
-Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
-
-### Parameters
-
-Same as above but with one additional parameter:
-
-- ``return_type`` defines type of data returned by iterator.
-
 ### Iteration types
 
-- ``RETURN_TYPE_BASE`` returned data is a ``Toc`` object.
-- ``RETURN_TYPE_WALK`` returned data is same as returned by ``os.walk``. This is the default since version 0.7.2.
-- ``RETURN_TYPE_EXT`` returned data contains additional groups: ``symlinks``, ``other`` and ``errors``.
+- ``ReturnType.Base`` return ``dirs`` and ``files`` as ``os.walk`` does.
+- ``ReturnType.Ext`` return additional data: ``symlinks``, ``other`` and ``errors``.
 
 **Please note:**
 > Due to limitations of jwalk the returned errors just contain the error message without any information to which files the errors correspond to.

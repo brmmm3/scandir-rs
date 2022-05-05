@@ -233,7 +233,7 @@ impl Count {
                 file_include: None,
                 file_exclude: None,
                 case_sensitive: false,
-                return_type: ReturnType::Fast,
+                return_type: ReturnType::Base,
             },
             statistics: Statistics::new(),
             duration: Arc::new(Mutex::new(0.0)),
@@ -310,7 +310,7 @@ impl Count {
     pub fn extended(mut self, extended: bool) -> Self {
         self.options.return_type = match extended {
             true => ReturnType::Ext,
-            false => ReturnType::Fast,
+            false => ReturnType::Base,
         };
         self
     }

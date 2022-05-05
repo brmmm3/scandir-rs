@@ -133,7 +133,7 @@ fn create_entry(
     let key = key.to_str().unwrap().to_string();
     let path = key.get(root_path_len..).unwrap_or(&file_name).to_string();
     let entry: ScandirResult = match return_type {
-        ReturnType::Fast | ReturnType::Base => ScandirResult::DirEntry(DirEntry {
+        ReturnType::Base => ScandirResult::DirEntry(DirEntry {
             path,
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),

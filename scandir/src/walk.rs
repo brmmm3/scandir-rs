@@ -117,7 +117,7 @@ impl Walk {
                 file_include: None,
                 file_exclude: None,
                 case_sensitive: false,
-                return_type: ReturnType::Fast,
+                return_type: ReturnType::Base,
             },
             entries: Vec::new(),
             duration: Arc::new(Mutex::new(0.0)),

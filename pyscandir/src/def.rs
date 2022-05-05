@@ -6,19 +6,15 @@ use scandir;
 #[pyclass]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum ReturnType {
-    Fast,
     Base,
     Ext,
-    Walk,
 }
 
 impl ReturnType {
     pub fn from_object(&self) -> scandir::ReturnType {
         match &self {
-            ReturnType::Fast => scandir::ReturnType::Fast,
             ReturnType::Base => scandir::ReturnType::Base,
             ReturnType::Ext => scandir::ReturnType::Ext,
-            ReturnType::Walk => scandir::ReturnType::Walk,
         }
     }
 }

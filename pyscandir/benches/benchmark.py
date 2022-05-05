@@ -86,13 +86,13 @@ scandir.Count('{dirName}', return_type=scandir.ReturnType.Ext).collect()
 toc = scandir.Walk('{dirName}').collect()
     """, setup="import scandir_rs as scandir", number=3))
 
-    print("scandir.Walk(return_type=scandir.ReturnType.Walk) (iter): %.3f" % timeit.timeit(f"""
-for result in scandir.Walk('{dirName}', return_type=scandir.ReturnType.Walk):
+    print("scandir.Walk(return_type=scandir.ReturnType.Ext) (iter): %.3f" % timeit.timeit(f"""
+for result in scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext):
     pass
     """, setup="import scandir_rs as scandir", number=3))
 
-    print("scandir.Walk(return_type=scandir.ReturnType.Walk) (collect): %.3f" % timeit.timeit(f"""
-toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Walk).collect()
+    print("scandir.Walk(return_type=scandir.ReturnType.Ext) (collect): %.3f" % timeit.timeit(f"""
+toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext).collect()
     """, setup="import scandir_rs as scandir", number=3))
 
     print("scandir.Scandir(return_type=ReturnType.Fast).collect(): %.3f" % timeit.timeit(f"""

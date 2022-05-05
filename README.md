@@ -188,33 +188,33 @@ Around **~5.3 times faster** on Windows 10 (os.walk compared to Walk.iter).
 - 69973 files
 - 1.08GB size and 1.23GB usage on disk
 
-| Time [s] | Method                                                      |
-| -------- | ----------------------------------------------------------- |
-| 0.411    | os.walk (Python 3.10)                                       |
-| 1.203    | os.walk (stat)                                              |
-| 0.218    | scandir.Count()                                             |
-| 0.278    | scandir.Count(return_type=ReturnType.Ext).collect()         |
-| 0.227    | scandir_rs.Walk().collect()                                 |
-| 0.164    | scandir.Walk(return_type=scandir.ReturnType.Walk) (iter)    |
-| 0.204    | scandir.Walk(return_type=scandir.ReturnType.Walk) (collect) |
-| 0.340    | scandir.Scandir(return_type=ReturnType.Fast).collect()      |
-| 0.350    | scandir.Scandir(return_type=ReturnType.Base).collect()      |
-| 0.426    | scandir.Scandir(return_type=ReturnType.Ext).collect()       |
+| Time [s] | Method                                                     |
+| -------- | ---------------------------------------------------------- |
+| 0.411    | os.walk (Python 3.10)                                      |
+| 1.203    | os.walk (stat)                                             |
+| 0.218    | scandir.Count()                                            |
+| 0.278    | scandir.Count(return_type=ReturnType.Ext).collect()        |
+| 0.227    | scandir_rs.Walk().collect()                                |
+| 0.164    | scandir.Walk(return_type=scandir.ReturnType.Ext) (iter)    |
+| 0.204    | scandir.Walk(return_type=scandir.ReturnType.Ext) (collect) |
+| 0.340    | scandir.Scandir(return_type=ReturnType.Fast).collect()     |
+| 0.350    | scandir.Scandir(return_type=ReturnType.Base).collect()     |
+| 0.426    | scandir.Scandir(return_type=ReturnType.Ext).collect()      |
 
 Around **~2.5 times faster** on Linux (os.walk compared to Walk.iter).
 
 
-| Time [s] | Method                                                      |
-| -------- | ----------------------------------------------------------- |
-| 1.998    | os.walk (Python 3.10)                                       |
-| 14.875   | os.walk (stat)                                              |
-| 0.278    | scandir.Count()                                             |
-| 2.114    | scandir.Count(return_type=ReturnType.Ext).collect()         |
-| 0.464    | scandir_rs.Walk().collect()                                 |
-| 0.313    | scandir.Walk(return_type=scandir.ReturnType.Walk) (iter)    |
-| 0.455    | scandir.Walk(return_type=scandir.ReturnType.Walk) (collect) |
-| 0.609    | scandir.Scandir(return_type=ReturnType.Fast).collect()      |
-| 0.624    | scandir.Scandir(return_type=ReturnType.Base).collect()      |
-| 2.409    | scandir.Scandir(return_type=ReturnType.Ext).collect()       |
+| Time [s] | Method                                                     |
+| -------- | ---------------------------------------------------------- |
+| 1.998    | os.walk (Python 3.10)                                      |
+| 14.875   | os.walk (stat)                                             |
+| 0.278    | scandir.Count()                                            |
+| 2.114    | scandir.Count(return_type=ReturnType.Ext).collect()        |
+| 0.464    | scandir_rs.Walk().collect()                                |
+| 0.313    | scandir.Walk(return_type=scandir.ReturnType.Ext) (iter)    |
+| 0.455    | scandir.Walk(return_type=scandir.ReturnType.Ext) (collect) |
+| 0.609    | scandir.Scandir(return_type=ReturnType.Fast).collect()     |
+| 0.624    | scandir.Scandir(return_type=ReturnType.Base).collect()     |
+| 2.409    | scandir.Scandir(return_type=ReturnType.Ext).collect()      |
 
 Around **~6.4 times faster** on Windows 10 (os.walk compared to Walk.iter).

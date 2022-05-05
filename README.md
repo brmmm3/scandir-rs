@@ -46,9 +46,11 @@ maturin build --release --strip --no-sdist
 ## Building and running tests for different Python versions
 
 To make it easier to build wheels for several different Python versions the script ``build_wheels.sh`` has been added.
-It creates wheels for Python versions 3.6, 3.7, 3.8 and 3.9. In addition it runs ``pytest`` after successfull creation of each wheel.
+It creates wheels for Python versions 3.7, 3.8, 3.9, 3.10 and 3.11.0a7. In addition it runs ``pytest`` after successfull creation of each wheel.
 
-To be able to run the script ``pyenv`` needs to be installed first including all Python interpreter versions mentioned above.
+To be able to run the script ``pyenv`` needs to be installed first including the following Python interpreter versions:
+
+3.7.9, 3.8.10, 3.9.12, 3.10.4, 3.11.a07
 
 Instruction how to install ``pyenv`` can be found [here](https://github.com/pyenv/pyenv).
 
@@ -62,29 +64,38 @@ from scandir_rs import Count, ReturnType
 print(Count("/usr", return_type=ReturnType.Ext).collect())
 ```
 
+The `collect` method releases the GIL. So other Python threads can run in parallel.
+
 The same, but asynchronously in background using a class instance:
 
 ```python
 from scandir_rs import Count, ReturnType
 
 instance = Count("/usr", return_type=ReturnType.Ext))
-instance.start())  # Start background thread pool
+instance.start())  # Start scanning the directory
 ...
-values = instance.results()  # Can be read at any time
+values = instance.results()  # Returns the current statistics. Can be read at any time
 ...
-instance.stop()  # If you want to cancel the scanner
+if instance.busy():  # Check if the task is still running.
+...
+instance.stop()  # If you want to cancel the task
+...
+instance.join()  # Wait for the instance to finish.
 ```
 
 and with a context manager:
 
 ```python
+import time
+
 from scandir_rs import Count, ReturnType
 
-instance = Count("/usr", return_type=ReturnType.Ext))
-with instance:
+with Count("/usr", return_type=ReturnType.Ext) as instance:
     while instance.busy():
         statistics = instance.results()
         # Do something
+        time.sleep(0.01)
+    print(instance.results())
 ```
 
 ``os.walk()`` example:
@@ -152,47 +163,58 @@ Around **~3 times faster** on Linux (os.walk compared to Walk.iter).
 
 #### Directory *C:\Windows* with
 
-- 84248 directories
-- 293108 files
+- 132604 directories
+- 349911 files
 - 44.4GB size and 45.2GB usage on disk
 
-| Time [s] | Method                                             |
-| -------- | -------------------------------------------------- |
-| 26.881   | os.walk (Python 3.7)                               |
-| 4.094    | scandir_rs.count.count                             |
-| 3.654    | scandir_rs.count.Count                             |
-| 3.978    | scandir_rs.walk.Walk                               |
-| 3.848    | scandir_rs.walk.toc                                |
-| 3.777    | scandir_rs.walk.collect                            |
-| 3.987    | scandir_rs.scandir.entries                         |
-| 3.905    | scandir_rs.scandir.entries(metadata=True)          |
-| 4.062    | scandir_rs.scandir.entries(metadata_ext=True)      |
-| 3.934    | scandir_rs.scandir.Scandir.collect                 |
-| 3.981    | scandir_rs.scandir.Scandir.iter                    |
-| 3.821    | scandir_rs.scandir.Scandir.iter(metadata_ext=True) |
+| Time [s] | Method                          |
+| -------- | ------------------------------- |
+| 21.779   | os.walk (Python 3.10)           |
+| 13.085   | scantree (Python 3.10)          |
+| 3.257    | Count.collect                   |
+| 16.605   | Count(ReturnType=Ext).collect   |
+| 4.102    | Walk.iter                       |
+| 4.056    | Walk.collect                    |
+| 4.190    | Walk(ReturnType=Ext).collect    |
+| 3.993    | Scandir.collect                 |
+| 8.921    | Scandir.iter                    |
+| 17.616   | Scandir(ReturnType=Ext).collect |
 
-Up to **6.7 times faster** on Windows 10.
+Around **~5.3 times faster** on Windows 10 (os.walk compared to Walk.iter).
 
-#### Directory *C:\testdir* with
+#### Directory *linux-5.9* with
 
-- 185563 directories
-- 1641277 files
-- 2696 symlinks
-- 97GB size and 100.5GB usage on disk
+- 4711 directories
+- 69973 files
+- 1.08GB size and 1.23GB usage on disk
 
-| Time [s] | Method                                             |
-| -------- | -------------------------------------------------- |
-| 151.143  | os.walk (Python 3.7)                               |
-| 7.549    | scandir_rs.count.count                             |
-| 7.531    | scandir_rs.count.Count                             |
-| 8.710    | scandir_rs.walk.Walk                               |
-| 8.625    | scandir_rs.walk.toc                                |
-| 8.599    | scandir_rs.walk.collect                            |
-| 9.014    | scandir_rs.scandir.entries                         |
-| 9.208    | scandir_rs.scandir.entries(metadata=True)          |
-| 8.925    | scandir_rs.scandir.entries(metadata_ext=True)      |
-| 9.243    | scandir_rs.scandir.Scandir.collect                 |
-| 8.462    | scandir_rs.scandir.Scandir.iter                    |
-| 8.380    | scandir_rs.scandir.Scandir.iter(metadata_ext=True) |
+| Time [s] | Method                                                      |
+| -------- | ----------------------------------------------------------- |
+| 0.411    | os.walk (Python 3.10)                                       |
+| 1.203    | os.walk (stat)                                              |
+| 0.218    | scandir.Count()                                             |
+| 0.278    | scandir.Count(return_type=ReturnType.Ext).collect()         |
+| 0.227    | scandir_rs.Walk().collect()                                 |
+| 0.164    | scandir.Walk(return_type=scandir.ReturnType.Walk) (iter)    |
+| 0.204    | scandir.Walk(return_type=scandir.ReturnType.Walk) (collect) |
+| 0.340    | scandir.Scandir(return_type=ReturnType.Fast).collect()      |
+| 0.350    | scandir.Scandir(return_type=ReturnType.Base).collect()      |
+| 0.426    | scandir.Scandir(return_type=ReturnType.Ext).collect()       |
 
-Up to **17.4 times faster** on Windows 10.
+Around **~2.5 times faster** on Linux (os.walk compared to Walk.iter).
+
+
+| Time [s] | Method                                                      |
+| -------- | ----------------------------------------------------------- |
+| 1.998    | os.walk (Python 3.10)                                       |
+| 14.875   | os.walk (stat)                                              |
+| 0.278    | scandir.Count()                                             |
+| 2.114    | scandir.Count(return_type=ReturnType.Ext).collect()         |
+| 0.464    | scandir_rs.Walk().collect()                                 |
+| 0.313    | scandir.Walk(return_type=scandir.ReturnType.Walk) (iter)    |
+| 0.455    | scandir.Walk(return_type=scandir.ReturnType.Walk) (collect) |
+| 0.609    | scandir.Scandir(return_type=ReturnType.Fast).collect()      |
+| 0.624    | scandir.Scandir(return_type=ReturnType.Base).collect()      |
+| 2.409    | scandir.Scandir(return_type=ReturnType.Ext).collect()       |
+
+Around **~6.4 times faster** on Windows 10 (os.walk compared to Walk.iter).

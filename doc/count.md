@@ -1,4 +1,4 @@
-# The API of submodule ``count``
+# The API of class ``Count``
 
 ## ``Statistics``
 

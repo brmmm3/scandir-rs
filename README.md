@@ -197,7 +197,6 @@ Around **~5.3 times faster** on Windows 10 (os.walk compared to Walk.iter).
 | 0.227    | scandir_rs.Walk().collect()                                |
 | 0.164    | scandir.Walk(return_type=scandir.ReturnType.Ext) (iter)    |
 | 0.204    | scandir.Walk(return_type=scandir.ReturnType.Ext) (collect) |
-| 0.340    | scandir.Scandir(return_type=ReturnType.Fast).collect()     |
 | 0.350    | scandir.Scandir(return_type=ReturnType.Base).collect()     |
 | 0.426    | scandir.Scandir(return_type=ReturnType.Ext).collect()      |
 
@@ -213,7 +212,6 @@ Around **~2.5 times faster** on Linux (os.walk compared to Walk.iter).
 | 0.464    | scandir_rs.Walk().collect()                                |
 | 0.313    | scandir.Walk(return_type=scandir.ReturnType.Ext) (iter)    |
 | 0.455    | scandir.Walk(return_type=scandir.ReturnType.Ext) (collect) |
-| 0.609    | scandir.Scandir(return_type=ReturnType.Fast).collect()     |
 | 0.624    | scandir.Scandir(return_type=ReturnType.Base).collect()     |
 | 2.409    | scandir.Scandir(return_type=ReturnType.Ext).collect()      |
 

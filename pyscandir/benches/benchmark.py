@@ -95,10 +95,6 @@ for result in scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext):
 toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext).collect()
     """, setup="import scandir_rs as scandir", number=3))
 
-    print("scandir.Scandir(return_type=ReturnType.Fast).collect(): %.3f" % timeit.timeit(f"""
-entries = scandir.Scandir('{dirName}', return_type=scandir.ReturnType.Fast).collect()
-    """, setup="import scandir_rs as scandir", number=3))
-
     print("scandir.Scandir(return_type=ReturnType.Base).collect(): %.3f" % timeit.timeit(f"""
 entries = scandir.Scandir('{dirName}', return_type=scandir.ReturnType.Base).collect()
     """, setup="import scandir_rs as scandir", number=3))

@@ -17,10 +17,6 @@ def Counter(sd):
 
 dirName = "C:/Windows/appcompat" if os.name == 'nt' else "/tmp"
 
-print("*** return_type=ReturnType.Fast:")
-for dirEntry in Scandir(dirName, return_type=ReturnType.Fast):
-    print(dirEntry)
-
 
 print("*** return_type=ReturnType.Base:")
 for dirEntry in Scandir(dirName, return_type=ReturnType.Base):

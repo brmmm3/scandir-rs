@@ -97,7 +97,7 @@ def test_walk_toc_iter(tempDir):
 
 
 def test_walk_walk(tempDir):
-    sd = Walk(tempDir.name, return_type=ReturnType.Ext)
+    sd = Walk(tempDir.name, return_type=ReturnType.Base)
     allDirs = []
     allFiles = []
     for root, dirs, files in sd:
@@ -127,15 +127,8 @@ def test_walk_walk_ext(tempDir):
     assert len(allFiles) == 180
 
 
-def test_scandir_invalid(tempDir):
-    with pytest.raises(Exception) as exc:
-        instance = Scandir(tempDir.name, return_type=ReturnType.Ext)
-        instance.start()
-    assert "Parameter return_type has invalid value" in str(exc.value)
-
-
 def test_scandir_fast(tempDir):
-    sd = Scandir(tempDir.name, return_type=ReturnType.Fast)
+    sd = Scandir(tempDir.name, return_type=ReturnType.Base)
     contents = {}
     for dirEntry in sd:
         assert dirEntry.st_atime > 0.0

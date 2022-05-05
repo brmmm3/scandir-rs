@@ -17,7 +17,7 @@ The ``Statistics`` class is the return value of class methods ``results`` and ``
 - ``errors`` list of access errors (list of strings).
 - ``duration`` time taken for scanning (in seconds as a float).
 
-## ``Count(root_path: str, skip_hidden: bool = False, max_depth: int = 0, max_file_cnt: int = 0, dir_include: List[str] = None, dir_exclude: List[str] = None, file_include: List[str] = None, file_exclude: List[str] = None, case_sensitive: bool = False, return_type: ReturnType = ReturnType.Fast)``
+## ``Count(root_path: str, skip_hidden: bool = False, max_depth: int = 0, max_file_cnt: int = 0, dir_include: List[str] = None, dir_exclude: List[str] = None, file_include: List[str] = None, file_exclude: List[str] = None, case_sensitive: bool = False, return_type: ReturnType = ReturnType.Base)``
 
 Creates a class instance for calculating statistics. The class instance initially does nothing. To start the scan either the method ``start``  or the method ``collect`` has to be called or a context has to be created (``with Count(...) as instance:``). When the context is closed the background thread is stopped.
 

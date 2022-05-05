@@ -169,7 +169,7 @@ impl Walk {
         loop {
             if let Some((root_dir, toc)) = self.entries.get(self.idx) {
                 self.idx += 1;
-                if self.return_type == ReturnType::Ext {
+                if self.return_type == ReturnType::Base {
                     return Ok(Some(
                         (root_dir, toc.dirs.clone(), toc.files.clone()).to_object(py),
                     ));

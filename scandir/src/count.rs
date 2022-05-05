@@ -386,8 +386,21 @@ impl Count {
         Ok(self.receive_all())
     }
 
+    pub fn has_results(&self) -> bool {
+        if let Some(ref rx) = self.rx {
+            if !rx.is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn results(&mut self) -> Statistics {
         self.receive_all()
+    }
+
+    pub fn has_errors(&mut self) -> bool {
+        !self.statistics.errors.is_empty()
     }
 
     pub fn duration(&mut self) -> f64 {
@@ -396,10 +409,6 @@ impl Count {
 
     pub fn finished(&self) -> bool {
         self.statistics.duration > 0.0
-    }
-
-    pub fn has_errors(&mut self) -> bool {
-        !self.statistics.errors.is_empty()
     }
 
     pub fn busy(&self) -> bool {

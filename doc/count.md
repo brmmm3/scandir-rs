@@ -2,7 +2,7 @@
 
 ## ``Statistics``
 
-The ``Statistics`` class is the return value of method ``count``, also of property ``statistics`` and class method ``collect`` of class ``Count``.
+The ``Statistics`` class is the return value of class methods ``results`` and ``collect`` of class ``Count``.
 
 ### ``Statistics`` has following class members
 
@@ -17,63 +17,76 @@ The ``Statistics`` class is the return value of method ``count``, also of proper
 - ``errors`` list of access errors (list of strings).
 - ``duration`` time taken for scanning (in seconds as a float).
 
-## ``count(root_path: str, skip_hidden: bool = False, extended: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True)``
+## ``Count(root_path: str, skip_hidden: bool = False, max_depth: int = 0, max_file_cnt: int = 0, dir_include: List[str] = None, dir_exclude: List[str] = None, file_include: List[str] = None, file_exclude: List[str] = None, case_sensitive: bool = False, return_type: ReturnType = ReturnType.Fast)``
 
-Scans directory provided through parameter ``root_path`` and returns a ``Statistics`` object. This function is blocking and releases the GIL.
+Creates a class instance for calculating statistics. The class instance initially does nothing. To start the scan either the method ``start``  or the method ``collect`` has to be called or a context has to be created (``with Count(...) as instance:``). When the context is closed the background thread is stopped.
 
 ### Parameters
 
 - ``root_path`` is directory to scan. ``~`` is allowed on Unix systems.
 - ``skip_hidden`` if ``True`` then ignore all hidden files and directories.
-- ``extended`` if ``True`` calculate statistcs for ``hardlinks``, ``devices``, ``pipes``, ``size`` and ``usage`` too.
 - ``max_depth`` is maximum depth of iteration. If ``0`` then depth limit is disabled.
+- ``max_file_cnt`` is maximum number of files to collect. If ``0`` then limit is disabled.
 - ``dir_include`` list of patterns for directories to include.
 - ``dir_exclude`` list of patterns for directories to exclude.
 - ``file_include`` list of patterns for files to include.
 - ``file_exclude`` list of patterns for files to exclude.
 - ``case_sensitive`` if `True` then do case sensitive pattern matching.
+- ``return_type`` if ``ReturnType.Ext`` calculate statistcs for ``hardlinks``, ``devices`` and ``pipes``.
 
 For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
-
-## ``Count(root_path: str, skip_hidden: bool = False, extended: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True)``
-
-Creates a class object for more control when calculating statistics. Useful when statistics should be calculated in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
 
 ### Example usage of the contect manager
 
 ```python
 import scandir_rs as scandir
-C = scandir.count.Count("~/workspace", extended=True))
-with C:
-    while C.busy():
-        statistics = C.statistics
+
+with scandir.Count("~/workspace", extended=True)) as instance:
+    while instance.busy():
+        statistics = instance.results()
         # Do something
 ```
 
-### ``statistics``
-
-Returns a ``Statistics`` object with the current statistics.
-
-### ``has_results()``
-
-Returns ``True`` after iteration has been finished.
-
-### ``as_dict()``
-
-Returns statistics as a ``dict``. Result will only contains the keys of which the values are non zero.
-
-### ``collect()``
-
-This does the same as the call of the ``count`` method. It returns a ``Statistics`` object and in addition the statistics are available also within the class instance through the ``statistics`` property. This method is blocking and releases the GIL.
-
 ### ``start()``
 
-Start iterating through the directory in background.
+Start calculating statistics in background. Raises an expception if a task is already running.
+
+### ``join()``
+
+Wait for task to finish.
 
 ### ``stop()``
 
-Stop iterating.
+Stop task.
+
+### ``collect() -> Statistics``
+
+Calculate statistics and return a ``Statistics`` object when the task has finished. This method is blocking and releases the GIL.
+
+### ``has_results() -> bool``
+
+Returns ``True`` if new statistics are available.
+
+### ``results() -> Statistics``
+
+Return a ``Statistics`` object with the current statistics.
+
+### ``has_errors() -> bool``
+
+Returns ``True`` if errors occured while scanning the directory tree. The errors can be found in the statistics object.
+
+### ``duration() -> float``
+
+Returns the duration of the task. As long as the task is running it will return 0.
+
+### ``finished() -> bool``
+
+Returns ``True`` after the task has finished.
 
 ### ``busy()``
 
-Return ``True`` when the iteration thread is running.
+Returns ``True`` while a task is running.
+
+### ``as_dict()``
+
+Returns statistics as a ``dict``. Result will only contain the keys of which the values are non zero.

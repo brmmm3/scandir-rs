@@ -83,10 +83,18 @@ impl Count {
             .to_object(py))
     }
 
+    pub fn has_results(&mut self) -> bool {
+        self.instance.has_results()
+    }
+
     pub fn results(&mut self, py: Python) -> PyObject {
         PyCell::new(py, Statistics::new(Some(self.instance.results())))
             .unwrap()
             .to_object(py)
+    }
+
+    pub fn has_errors(&mut self) -> bool {
+        self.instance.has_errors()
     }
 
     pub fn duration(&mut self) -> f64 {
@@ -95,10 +103,6 @@ impl Count {
 
     pub fn finished(&mut self) -> bool {
         self.instance.finished()
-    }
-
-    pub fn has_errors(&mut self) -> bool {
-        self.instance.has_errors()
     }
 
     pub fn busy(&self) -> bool {

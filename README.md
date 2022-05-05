@@ -50,7 +50,7 @@ It creates wheels for Python versions 3.7, 3.8, 3.9, 3.10 and 3.11.0a7. In addit
 
 To be able to run the script ``pyenv`` needs to be installed first including the following Python interpreter versions:
 
-3.7.9, 3.8.10, 3.9.12, 3.10.4, 3.11.a07
+3.7.9, 3.8.10, 3.9.12, 3.10.4, 3.11.0a7
 
 Instruction how to install ``pyenv`` can be found [here](https://github.com/pyenv/pyenv).
 

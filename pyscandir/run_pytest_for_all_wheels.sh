@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 eval "$(pyenv init -)"
+
 name=`grep -Po '\bname\s*=\s*"\K.*?(?=")' Cargo.toml | head -1 | tr - _`
 version=`grep -Po '\bversion\s*=\s*"\K.*?(?=")' Cargo.toml | head -1`
 

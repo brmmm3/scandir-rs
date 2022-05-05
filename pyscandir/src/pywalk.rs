@@ -123,10 +123,11 @@ impl Walk {
         self.instance.busy()
     }
 
-    fn __enter__(&mut self) -> PyResult<()> {
-        self.instance
+    fn __enter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
+        slf.instance
             .start()
-            .map_err(|e| PyException::new_err(e.to_string()))
+            .map_err(|e| PyException::new_err(e.to_string()))?;
+        Ok(slf)
     }
 
     fn __exit__(
@@ -138,6 +139,7 @@ impl Walk {
         if !self.instance.stop() {
             return Ok(false);
         }
+        self.instance.join();
         match ty {
             Some(ty) => {
                 if ty

@@ -13,8 +13,9 @@ if os.name == 'nt':
     LINUX_DIR = "C:/Workspace/benches/linux-5.9"
     LINUX_KERNEL_ARCHIVE = "C:/Workspace/benches/linux-5.9.tar.gz"
 else:
-    LINUX_DIR = "~/Rust/_Data/benches/linux-5.9"
-    LINUX_KERNEL_ARCHIVE = "~/Rust/_Data/benches/linux-5.9.tar.gz"
+    LINUX_DIR = os.path.expanduser("~/Rust/_Data/benches/linux-5.9")
+    LINUX_KERNEL_ARCHIVE = os.path.expanduser(
+        "~/Rust/_Data/benches/linux-5.9.tar.gz")
 
 
 def CreateTestData():
@@ -23,12 +24,14 @@ def CreateTestData():
         os.makedirs(tempDir)
     if not os.path.exists(LINUX_KERNEL_ARCHIVE):
         proxies = None
-        if os.environ.get("USERDNSDOMAIN").ends_with("BOSCH.COM"):
+        userDnsDomain = os.environ.get("USERDNSDOMAIN")
+        if userDnsDomain and userDnsDomain.ends_with("SCH.COM"):
             proxies = {
-                "http": "http://10.10.1.10:3128",
-                "https": "https://10.10.1.10:1080",
+                "http": "http://127.0.0.1:3129",
+                "https": "https://127.0.0.1:3129",
             }
-        r = requests.get("https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz", stream=True, proxies=proxies)
+        r = requests.get(
+            "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz", stream=True, proxies=proxies)
         print("Downloading linux-5.9.tar.gz...")
         with open(LINUX_KERNEL_ARCHIVE, 'wb') as F:
             for chunk in r.iter_content(chunk_size=4096):

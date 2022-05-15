@@ -176,7 +176,7 @@ fn count_thread(
                     statistics.hlinks = hlinks;
                     statistics.size = size;
                     statistics.usage = usage;
-                    statistics.duration = start_time.elapsed().as_millis() as f64 * 0.001;
+                    statistics.duration = start_time.elapsed().as_secs_f64();
                     #[cfg(unix)]
                     {
                         statistics.devices = devices;
@@ -196,7 +196,7 @@ fn count_thread(
     statistics.hlinks = hlinks;
     statistics.size = size;
     statistics.usage = usage;
-    statistics.duration = start_time.elapsed().as_millis() as f64 * 0.001;
+    statistics.duration = start_time.elapsed().as_secs_f64();
     #[cfg(unix)]
     {
         statistics.devices = devices;
@@ -214,7 +214,6 @@ pub struct Count {
     duration: Arc<Mutex<f64>>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
-    alive: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
     rx: Option<Receiver<Statistics>>,
 }
@@ -238,7 +237,6 @@ impl Count {
             statistics: Statistics::new(),
             duration: Arc::new(Mutex::new(0.0)),
             thr: None,
-            alive: Arc::new(AtomicBool::new(false)),
             stop: Arc::new(AtomicBool::new(false)),
             rx: None,
         })
@@ -329,16 +327,13 @@ impl Count {
         let filter = create_filter(&options)?;
         let (tx, rx) = unbounded();
         self.rx = Some(rx);
-        self.alive.store(true, Ordering::Relaxed);
         self.stop.store(false, Ordering::Relaxed);
-        let alive = self.alive.clone();
         let stop = self.stop.clone();
         let duration = self.duration.clone();
         self.thr = Some(thread::spawn(move || {
             let start_time = Instant::now();
             count_thread(options, filter, tx, stop);
-            alive.store(false, Ordering::Relaxed);
-            *duration.lock().unwrap() = start_time.elapsed().as_millis() as f64 * 0.001;
+            *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
         }));
         Ok(())
     }
@@ -412,7 +407,11 @@ impl Count {
     }
 
     pub fn busy(&self) -> bool {
-        self.alive.load(Ordering::Relaxed)
+        if let Some(ref thr) = self.thr {
+            !thr.is_finished()
+        } else {
+            false
+        }
     }
 
     // For debugging

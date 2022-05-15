@@ -29,6 +29,8 @@ Install ``maturin``:
 cargo install maturin
 ```
 
+IMPORTANT: In order to build this project at least Rust version 1.61 is needed!
+
 Build wheel (not on Windows):
 
 ```sh

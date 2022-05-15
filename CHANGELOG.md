@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2022-05-05
+
+### Changed
+
+- Replace alive AtomicBool by is_finished method of JoinHandle.
+  IMPORTANT: At least Rust 1.61 is needed!
+
 ## [2.0.3] - 2022-05-05
 
 ### Fixed

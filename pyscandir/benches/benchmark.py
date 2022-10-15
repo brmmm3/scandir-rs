@@ -40,7 +40,26 @@ def CreateTestData():
         print("Extracting linux-5.9.tar.gz...")
         try:
             with tarfile.open(LINUX_KERNEL_ARCHIVE, "r:gz") as Z:
-                Z.extractall(os.path.dirname(LINUX_DIR))
+                def is_within_directory(directory, target):
+                    
+                    abs_directory = os.path.abspath(directory)
+                    abs_target = os.path.abspath(target)
+                
+                    prefix = os.path.commonprefix([abs_directory, abs_target])
+                    
+                    return prefix == abs_directory
+                
+                def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+                
+                    for member in tar.getmembers():
+                        member_path = os.path.join(path, member.name)
+                        if not is_within_directory(path, member_path):
+                            raise Exception("Attempted Path Traversal in Tar File")
+                
+                    tar.extractall(path, members, numeric_owner=numeric_owner) 
+                    
+                
+                safe_extract(Z, os.path.dirname(LINUX_DIR))
         except:
             traceback.print_exc()
     return tempDir

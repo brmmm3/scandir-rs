@@ -37,10 +37,16 @@ def CreateTestData():
             for chunk in r.iter_content(chunk_size=4096):
                 F.write(chunk)
     if not os.path.exists(LINUX_DIR):
+        abspath = os.path.abspath
         print("Extracting linux-5.9.tar.gz...")
         try:
             with tarfile.open(LINUX_KERNEL_ARCHIVE, "r:gz") as Z:
-                Z.extractall(os.path.dirname(LINUX_DIR))
+                destDir = os.path.dirname(LINUX_DIR)
+                for member in Z.getmembers():
+                    member_path = os.path.join(destDir, member.name)
+                    if not abspath(member_path).startswith(abspath(destDir)):
+                        raise Exception("Attempted Path Traversal in Tar File")
+                Z.extractall(destDir) 
         except:
             traceback.print_exc()
     return tempDir

@@ -1,6 +1,6 @@
 [package]
 name = "scandir_rs"
-version = "2.0.4"
+version = "2.0.5"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -45,5 +45,5 @@ classifier = [
 scandir = { path = "../scandir" }
 
 [dependencies.pyo3]
-version = "0.16"
+version = "0.17"
 features = ["extension-module"]

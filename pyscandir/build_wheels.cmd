@@ -1,2 +1,2 @@
-pyenv shell 3.7.9 3.8.10 3.9.12 3.10.4 3.11.0a7
-maturin build --release --strip --no-sdist
+pyenv shell 3.7.15 3.8.15 3.9.15 3.10.8 3.11.0rc2
+maturin build --release --strip --sdist

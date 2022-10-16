@@ -1,4 +1,4 @@
-pyenv shell 3.10.4
+pyenv shell 3.10.8
 pip install --upgrade pip
 pip install -U pytest
 maturin build --release --strip -i python3.10

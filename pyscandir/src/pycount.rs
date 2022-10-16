@@ -132,15 +132,10 @@ impl Count {
         self.instance.join();
         match ty {
             Some(ty) => {
-                if ty
-                    .eq(Python::acquire_gil().python().get_type::<PyValueError>())
-                    .unwrap()
-                {
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            }
+                Python::with_gil(|py| {
+                    ty.eq(py.get_type::<PyValueError>())
+                })
+            },
             None => Ok(false),
         }
     }

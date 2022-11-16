@@ -8,7 +8,7 @@ use pyo3::types::{PyAny, PyDict, PyType};
 use pyo3::Python;
 
 use crate::def::{DirEntry, DirEntryExt, ReturnType};
-use scandir::{self, ScandirResult};
+use scandir::{self, ScandirResult, ScandirResultsType, ErrorsType};
 
 fn result2py(result: &ScandirResult, py: Python) -> PyObject {
     match result {
@@ -24,8 +24,8 @@ fn result2py(result: &ScandirResult, py: Python) -> PyObject {
 #[derive(Debug)]
 pub struct Scandir {
     instance: scandir::Scandir,
-    entries: Vec<ScandirResult>,
-    errors: Vec<(String, String)>,
+    entries: ScandirResultsType,
+    errors: ErrorsType,
 }
 
 #[pymethods]
@@ -95,7 +95,7 @@ impl Scandir {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, Vec<(String, String)>)> {
+    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, ErrorsType)> {
         let (entries, errors) = py.allow_threads(|| self.instance.collect())?;
         let results = entries.iter().map(|e| result2py(e, py)).collect();
         Ok((results, errors))
@@ -113,7 +113,7 @@ impl Scandir {
         &mut self,
         return_all: Option<bool>,
         py: Python,
-    ) -> (Vec<PyObject>, Vec<(String, String)>) {
+    ) -> (Vec<PyObject>, ErrorsType) {
         let (entries, errors) = self.instance.results(return_all.unwrap_or(false));
         let results = entries.iter().map(|e| result2py(e, py)).collect();
         (results, errors)
@@ -143,7 +143,7 @@ impl Scandir {
         self.instance.errors_cnt(update.unwrap_or(false))
     }
 
-    pub fn errors(&mut self, return_all: Option<bool>) -> Vec<(String, String)> {
+    pub fn errors(&mut self, return_all: Option<bool>) -> ErrorsType {
         self.instance.errors(return_all.unwrap_or(false))
     }
 

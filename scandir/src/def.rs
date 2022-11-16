@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use glob::{MatchOptions, Pattern};
+#[cfg(feature = "speedy")]
+use speedy::{Readable, Writable};
 
 #[derive(Debug, Clone)]
 pub struct Options {
@@ -26,7 +28,8 @@ pub struct Filter {
     pub options: Option<MatchOptions>,
 }
 
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct DirEntry {
     pub path: String,
     pub is_symlink: bool,
@@ -38,7 +41,8 @@ pub struct DirEntry {
     pub st_size: u64,
 }
 
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct DirEntryExt {
     pub path: String,
     pub is_symlink: bool,
@@ -66,7 +70,11 @@ pub enum ScandirResult {
     Error((String, String)),
 }
 
-#[derive(Debug, Clone)]
+pub type ScandirResultsType = Vec<ScandirResult>;
+pub type ErrorsType = Vec<(String, String)>;
+
+#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Toc {
     pub dirs: Vec<String>,
     pub files: Vec<String>,
@@ -84,6 +92,14 @@ impl Toc {
             other: Vec::new(),
             errors: Vec::new(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.dirs.clear();
+        self.files.clear();
+        self.symlinks.clear();
+        self.other.clear();
+        self.errors.clear();
     }
 
     pub fn dirs(&self) -> Vec<String> {
@@ -107,11 +123,11 @@ impl Toc {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.dirs.is_empty()
+        self.dirs.is_empty()
             && self.files.is_empty()
             && self.symlinks.is_empty()
             && self.other.is_empty()
-            && self.errors.is_empty();
+            && self.errors.is_empty()
     }
 
     pub fn extend(&mut self, root_dir: &str, other: &Toc) {
@@ -153,23 +169,21 @@ impl Toc {
     }
 }
 
-impl Toc {
-    pub fn clear(&mut self) {
-        self.dirs.clear();
-        self.files.clear();
-        self.symlinks.clear();
-        self.other.clear();
-        self.errors.clear();
+impl Default for Toc {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct WalkEntry {
     pub path: String,
     pub toc: Toc,
 }
 
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct WalkEntryExt {
     pub path: String,
     pub toc: Toc,

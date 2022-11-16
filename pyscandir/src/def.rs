@@ -1,8 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use scandir;
-
 #[pyclass]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum ReturnType {
@@ -315,7 +313,7 @@ impl Statistics {
         if !self.errors.is_empty() {
             pyresult.set_item("errors", self.errors.to_vec()).unwrap();
         }
-        if duration.unwrap_or(false) == true {
+        if duration.unwrap_or(false) {
             pyresult.set_item("duration", self.duration).unwrap();
         }
         Ok(pyresult.to_object(py))

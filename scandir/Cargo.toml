@@ -1,6 +1,6 @@
 [package]
 name = "scandir"
-version = "2.0.4"
+version = "2.1.0"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -20,6 +20,10 @@ jwalk = { git = "https://github.com/brmmm3/jwalk", tag = "0.7.1" }
 rayon = "1.5"
 flume = "0.10"
 glob = { git = "https://github.com/brmmm3/glob.git", tag = "0.4.0" }
+speedy = { version = "0.8", optional = true }
+
+[features]
+speedy = ["dep:speedy"]
 
 [target.'cfg(unix)'.dependencies]
 expanduser = "1.2"

@@ -150,20 +150,17 @@ impl Count {
     }
 
     fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
-        loop {
-            if !self.busy {
-                break;
-            }
-            if !self.instance.busy() {
-                self.busy = false;
-            }
-            return Ok(Some(
-                PyCell::new(py, Statistics::new(Some(self.instance.results())))
-                    .unwrap()
-                    .to_object(py),
-            ));
+        if !self.busy {
+            return Ok(None);
         }
-        Ok(None)
+        if !self.instance.busy() {
+            self.busy = false;
+        }
+        Ok(Some(
+            PyCell::new(py, Statistics::new(Some(self.instance.results())))
+                .unwrap()
+                .to_object(py),
+        ))
     }
 
     fn __str__(&self) -> PyResult<String> {

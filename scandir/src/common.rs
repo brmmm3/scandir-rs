@@ -1,7 +1,7 @@
 use std::fs;
 use std::fs::Metadata;
 use std::io::{Error, ErrorKind};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[cfg(unix)]
 use expanduser::expanduser;
@@ -29,7 +29,7 @@ pub fn check_and_expand_path(path_str: &str) -> Result<PathBuf, Error> {
     Ok(path)
 }
 
-pub fn get_root_path_len(root_path: &PathBuf) -> usize {
+pub fn get_root_path_len(root_path: &Path) -> usize {
     let root_path = root_path.to_str().unwrap();
     let mut root_path_len = root_path.len();
     #[cfg(unix)]
@@ -37,7 +37,7 @@ pub fn get_root_path_len(root_path: &PathBuf) -> usize {
         root_path_len += 1;
     }
     #[cfg(windows)]
-    if !root_path.ends_with("\\") {
+    if !root_path.ends_with('\\') {
         root_path_len += 1;
     }
     root_path_len
@@ -57,81 +57,69 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
             }),
         },
     };
-    match options.dir_include {
-        Some(ref f) => {
-            let f = &mut f
-                .iter()
-                .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>();
-            let f = match f {
-                Ok(f) => f,
-                Err(e) => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("dir_include: {}", e.to_string()),
-                    ))
-                }
-            };
-            filter.dir_include.append(f);
-        }
-        None => {}
+    if let Some(ref f) = options.dir_include {
+        let f = &mut f
+            .iter()
+            .map(|s| Pattern::new(s))
+            .collect::<Result<Vec<_>, glob::PatternError>>();
+        let f = match f {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("dir_include: {}", e),
+                ))
+            }
+        };
+        filter.dir_include.append(f);
     }
-    match options.dir_exclude {
-        Some(ref f) => {
-            let f = &mut f
-                .iter()
-                .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>();
-            let f = match f {
-                Ok(f) => f,
-                Err(e) => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("dir_exclude: {}", e.to_string()),
-                    ))
-                }
-            };
-            filter.dir_exclude.append(f);
-        }
-        None => {}
+    if let Some(ref f) = options.dir_exclude {
+        let f = &mut f
+            .iter()
+            .map(|s| Pattern::new(s))
+            .collect::<Result<Vec<_>, glob::PatternError>>();
+        let f = match f {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("dir_exclude: {}", e),
+                ))
+            }
+        };
+        filter.dir_exclude.append(f);
     }
-    match options.file_include {
-        Some(ref f) => {
-            let f = &mut f
-                .iter()
-                .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>();
-            let f = match f {
-                Ok(f) => f,
-                Err(e) => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("file_include: {}", e.to_string()),
-                    ))
-                }
-            };
-            filter.file_include.append(f);
-        }
-        None => {}
+    if let Some(ref f) = options.file_include {
+        let f = &mut f
+            .iter()
+            .map(|s| Pattern::new(s))
+            .collect::<Result<Vec<_>, glob::PatternError>>();
+        let f = match f {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("file_include: {}", e),
+                ))
+            }
+        };
+        filter.file_include.append(f);
     }
-    match options.file_exclude {
-        Some(ref f) => {
-            let f = &mut f
-                .iter()
-                .map(|s| Pattern::new(s))
-                .collect::<Result<Vec<_>, glob::PatternError>>();
-            let f = match f {
-                Ok(f) => f,
-                Err(e) => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("file_exclude: {}", e.to_string()),
-                    ))
-                }
-            };
-            filter.file_exclude.append(f);
-        }
-        None => {}
+    if let Some(ref f) = options.file_exclude {
+        let f = &mut f
+            .iter()
+            .map(|s| Pattern::new(s))
+            .collect::<Result<Vec<_>, glob::PatternError>>();
+        let f = match f {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("file_exclude: {}", e),
+                ))
+            }
+        };
+        filter.file_exclude.append(f);
     }
     if filter.dir_include.is_empty()
         && filter.dir_exclude.is_empty()
@@ -155,30 +143,30 @@ pub fn filter_direntry(
     match options {
         Some(options) => {
             for f in filter {
-                if f.as_str().ends_with("**") && !key.ends_with("/") {
+                if f.as_str().ends_with("**") && !key.ends_with('/') {
                     // Workaround: glob currently has problems with "foo/**"
                     let mut key = String::from(key);
-                    key.push_str("/");
+                    key.push('/');
                     if f.matches_with(&key, options) {
                         return true;
                     }
                 }
-                if f.matches_with(&key, options) {
+                if f.matches_with(key, options) {
                     return true;
                 }
             }
         }
         None => {
             for f in filter {
-                if f.as_str().ends_with("**") && !key.ends_with("/") {
+                if f.as_str().ends_with("**") && !key.ends_with('/') {
                     // Workaround: glob currently has problems with "foo/**"
                     let mut key = String::from(key);
-                    key.push_str("/");
+                    key.push('/');
                     if f.matches(&key) {
                         return true;
                     }
                 }
-                if f.matches(&key) {
+                if f.matches(key) {
                     return true;
                 }
             }
@@ -200,9 +188,8 @@ pub fn filter_dir(
         .get(root_path_len..)
         .unwrap_or("")
         .to_string();
-    if filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false) {
-        return false;
-    } else if !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true) {
+    if filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false) 
+        || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true) {
         return false;
     }
     true
@@ -221,13 +208,12 @@ pub fn filter_children(
                 .as_ref()
                 .map(|dir_entry| {
                     if dir_entry.file_type.is_dir() {
-                        return filter_dir(root_path_len, dir_entry, &filter_ref);
+                        return filter_dir(root_path_len, dir_entry, filter_ref);
                     } else {
                         let options = filter_ref.options;
                         let key = dir_entry.file_name.to_str().unwrap();
-                        if filter_direntry(key, &filter_ref.file_exclude, options, false) {
-                            return false;
-                        } else if !filter_direntry(key, &filter_ref.file_include, options, true) {
+                        if filter_direntry(key, &filter_ref.file_exclude, options, false)
+                            || !filter_direntry(key, &filter_ref.file_include, options, true) {
                             return false;
                         }
                     }

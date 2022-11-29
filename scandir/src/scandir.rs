@@ -1,5 +1,6 @@
 use std::fs::Metadata;
 use std::io::{Error, ErrorKind};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -10,7 +11,10 @@ use flume::{unbounded, Receiver, Sender};
 use jwalk::WalkDirGeneric;
 
 use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
-use crate::def::{DirEntry, DirEntryExt, Filter, Options, ReturnType, ScandirResult};
+use crate::def::{
+    DirEntry, DirEntryExt, ErrorsType, Filter, Options, ReturnType, ScandirResult,
+    ScandirResultsType,
+};
 
 #[derive(Debug, Clone)]
 pub enum Stats {
@@ -185,7 +189,7 @@ fn entries_thread(
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
     let stop_cloned = stop.clone();
-    let tx_cloned = tx.clone();
+    let tx_cloned = tx;
     for _ in WalkDirGeneric::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(options.sorted)
@@ -242,8 +246,8 @@ pub struct Scandir {
     // Options
     options: Options,
     // Results
-    entries: Vec<ScandirResult>,
-    errors: Vec<(String, String)>,
+    entries: ScandirResultsType,
+    errors: ErrorsType,
     duration: Arc<Mutex<f64>>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
@@ -252,10 +256,10 @@ pub struct Scandir {
 }
 
 impl Scandir {
-    pub fn new(root_path: &str) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path>>(root_path: P) -> Result<Self, Error> {
         Ok(Scandir {
             options: Options {
-                root_path: check_and_expand_path(&root_path)?,
+                root_path: check_and_expand_path(root_path)?,
                 sorted: false,
                 skip_hidden: true,
                 max_depth: std::usize::MAX,
@@ -403,33 +407,30 @@ impl Scandir {
         false
     }
 
-    fn receive_all(&mut self) -> (Vec<ScandirResult>, Vec<(String, String)>) {
-        let mut entries: Vec<ScandirResult> = Vec::new();
-        let mut errors: Vec<(String, String)> = Vec::new();
+    fn receive_all(&mut self) -> (ScandirResultsType, ErrorsType) {
+        let mut entries: ScandirResultsType = Vec::new();
+        let mut errors: ErrorsType = Vec::new();
         if let Some(ref rx) = self.rx {
-            loop {
-                match rx.try_recv() {
-                    Ok(entry) => match entry.entry {
-                        Stats::ScandirResult(ref r) => match r {
-                            ScandirResult::DirEntry(_) => entries.push(r.clone()),
-                            ScandirResult::DirEntryExt(_) => entries.push(r.clone()),
-                            ScandirResult::Error((path, e)) => {
-                                errors.push((path.to_owned(), e.to_owned()));
-                            }
-                        },
-                        Stats::Error(e) => {
-                            errors.push((entry.path, e));
+            while let Ok(entry) = rx.try_recv() {
+                match entry.entry {
+                    Stats::ScandirResult(ref r) => match r {
+                        ScandirResult::DirEntry(_) => entries.push(r.clone()),
+                        ScandirResult::DirEntryExt(_) => entries.push(r.clone()),
+                        ScandirResult::Error((path, e)) => {
+                            errors.push((path.to_owned(), e.to_owned()));
                         }
-                        Stats::Duration(d) => *self.duration.lock().unwrap() = d,
                     },
-                    Err(_) => break,
+                    Stats::Error(e) => {
+                        errors.push((entry.path, e));
+                    }
+                    Stats::Duration(d) => *self.duration.lock().unwrap() = d,
                 }
             }
         }
         (entries, errors)
     }
 
-    pub fn collect(&mut self) -> Result<(Vec<ScandirResult>, Vec<(String, String)>), Error> {
+    pub fn collect(&mut self) -> Result<(ScandirResultsType, ErrorsType), Error> {
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
@@ -458,7 +459,7 @@ impl Scandir {
         self.entries.len() + self.errors.len()
     }
 
-    pub fn results(&mut self, return_all: bool) -> (Vec<ScandirResult>, Vec<(String, String)>) {
+    pub fn results(&mut self, return_all: bool) -> (ScandirResultsType, ErrorsType) {
         let (entries, errors) = self.receive_all();
         self.entries.extend_from_slice(&entries);
         self.errors.extend(errors.clone());
@@ -487,7 +488,7 @@ impl Scandir {
         self.entries.len()
     }
 
-    pub fn entries(&mut self, return_all: bool) -> Vec<ScandirResult> {
+    pub fn entries(&mut self, return_all: bool) -> ScandirResultsType {
         self.results(return_all).0
     }
 
@@ -502,7 +503,7 @@ impl Scandir {
         self.errors.len()
     }
 
-    pub fn errors(&mut self, return_all: bool) -> Vec<(String, String)> {
+    pub fn errors(&mut self, return_all: bool) -> ErrorsType {
         self.results(return_all).1
     }
 

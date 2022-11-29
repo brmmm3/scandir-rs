@@ -28,7 +28,7 @@ pip install -U pytest
 pip install --force-reinstall ../target/wheels/$name-$version-cp310-cp310-linux_x86_64.whl
 python3.10 -m pytest
 
-pyenv shell 3.11.0rc2
+pyenv shell 3.11.0
 pip install --upgrade pip
 pip install -U pytest
 pip install --force-reinstall ../target/wheels/$name-$version-cp311-cp311-linux_x86_64.whl

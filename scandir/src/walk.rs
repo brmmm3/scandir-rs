@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::fs;
 use std::io::{Error, ErrorKind};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -41,7 +42,6 @@ pub fn toc_thread(
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
     let stop_cloned = stop.clone();
-    let tx_cloned = tx.clone();
     for _ in WalkDirGeneric::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(options.sorted)
@@ -65,14 +65,14 @@ pub fn toc_thread(
             let mut toc = Toc::new();
             children.iter_mut().for_each(|dir_entry_result| {
                 if let Ok(dir_entry) = dir_entry_result {
-                    update_toc(&dir_entry, &mut toc);
+                    update_toc(dir_entry, &mut toc);
                 }
             });
             if !toc.is_empty() {
                 if root_dir.len() > root_path_len {
-                    let _ = tx_cloned.send((root_dir[root_path_len..].to_owned(), toc));
+                    let _ = tx.send((root_dir[root_path_len..].to_owned(), toc));
                 } else {
-                    let _ = tx_cloned.send(("".to_owned(), toc));
+                    let _ = tx.send(("".to_owned(), toc));
                 }
             }
             let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len();
@@ -103,10 +103,10 @@ pub struct Walk {
 }
 
 impl Walk {
-    pub fn new(root_path: &str) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path>>(root_path: P) -> Result<Self, Error> {
         Ok(Walk {
             options: Options {
-                root_path: check_and_expand_path(&root_path)?,
+                root_path: check_and_expand_path(root_path)?,
                 sorted: false,
                 skip_hidden: true,
                 max_depth: std::usize::MAX,
@@ -251,16 +251,11 @@ impl Walk {
     fn receive_all(&mut self) -> Vec<(String, Toc)> {
         let mut entries = Vec::new();
         if let Some(ref rx) = self.rx {
-            loop {
-                match rx.try_recv() {
-                    Ok(entry) => {
-                        if !entry.1.errors.is_empty() {
-                            self.has_errors = true;
-                        }
-                        entries.push(entry);
-                    }
-                    Err(_) => break,
+            while let Ok(entry) = rx.try_recv() {
+                if !entry.1.errors.is_empty() {
+                    self.has_errors = true;
                 }
+                entries.push(entry);
             }
         }
         entries

@@ -1,6 +1,6 @@
 [package]
 name = "scandir_rs"
-version = "2.0.5"
+version = "2.1.0"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -22,24 +22,6 @@ include = [
 [lib]
 name = "scandir_rs"
 crate-type = ["cdylib"]
-
-[package.metadata.maturin]
-requires-python = ">=3.7"
-classifier = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python",
-    "Programming Language :: Rust",
-    "Typing :: Typed",
-]
 
 [dependencies]
 scandir = { path = "../scandir" }

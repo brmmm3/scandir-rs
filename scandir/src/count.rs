@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::fs::Metadata;
 use std::io::{Error, ErrorKind};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -56,6 +57,12 @@ impl Statistics {
     }
 }
 
+impl Default for Statistics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn count_thread(
     options: Options,
     filter: Option<Filter>,
@@ -82,7 +89,6 @@ fn count_thread(
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
     let stop_cloned = stop.clone();
-    let tx_cloned = tx.clone();
     for entry in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(false)
@@ -182,7 +188,7 @@ fn count_thread(
                         statistics.devices = devices;
                         statistics.pipes = pipes;
                     }
-                    let _ = tx_cloned.send(statistics.clone());
+                    let _ = tx.send(statistics.clone());
                     cnt = 0;
                     update_time = Instant::now();
                 }
@@ -202,7 +208,7 @@ fn count_thread(
         statistics.devices = devices;
         statistics.pipes = pipes;
     }
-    let _ = tx_cloned.send(statistics);
+    let _ = tx.send(statistics);
 }
 
 #[derive(Debug)]
@@ -219,10 +225,10 @@ pub struct Count {
 }
 
 impl Count {
-    pub fn new(root_path: &str) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path>>(root_path: P) -> Result<Self, Error> {
         Ok(Count {
             options: Options {
-                root_path: check_and_expand_path(&root_path)?,
+                root_path: check_and_expand_path(root_path)?,
                 sorted: false,
                 skip_hidden: true,
                 max_depth: std::usize::MAX,
@@ -361,11 +367,8 @@ impl Count {
 
     fn receive_all(&mut self) -> Statistics {
         if let Some(ref rx) = self.rx {
-            loop {
-                match rx.try_recv() {
-                    Ok(s) => self.statistics = s,
-                    Err(_) => break,
-                }
+            while let Ok(s) = rx.try_recv() {
+                self.statistics = s;
             }
         }
         self.statistics.clone()

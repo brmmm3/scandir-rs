@@ -26,8 +26,8 @@ jobs:
 
     env:
       CIBW_BUILD_VERBOSITY: 1
-      CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
-      CIBW_SKIP: cp36-*
+      CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y && yum install -y openssl-devel"
+      CIBW_SKIP: "cp27-* cp34-* cp35-* cp36-* pp* *-win32 *-musllinux*"
       # Build separate wheels for macOS's different architectures.
       CIBW_ARCHS_MACOS: "x86_64"
       # Build only on Linux architectures that don't need qemu emulation.

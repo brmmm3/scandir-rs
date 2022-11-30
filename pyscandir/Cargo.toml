@@ -7,16 +7,16 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/brmmm3/scandir-rs"
 homepage = "https://github.com/brmmm3/scandir-rs"
-readme = "../README.md"
+readme = "README.md"
 keywords = ["fast", "scandir", "walk"]
 include = [
     "Cargo.toml",
     "pyproject.toml",
     "src/*",
     "test/*.py",
-    "../README.md",
-    "../CHANGELOG.md",
-    "../LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
 ]
 
 [lib]

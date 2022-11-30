@@ -88,23 +88,31 @@ impl Walk {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<Toc> {
-        Ok(Toc::new(Some(
-            py.allow_threads(|| self.instance.collect())?,
-        )))
+    pub fn collect(&mut self, store: Option<bool>, py: Python) -> PyResult<Toc> {
+        Ok(Toc::new(Some(py.allow_threads(|| {
+            self.instance.collect(store.unwrap_or(true))
+        })?)))
     }
 
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
         self.instance.has_results(only_new.unwrap_or(false))
     }
 
-    pub fn results_cnt(&mut self, update: Option<bool>) -> usize {
-        self.instance.results_cnt(update.unwrap_or(false))
+    pub fn results_cnt(&mut self) -> usize {
+        self.instance.results_cnt()
     }
 
-    pub fn results(&mut self, return_all: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
+    pub fn results(
+        &mut self,
+        return_all: Option<bool>,
+        store: Option<bool>,
+        py: Python,
+    ) -> Vec<(String, PyObject)> {
         let mut results = Vec::new();
-        for result in self.instance.results(return_all.unwrap_or(false)) {
+        for result in self
+            .instance
+            .results(return_all.unwrap_or(false), store.unwrap_or(true))
+        {
             results.push((
                 result.0,
                 PyCell::new(py, Toc::new(Some(result.1)))
@@ -149,11 +157,7 @@ impl Walk {
         }
         self.instance.join();
         match ty {
-            Some(ty) => {
-                Python::with_gil(|py| {
-                    ty.eq(py.get_type::<PyValueError>())
-                })
-            },
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -192,7 +196,7 @@ impl Walk {
             } else {
                 self.entries.clear();
                 self.entries
-                    .extend_from_slice(&self.instance.results(false)[..]);
+                    .extend_from_slice(&self.instance.results(false, true)[..]);
                 if self.entries.is_empty() {
                     if !self.instance.busy() {
                         break;

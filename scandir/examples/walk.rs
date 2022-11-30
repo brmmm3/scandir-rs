@@ -21,9 +21,9 @@ fn main() -> Result<(), Error> {
         }
         thread::sleep(Duration::from_millis(10));
     }
-    instance.collect()?;
-    println!("{}", &format!("{:#?}", instance.collect())[..200]);
-    println!("{:?}", instance.results(true).len());
+    instance.collect(true)?;
+    println!("{}", &format!("{:#?}", instance.collect(true))[..200]);
+    println!("{:?}", instance.results(true, true).len());
     println!("{:?}", instance.finished());
     println!("{:?}", instance.has_errors());
     println!("{:?}", instance.duration());

@@ -8,7 +8,7 @@ use pyo3::types::{PyAny, PyDict, PyType};
 use pyo3::Python;
 
 use crate::def::{DirEntry, DirEntryExt, ReturnType};
-use scandir::{self, ScandirResult, ScandirResultsType, ErrorsType};
+use scandir::{self, ErrorsType, ScandirResult, ScandirResultsType};
 
 fn result2py(result: &ScandirResult, py: Python) -> PyObject {
     match result {
@@ -95,8 +95,13 @@ impl Scandir {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, ErrorsType)> {
-        let (entries, errors) = py.allow_threads(|| self.instance.collect())?;
+    pub fn collect(
+        &mut self,
+        store: Option<bool>,
+        py: Python,
+    ) -> PyResult<(Vec<PyObject>, ErrorsType)> {
+        let (entries, errors) =
+            py.allow_threads(|| self.instance.collect(store.unwrap_or(true)))?;
         let results = entries.iter().map(|e| result2py(e, py)).collect();
         Ok((results, errors))
     }
@@ -105,16 +110,19 @@ impl Scandir {
         self.instance.has_results(only_new.unwrap_or(false))
     }
 
-    pub fn results_cnt(&mut self, update: Option<bool>) -> usize {
-        self.instance.results_cnt(update.unwrap_or(false))
+    pub fn results_cnt(&mut self) -> usize {
+        self.instance.results_cnt()
     }
 
     pub fn results(
         &mut self,
         return_all: Option<bool>,
+        store: Option<bool>,
         py: Python,
     ) -> (Vec<PyObject>, ErrorsType) {
-        let (entries, errors) = self.instance.results(return_all.unwrap_or(false));
+        let (entries, errors) = self
+            .instance
+            .results(return_all.unwrap_or(false), store.unwrap_or(true));
         let results = entries.iter().map(|e| result2py(e, py)).collect();
         (results, errors)
     }
@@ -123,13 +131,18 @@ impl Scandir {
         self.instance.has_entries(only_new.unwrap_or(false))
     }
 
-    pub fn entries_cnt(&mut self, update: Option<bool>) -> usize {
-        self.instance.entries_cnt(update.unwrap_or(false))
+    pub fn entries_cnt(&mut self) -> usize {
+        self.instance.entries_cnt()
     }
 
-    pub fn entries(&mut self, return_all: Option<bool>, py: Python) -> Vec<PyObject> {
+    pub fn entries(
+        &mut self,
+        store: Option<bool>,
+        return_all: Option<bool>,
+        py: Python,
+    ) -> Vec<PyObject> {
         self.instance
-            .entries(return_all.unwrap_or(false))
+            .entries(return_all.unwrap_or(false), store.unwrap_or(true))
             .iter()
             .map(|e| result2py(e, py))
             .collect()
@@ -139,12 +152,14 @@ impl Scandir {
         self.instance.has_errors()
     }
 
-    pub fn errors_cnt(&mut self, update: Option<bool>) -> usize {
-        self.instance.errors_cnt(update.unwrap_or(false))
+    pub fn errors_cnt(&mut self, update: Option<bool>, store: Option<bool>) -> usize {
+        self.instance
+            .errors_cnt(update.unwrap_or(false), store.unwrap_or(true))
     }
 
-    pub fn errors(&mut self, return_all: Option<bool>) -> ErrorsType {
-        self.instance.errors(return_all.unwrap_or(false))
+    pub fn errors(&mut self, return_all: Option<bool>, store: Option<bool>) -> ErrorsType {
+        self.instance
+            .errors(return_all.unwrap_or(false), store.unwrap_or(true))
     }
 
     pub fn duration(&mut self) -> f64 {
@@ -159,9 +174,9 @@ impl Scandir {
         self.instance.busy()
     }
 
-    pub fn as_dict(&mut self, py: Python) -> PyObject {
+    pub fn as_dict(&mut self, store: Option<bool>, py: Python) -> PyObject {
         let pyresults = PyDict::new(py);
-        for result in self.instance.entries(true) {
+        for result in self.instance.entries(true, store.unwrap_or(true)) {
             let _ = match result {
                 ScandirResult::DirEntry(e) => pyresults.set_item(
                     e.path.clone().into_py(py),
@@ -197,11 +212,7 @@ impl Scandir {
         }
         self.instance.join();
         match ty {
-            Some(ty) => {
-                Python::with_gil(|py| {
-                    ty.eq(py.get_type::<PyValueError>())
-                })
-            },
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -236,7 +247,7 @@ impl Scandir {
             if let Some(error) = self.errors.pop() {
                 return Ok(Some(error.to_object(py)));
             }
-            let (entries, errors) = self.instance.results(false);
+            let (entries, errors) = self.instance.results(false, true);
             if entries.is_empty() && errors.is_empty() {
                 if !self.instance.busy() {
                     break;

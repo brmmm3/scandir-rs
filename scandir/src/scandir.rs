@@ -430,14 +430,14 @@ impl Scandir {
         (entries, errors)
     }
 
-    pub fn collect(&mut self) -> Result<(ScandirResultsType, ErrorsType), Error> {
+    pub fn collect(&mut self, store: bool) -> Result<(ScandirResultsType, ErrorsType), Error> {
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
             }
             self.join();
         }
-        Ok(self.results(true))
+        Ok(self.results(true, store))
     }
 
     pub fn has_results(&mut self, only_new: bool) -> bool {
@@ -452,18 +452,21 @@ impl Scandir {
         !self.entries.is_empty() && !self.errors.is_empty()
     }
 
-    pub fn results_cnt(&mut self, update: bool) -> usize {
-        if update {
-            self.results(false);
+    pub fn results_cnt(&mut self) -> usize {
+        if let Some(ref rx) = self.rx {
+            self.entries.len() + self.errors.len() + rx.len()
+        } else {
+            self.entries.len() + self.errors.len()
         }
-        self.entries.len() + self.errors.len()
     }
 
-    pub fn results(&mut self, return_all: bool) -> (ScandirResultsType, ErrorsType) {
+    pub fn results(&mut self, return_all: bool, store: bool) -> (ScandirResultsType, ErrorsType) {
         let (entries, errors) = self.receive_all();
-        self.entries.extend_from_slice(&entries);
-        self.errors.extend(errors.clone());
-        if return_all {
+        if store {
+            self.entries.extend_from_slice(&entries);
+            self.errors.extend(errors.clone());
+        }
+        if return_all && store {
             return (self.entries.clone(), self.errors.clone());
         }
         (entries, errors)
@@ -481,30 +484,31 @@ impl Scandir {
         !self.entries.is_empty()
     }
 
-    pub fn entries_cnt(&mut self, update: bool) -> usize {
-        if update {
-            self.results(false);
+    pub fn entries_cnt(&mut self) -> usize {
+        if let Some(ref rx) = self.rx {
+            self.entries.len() + rx.len()
+        } else {
+            self.entries.len()
         }
-        self.entries.len()
     }
 
-    pub fn entries(&mut self, return_all: bool) -> ScandirResultsType {
-        self.results(return_all).0
+    pub fn entries(&mut self, return_all: bool, store: bool) -> ScandirResultsType {
+        self.results(return_all, store).0
     }
 
     pub fn has_errors(&mut self) -> bool {
         !self.errors.is_empty()
     }
 
-    pub fn errors_cnt(&mut self, update: bool) -> usize {
+    pub fn errors_cnt(&mut self, update: bool, store: bool) -> usize {
         if update {
-            self.results(false);
+            self.results(false, store);
         }
         self.errors.len()
     }
 
-    pub fn errors(&mut self, return_all: bool) -> ErrorsType {
-        self.results(return_all).1
+    pub fn errors(&mut self, return_all: bool, store: bool) -> ErrorsType {
+        self.results(return_all, store).1
     }
 
     pub fn duration(&mut self) -> f64 {

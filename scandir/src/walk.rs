@@ -261,7 +261,7 @@ impl Walk {
         entries
     }
 
-    pub fn collect(&mut self) -> Result<Toc, Error> {
+    pub fn collect(&mut self, store: bool) -> Result<Toc, Error> {
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
@@ -269,7 +269,7 @@ impl Walk {
             self.join();
         }
         let mut toc = Toc::new();
-        for (root_dir, dir_toc) in self.results(true) {
+        for (root_dir, dir_toc) in self.results(true, store) {
             toc.extend(&root_dir, &dir_toc);
         }
         Ok(toc)
@@ -287,17 +287,20 @@ impl Walk {
         !self.entries.is_empty()
     }
 
-    pub fn results_cnt(&mut self, update: bool) -> usize {
-        if update {
-            self.results(false);
+    pub fn results_cnt(&mut self) -> usize {
+        if let Some(ref rx) = self.rx {
+            self.entries.len() + rx.len()
+        } else {
+            self.entries.len()
         }
-        self.entries.len()
     }
 
-    pub fn results(&mut self, return_all: bool) -> Vec<(String, Toc)> {
+    pub fn results(&mut self, return_all: bool, store: bool) -> Vec<(String, Toc)> {
         let entries = self.receive_all();
-        self.entries.extend_from_slice(&entries);
-        if return_all {
+        if store {
+            self.entries.extend_from_slice(&entries);
+        }
+        if return_all && store {
             return self.entries.clone();
         }
         entries

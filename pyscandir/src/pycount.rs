@@ -131,11 +131,7 @@ impl Count {
         }
         self.instance.join();
         match ty {
-            Some(ty) => {
-                Python::with_gil(|py| {
-                    ty.eq(py.get_type::<PyValueError>())
-                })
-            },
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }

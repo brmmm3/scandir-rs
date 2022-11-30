@@ -11,9 +11,12 @@ fn main() -> Result<(), Error> {
     if args.len() > 2 {
         instance = instance.return_type(ReturnType::Ext);
     }
-    instance.collect()?;
+    instance.collect(true)?;
     println!("{:#?}", instance.options());
-    println!("{}", &format!("{:#?}", instance.results(true))[..2000]);
+    println!(
+        "{}",
+        &format!("{:#?}", instance.results(true, true))[..2000]
+    );
     println!("{:?}", instance.finished());
     println!("{:?}", instance.has_entries(true));
     println!("{:?}", instance.has_errors());

@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::fs::Metadata;
 use std::io::{Error, ErrorKind};
-use std::os::unix::prelude::FileTypeExt;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

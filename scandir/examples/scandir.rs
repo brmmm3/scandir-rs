@@ -11,15 +11,16 @@ fn main() -> Result<(), Error> {
     if args.len() > 2 {
         instance = instance.return_type(ReturnType::Ext);
     }
-    instance.collect(true)?;
-    println!("{:#?}", instance.options());
-    println!(
-        "{}",
-        &format!("{:#?}", instance.results(true, true))[..2000]
-    );
-    println!("{:?}", instance.finished());
-    println!("{:?}", instance.has_entries(true));
-    println!("{:?}", instance.has_errors());
-    println!("{:?}", instance.duration());
+    let (_results, _errors) = instance.collect(true)?;
+    let mut result = format!("{:#?}", instance.results(true, true));
+    if result.len() > 2000 {
+        result = result[..2000].to_string();
+    }
+    println!("options {:#?}", instance.options());
+    println!("result {}", &format!("{:#?}", result));
+    println!("finished {:?}", instance.finished());
+    println!("has more entries {:?}", instance.has_entries(true));
+    println!("has more errors {:?}", instance.has_errors());
+    println!("duration {:?}", instance.duration());
     Ok(())
 }

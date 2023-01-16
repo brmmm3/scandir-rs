@@ -184,12 +184,28 @@ fn entries_thread(
     stop: Arc<AtomicBool>,
 ) {
     let root_path_len = get_root_path_len(&options.root_path);
-    let max_file_cnt = options.max_file_cnt;
     let return_type = options.return_type.clone();
+
+    let dir_entry = jwalk::DirEntry::from_path(
+        0,
+        &options.root_path,
+        true,
+        true,
+        false,
+        Arc::new(Vec::new()),
+    )
+    .unwrap();
+
+    if !dir_entry.file_type.is_dir() {
+        let _ = tx.send(create_entry(root_path_len, &return_type, &dir_entry).1);
+        return;
+    }
+
+    let max_file_cnt = options.max_file_cnt;
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
     let stop_cloned = stop.clone();
-    let tx_cloned = tx;
+
     for _ in WalkDirGeneric::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(options.sorted)
@@ -215,7 +231,7 @@ fn entries_thread(
             children.iter_mut().for_each(|dir_entry_result| {
                 if let Ok(dir_entry) = dir_entry_result {
                     let (is_file, entry) = create_entry(root_path_len, &return_type, dir_entry);
-                    if tx_cloned.send(entry).is_err() {
+                    if tx.send(entry).is_err() {
                         return;
                     }
                     if is_file {

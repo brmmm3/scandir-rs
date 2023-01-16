@@ -13,10 +13,11 @@ fn main() -> Result<(), Error> {
     if args.len() > 2 {
         instance = instance.extended(true);
     }
-    instance.collect()?;
-    println!("{:#?}", instance.results());
-    println!("{:?}", instance.finished());
-    println!("{:?}", instance.has_errors());
-    println!("{:?}", instance.duration());
+    let _results = instance.collect()?;
+    println!("options {:#?}", instance.options());
+    println!("results {:#?}", instance.results());
+    println!("finished {:?}", instance.finished());
+    println!("has more errors {:?}", instance.has_errors());
+    println!("duration {:?}", instance.duration());
     Ok(())
 }

@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::fs;
+use std::fs::{self, Metadata};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -38,6 +38,26 @@ pub fn toc_thread(
     stop: Arc<AtomicBool>,
 ) {
     let root_path_len = get_root_path_len(&options.root_path);
+
+    let dir_entry: jwalk::DirEntry<((), Option<Result<Metadata, Error>>)> =
+        jwalk::DirEntry::from_path(
+            0,
+            &options.root_path,
+            true,
+            true,
+            false,
+            Arc::new(Vec::new()),
+        )
+        .unwrap();
+
+    if !dir_entry.file_type.is_dir() {
+        let mut toc = Toc::new();
+
+        update_toc(&dir_entry, &mut toc);
+        let _ = tx.send(("".to_owned(), toc));
+        return;
+    }
+
     let max_file_cnt = options.max_file_cnt;
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();

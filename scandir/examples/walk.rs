@@ -21,11 +21,15 @@ fn main() -> Result<(), Error> {
         }
         thread::sleep(Duration::from_millis(10));
     }
-    instance.collect(true)?;
-    println!("{}", &format!("{:#?}", instance.collect(true))[..200]);
-    println!("{:?}", instance.results(true, true).len());
-    println!("{:?}", instance.finished());
-    println!("{:?}", instance.has_errors());
-    println!("{:?}", instance.duration());
+    let mut result = format!("{:#?}", instance.collect(true)?);
+    if result.len() > 2000 {
+        result = result[..2000].to_string();
+    }
+    println!("options {:#?}", instance.options());
+    println!("result {}", &format!("{:#?}", result));
+    println!("result_cnt {}", instance.results(true, true).len());
+    println!("finished {:?}", instance.finished());
+    println!("has more errors {:?}", instance.has_errors());
+    println!("duration {:?}", instance.duration());
     Ok(())
 }

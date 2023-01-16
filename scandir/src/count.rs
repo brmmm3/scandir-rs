@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::fs::Metadata;
 use std::io::{Error, ErrorKind};
+use std::os::unix::prelude::FileTypeExt;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -69,6 +70,54 @@ fn count_thread(
     tx: Sender<Statistics>,
     stop: Arc<AtomicBool>,
 ) {
+    let mut statistics = Statistics::new();
+
+    let dir_entry: jwalk::DirEntry<((), Option<Result<Metadata, Error>>)> =
+        jwalk::DirEntry::from_path(
+            0,
+            &options.root_path,
+            true,
+            true,
+            false,
+            Arc::new(Vec::new()),
+        )
+        .unwrap();
+
+    if !dir_entry.file_type.is_dir() {
+        if dir_entry.file_type.is_symlink() {
+            statistics.slinks += 1;
+            statistics.usage += 4096;
+            statistics.size += 4096;
+        } else if dir_entry.file_type.is_file() {
+            statistics.files += 1;
+            if let Some(ref metadata) = dir_entry.metadata {
+                let file_size = metadata.size;
+                let mut blocks = file_size >> 12;
+                if blocks << 12 < file_size {
+                    blocks += 1;
+                }
+                statistics.usage += blocks << 12;
+                statistics.size += file_size;
+            }
+        } else {
+            #[cfg(unix)]
+            if let Some(ref metadata) = dir_entry.metadata_ext {
+                {
+                    if metadata.st_rdev > 0 {
+                        statistics.devices += 1;
+                    } else if (metadata.st_mode & 4096) != 0 {
+                        statistics.pipes += 1;
+                    }
+                }
+            }
+            statistics.usage += 4096;
+            statistics.size += 4096;
+        }
+        statistics.duration = 0.01;
+        let _ = tx.send(statistics);
+        return;
+    }
+
     let mut dirs: i32 = 0;
     let mut files: i32 = 0;
     let mut slinks: i32 = 0;
@@ -83,7 +132,6 @@ fn count_thread(
     let start_time = Instant::now();
     let mut update_time = start_time;
     let mut file_indexes: HashSet<u64> = HashSet::new();
-    let mut statistics = Statistics::new();
     let root_path_len = get_root_path_len(&options.root_path);
     let max_file_cnt = options.max_file_cnt;
     let file_cnt = Arc::new(AtomicUsize::new(0));
@@ -128,51 +176,64 @@ fn count_thread(
                 let file_type = v.file_type;
                 if file_type.is_dir() {
                     dirs += 1;
-                } else if file_type.is_file() {
-                    files += 1;
+                    usage += 4096;
+                    size += 4096;
                 } else if file_type.is_symlink() {
                     slinks += 1;
-                }
-                if let Some(ref metadata) = v.metadata {
-                    let file_size = metadata.size;
-                    let mut blocks = file_size >> 12;
-                    if blocks << 12 < file_size {
-                        blocks += 1;
+                    usage += 4096;
+                    size += 4096;
+                } else if file_type.is_file() {
+                    files += 1;
+                    if let Some(ref metadata) = v.metadata {
+                        let file_size = metadata.size;
+                        let mut blocks = file_size >> 12;
+                        if blocks << 12 < file_size {
+                            blocks += 1;
+                        }
+                        usage += blocks << 12;
+                        size += file_size;
                     }
-                    usage += blocks << 12;
-                    size += file_size;
-                }
-                if let Some(ref metadata) = v.metadata_ext {
-                    #[cfg(unix)]
-                    {
-                        if metadata.st_nlink > 1 {
-                            if file_indexes.contains(&metadata.st_ino) {
-                                hlinks += 1;
-                            } else {
-                                file_indexes.insert(metadata.st_ino);
+                    if let Some(ref metadata) = v.metadata_ext {
+                        #[cfg(unix)]
+                        {
+                            if metadata.st_nlink > 1 {
+                                if file_indexes.contains(&metadata.st_ino) {
+                                    hlinks += 1;
+                                    files -= 1;
+                                } else {
+                                    file_indexes.insert(metadata.st_ino);
+                                }
                             }
                         }
-                        if metadata.st_rdev > 0 {
-                            devices += 1;
-                        }
-                        if (metadata.st_mode & 4096) != 0 {
-                            pipes += 1;
-                        }
-                    }
-                    #[cfg(windows)]
-                    {
-                        if let Some(nlink) = metadata.number_of_links {
-                            if nlink > 1 {
-                                if let Some(ino) = metadata.file_index {
-                                    if file_indexes.contains(&ino) {
-                                        hlinks += 1;
-                                    } else {
-                                        file_indexes.insert(ino);
+                        #[cfg(windows)]
+                        {
+                            if let Some(nlink) = metadata.number_of_links {
+                                if nlink > 1 {
+                                    if let Some(ino) = metadata.file_index {
+                                        if file_indexes.contains(&ino) {
+                                            hlinks += 1;
+                                            files -= 1;
+                                        } else {
+                                            file_indexes.insert(ino);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                } else {
+                    #[cfg(unix)]
+                    if let Some(ref metadata) = v.metadata_ext {
+                        {
+                            if metadata.st_rdev > 0 {
+                                devices += 1;
+                            } else if (metadata.st_mode & 4096) != 0 {
+                                pipes += 1;
+                            }
+                        }
+                    }
+                    usage += 4096;
+                    size += 4096;
                 }
                 cnt += 1;
                 if (cnt >= 1000) || (update_time.elapsed().as_millis() >= 10) {

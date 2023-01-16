@@ -1,6 +1,6 @@
 [package]
 name = "scandir"
-version = "2.3.0"
+version = "2.3.1"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -16,7 +16,7 @@ name = "scandir"
 crate-type = ["lib"]
 
 [dependencies]
-jwalk = { git = "https://github.com/brmmm3/jwalk", tag = "0.8.0" }
+jwalk = { git = "https://github.com/brmmm3/jwalk", tag = "0.8.1" }
 rayon = "1.6"
 flume = "0.10"
 glob = { git = "https://github.com/brmmm3/glob.git", tag = "0.4.0" }

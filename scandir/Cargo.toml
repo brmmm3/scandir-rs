@@ -1,6 +1,6 @@
 [package]
 name = "scandir"
-version = "2.3.1"
+version = "2.3.2"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -23,8 +23,8 @@ glob = { git = "https://github.com/brmmm3/glob.git", tag = "0.4.0" }
 speedy = { version = "0.8", optional = true }
 
 [dev-dependencies]
-tempfile = "3.3.0"
-unix-named-pipe = "0.2.0"
+tempfile = "3.3"
+unix-named-pipe = "0.2"
 
 [features]
 speedy = ["dep:speedy"]

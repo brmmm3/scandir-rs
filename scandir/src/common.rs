@@ -214,7 +214,10 @@ pub fn filter_children(
                         return filter_dir(root_path_len, dir_entry, filter_ref);
                     } else {
                         let options = filter_ref.options;
-                        let key = dir_entry.file_name.to_str().unwrap();
+                        let key = match dir_entry.file_name.to_str() {
+                            Some(s) => s,
+                            None => return false,
+                        };
                         if filter_direntry(key, &filter_ref.file_exclude, options, false)
                             || !filter_direntry(key, &filter_ref.file_include, options, true)
                         {

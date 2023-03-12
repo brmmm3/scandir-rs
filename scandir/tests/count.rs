@@ -1,7 +1,9 @@
 use std::fs::{create_dir, hard_link, File};
 use std::io::Error;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
 
+#[cfg(unix)]
 use unix_named_pipe;
 
 use scandir::Count;
@@ -24,12 +26,14 @@ fn test_count() -> Result<(), Error> {
             dir.join(format!("hardlink{i}")),
         )?;
     }
+    #[cfg(unix)]
     for i in 1..=9 {
         symlink(
             dir.join(format!("file{i}")),
             dir.join(format!("symlink{i}")),
         )?;
     }
+    #[cfg(unix)]
     for i in 1..=8 {
         unix_named_pipe::create(dir.join(format!("pipe{i}")), None)?;
     }
@@ -38,6 +42,7 @@ fn test_count() -> Result<(), Error> {
     assert!(count.duration > 0.0);
     assert_eq!(10, count.dirs);
     assert_eq!(23, count.files);
+    #[cfg(unix)]
     assert_eq!(9, count.slinks);
     assert_eq!(0, count.hlinks);
     assert_eq!(0, count.pipes);
@@ -60,12 +65,14 @@ fn test_count_extended() -> Result<(), Error> {
             dir.join(format!("hardlink{i}")),
         )?;
     }
+    #[cfg(unix)]
     for i in 1..=9 {
         symlink(
             dir.join(format!("file{i}")),
             dir.join(format!("symlink{i}")),
         )?;
     }
+    #[cfg(unix)]
     for i in 1..=8 {
         unix_named_pipe::create(dir.join(format!("pipe{i}")), None)?;
     }
@@ -74,6 +81,7 @@ fn test_count_extended() -> Result<(), Error> {
     assert!(count.duration > 0.0);
     assert_eq!(10, count.dirs);
     assert_eq!(12, count.files);
+    #[cfg(unix)]
     assert_eq!(9, count.slinks);
     assert_eq!(11, count.hlinks);
     assert_eq!(8, count.pipes);

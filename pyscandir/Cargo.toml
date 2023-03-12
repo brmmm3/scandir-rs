@@ -1,6 +1,6 @@
 [package]
 name = "scandir_rs"
-version = "2.3.3"
+version = "2.3.4"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"

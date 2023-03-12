@@ -48,11 +48,7 @@ maturin build --release --strip --no-sdist
 ## Building and running tests for different Python versions
 
 To make it easier to build wheels for several different Python versions the script ``build_wheels.sh`` has been added.
-It creates wheels for Python versions 3.7, 3.8, 3.9, 3.10 and 3.11.0. In addition it runs ``pytest`` after successfull creation of each wheel.
-
-To be able to run the script ``pyenv`` needs to be installed first including the following Python interpreter versions:
-
-3.7.15 3.8.15 3.9.15 3.10.8 3.11.0
+It creates wheels for Python versions 3.7, 3.8, 3.9, 3.10 and 3.11. In addition it runs ``pytest`` after successfull creation of each wheel.
 
 Instruction how to install ``pyenv`` can be found [here](https://github.com/pyenv/pyenv).
 

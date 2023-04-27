@@ -8,14 +8,14 @@ use std::thread;
 use std::time::Instant;
 
 use flume::{unbounded, Receiver, Sender};
-use jwalk::WalkDirGeneric;
+use jwalk_meta::WalkDirGeneric;
 
 use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::*;
 
 #[inline]
 fn update_toc(
-    dir_entry: &jwalk::DirEntry<((), Option<Result<fs::Metadata, Error>>)>,
+    dir_entry: &jwalk_meta::DirEntry<((), Option<Result<fs::Metadata, Error>>)>,
     toc: &mut Toc,
 ) {
     let file_type = dir_entry.file_type;
@@ -39,8 +39,8 @@ pub fn toc_thread(
 ) {
     let root_path_len = get_root_path_len(&options.root_path);
 
-    let dir_entry: jwalk::DirEntry<((), Option<Result<Metadata, Error>>)> =
-        jwalk::DirEntry::from_path(
+    let dir_entry: jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)> =
+        jwalk_meta::DirEntry::from_path(
             0,
             &options.root_path,
             true,

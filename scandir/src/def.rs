@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use glob::{MatchOptions, Pattern};
+use glob_sl::{MatchOptions, Pattern};
 #[cfg(feature = "speedy")]
 use speedy::{Readable, Writable};
 

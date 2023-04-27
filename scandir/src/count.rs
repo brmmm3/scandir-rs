@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Instant;
 
 use flume::{unbounded, Receiver, Sender};
-use jwalk::WalkDirGeneric;
+use jwalk_meta::WalkDirGeneric;
 
 use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::{Filter, Options, ReturnType};
@@ -71,8 +71,8 @@ fn count_thread(
 ) {
     let mut statistics = Statistics::new();
 
-    let dir_entry: jwalk::DirEntry<((), Option<Result<Metadata, Error>>)> =
-        jwalk::DirEntry::from_path(
+    let dir_entry: jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)> =
+        jwalk_meta::DirEntry::from_path(
             0,
             &options.root_path,
             true,

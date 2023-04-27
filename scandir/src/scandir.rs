@@ -8,7 +8,7 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flume::{unbounded, Receiver, Sender};
 
-use jwalk::WalkDirGeneric;
+use jwalk_meta::WalkDirGeneric;
 
 use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::{
@@ -36,7 +36,7 @@ pub struct Entry {
 fn create_entry(
     root_path_len: usize,
     return_type: &ReturnType,
-    dir_entry: &jwalk::DirEntry<((), Option<Result<Metadata, Error>>)>,
+    dir_entry: &jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>,
 ) -> (bool, Entry) {
     let file_type = dir_entry.file_type;
     let mut st_ctime: f64 = 0.0;
@@ -186,7 +186,7 @@ fn entries_thread(
     let root_path_len = get_root_path_len(&options.root_path);
     let return_type = options.return_type.clone();
 
-    let dir_entry = jwalk::DirEntry::from_path(
+    let dir_entry = jwalk_meta::DirEntry::from_path(
         0,
         &options.root_path,
         true,

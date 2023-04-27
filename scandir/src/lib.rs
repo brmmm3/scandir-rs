@@ -1,6 +1,6 @@
 #![cfg_attr(windows, feature(windows_by_handle))]
 
-extern crate glob;
+extern crate glob_sl;
 
 pub mod def;
 pub use def::*;

@@ -1,6 +1,6 @@
 [package]
 name = "scandir"
-version = "2.3.4"
+version = "2.3.5"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -16,14 +16,14 @@ name = "scandir"
 crate-type = ["lib"]
 
 [dependencies]
-jwalk = { git = "https://github.com/brmmm3/jwalk", tag = "0.8.3" }
-rayon = "1.6"
+jwalk-meta = "0.9"
+rayon = "1.7"
 flume = "0.10"
-glob = { git = "https://github.com/brmmm3/glob.git", tag = "0.4.0" }
+glob-sl = "0.4"
 speedy = { version = "0.8", optional = true }
 
 [dev-dependencies]
-tempfile = "3.4"
+tempfile = "3.5"
 unix-named-pipe = "0.2"
 
 [features]

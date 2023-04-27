@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 #[cfg(unix)]
 use expanduser::expanduser;
 
-use glob::{MatchOptions, Pattern};
+use glob_sl::{MatchOptions, Pattern};
 
 use crate::def::{Filter, Options};
 
@@ -63,7 +63,7 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = &mut f
             .iter()
             .map(|s| Pattern::new(s))
-            .collect::<Result<Vec<_>, glob::PatternError>>();
+            .collect::<Result<Vec<_>, glob_sl::PatternError>>();
         let f = match f {
             Ok(f) => f,
             Err(e) => {
@@ -79,7 +79,7 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = &mut f
             .iter()
             .map(|s| Pattern::new(s))
-            .collect::<Result<Vec<_>, glob::PatternError>>();
+            .collect::<Result<Vec<_>, glob_sl::PatternError>>();
         let f = match f {
             Ok(f) => f,
             Err(e) => {
@@ -95,7 +95,7 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = &mut f
             .iter()
             .map(|s| Pattern::new(s))
-            .collect::<Result<Vec<_>, glob::PatternError>>();
+            .collect::<Result<Vec<_>, glob_sl::PatternError>>();
         let f = match f {
             Ok(f) => f,
             Err(e) => {
@@ -111,7 +111,7 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = &mut f
             .iter()
             .map(|s| Pattern::new(s))
-            .collect::<Result<Vec<_>, glob::PatternError>>();
+            .collect::<Result<Vec<_>, glob_sl::PatternError>>();
         let f = match f {
             Ok(f) => f,
             Err(e) => {
@@ -179,7 +179,7 @@ pub fn filter_direntry(
 
 pub fn filter_dir(
     root_path_len: usize,
-    dir_entry: &jwalk::DirEntry<((), Option<Result<Metadata, Error>>)>,
+    dir_entry: &jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>,
     filter_ref: &Filter,
 ) -> bool {
     let mut key = dir_entry.parent_path.to_path_buf();
@@ -200,7 +200,7 @@ pub fn filter_dir(
 
 pub fn filter_children(
     children: &mut Vec<
-        Result<jwalk::DirEntry<((), Option<Result<Metadata, Error>>)>, jwalk::Error>,
+        Result<jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>, jwalk_meta::Error>,
     >,
     filter: &Option<Filter>,
     root_path_len: usize,

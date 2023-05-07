@@ -52,17 +52,21 @@ with scandir.Count("~/workspace", extended=True)) as instance:
         # Do something
 ```
 
+### ``clear()``
+
+Clear all results.
+
 ### ``start()``
 
 Start calculating statistics in background. Raises an expception if a task is already running.
 
 ### ``join()``
 
-Wait for task to finish.
+Wait for parsing task to finish.
 
 ### ``stop()``
 
-Stop task.
+Stop parsing task.
 
 ### ``collect() -> Statistics``
 

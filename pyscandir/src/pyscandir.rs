@@ -10,13 +10,15 @@ use pyo3::Python;
 use crate::def::{DirEntry, DirEntryExt, ReturnType};
 use scandir::{self, ErrorsType, ScandirResult, ScandirResultsType};
 
-fn result2py(result: &ScandirResult, py: Python) -> PyObject {
+fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
     match result {
-        ScandirResult::DirEntry(e) => PyCell::new(py, DirEntry::new(e)).unwrap().to_object(py),
-        ScandirResult::DirEntryExt(e) => {
-            PyCell::new(py, DirEntryExt::new(e)).unwrap().to_object(py)
+        ScandirResult::DirEntry(e) => {
+            Some(PyCell::new(py, DirEntry::new(e)).unwrap().to_object(py))
         }
-        ScandirResult::Error((path, e)) => (path.into_py(py), e.to_object(py)).to_object(py),
+        ScandirResult::DirEntryExt(e) => {
+            Some(PyCell::new(py, DirEntryExt::new(e)).unwrap().to_object(py))
+        }
+        ScandirResult::Error((_path, _e)) => None,
     }
 }
 
@@ -102,49 +104,49 @@ impl Scandir {
     ) -> PyResult<(Vec<PyObject>, ErrorsType)> {
         let (entries, errors) =
             py.allow_threads(|| self.instance.collect(store.unwrap_or(true)))?;
-        let results = entries.iter().map(|e| result2py(e, py)).collect();
+        let results = entries.iter().filter_map(|r| result2py(r, py)).collect();
         Ok((results, errors))
     }
 
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
-        self.instance.has_results(only_new.unwrap_or(false))
+        self.instance.has_results(only_new.unwrap_or(true))
     }
 
-    pub fn results_cnt(&mut self) -> usize {
-        self.instance.results_cnt()
+    pub fn results_cnt(&mut self, only_new: Option<bool>) -> usize {
+        self.instance.results_cnt(only_new.unwrap_or(true))
     }
 
     pub fn results(
         &mut self,
-        return_all: Option<bool>,
+        only_new: Option<bool>,
         store: Option<bool>,
         py: Python,
     ) -> (Vec<PyObject>, ErrorsType) {
         let (entries, errors) = self
             .instance
-            .results(return_all.unwrap_or(false), store.unwrap_or(true));
-        let results = entries.iter().map(|e| result2py(e, py)).collect();
+            .results(only_new.unwrap_or(true), store.unwrap_or(true));
+        let results = entries.iter().filter_map(|e| result2py(e, py)).collect();
         (results, errors)
     }
 
     pub fn has_entries(&mut self, only_new: Option<bool>) -> bool {
-        self.instance.has_entries(only_new.unwrap_or(false))
+        self.instance.has_entries(only_new.unwrap_or(true))
     }
 
-    pub fn entries_cnt(&mut self) -> usize {
-        self.instance.entries_cnt()
+    pub fn entries_cnt(&mut self, only_new: Option<bool>) -> usize {
+        self.instance.entries_cnt(only_new.unwrap_or(true))
     }
 
     pub fn entries(
         &mut self,
+        only_new: Option<bool>,
         store: Option<bool>,
-        return_all: Option<bool>,
         py: Python,
     ) -> Vec<PyObject> {
         self.instance
-            .entries(return_all.unwrap_or(false), store.unwrap_or(true))
+            .entries(only_new.unwrap_or(true), store.unwrap_or(true))
             .iter()
-            .map(|e| result2py(e, py))
+            .filter_map(|e| result2py(e, py))
             .collect()
     }
 
@@ -152,32 +154,22 @@ impl Scandir {
         self.instance.has_errors()
     }
 
-    pub fn errors_cnt(&mut self, update: Option<bool>, store: Option<bool>) -> usize {
+    pub fn errors_cnt(&mut self) -> usize {
+        self.instance.errors_cnt()
+    }
+
+    pub fn errors(&mut self, only_new: Option<bool>, store: Option<bool>) -> ErrorsType {
         self.instance
-            .errors_cnt(update.unwrap_or(false), store.unwrap_or(true))
+            .errors(only_new.unwrap_or(true), store.unwrap_or(true))
     }
 
-    pub fn errors(&mut self, return_all: Option<bool>, store: Option<bool>) -> ErrorsType {
-        self.instance
-            .errors(return_all.unwrap_or(false), store.unwrap_or(true))
-    }
-
-    pub fn duration(&mut self) -> f64 {
-        self.instance.duration()
-    }
-
-    pub fn finished(&mut self) -> bool {
-        self.instance.finished()
-    }
-
-    pub fn busy(&self) -> bool {
-        self.instance.busy()
-    }
-
-    pub fn as_dict(&mut self, store: Option<bool>, py: Python) -> PyObject {
+    pub fn as_dict(&mut self, only_new: Option<bool>, store: Option<bool>, py: Python) -> PyObject {
         let pyresults = PyDict::new(py);
-        for result in self.instance.entries(true, store.unwrap_or(true)) {
-            let _ = match result {
+        let (entries, errors) = self
+            .instance
+            .results(only_new.unwrap_or(true), store.unwrap_or(true));
+        for entry in entries {
+            let _ = match entry {
                 ScandirResult::DirEntry(e) => pyresults.set_item(
                     e.path.clone().into_py(py),
                     PyCell::new(py, DirEntry::new(&e)).unwrap().to_object(py),
@@ -191,7 +183,22 @@ impl Scandir {
                 }
             };
         }
+        for error in errors {
+            let _ = pyresults.set_item(error.0.into_py(py), error.1.to_object(py));
+        }
         pyresults.to_object(py)
+    }
+
+    pub fn duration(&mut self) -> f64 {
+        self.instance.duration()
+    }
+
+    pub fn finished(&mut self) -> bool {
+        self.instance.finished()
+    }
+
+    pub fn busy(&self) -> bool {
+        self.instance.busy()
     }
 
     fn __enter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {

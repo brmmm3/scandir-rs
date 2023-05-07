@@ -1,6 +1,6 @@
 [project]
 name = "scandir-rs"
-version = "2.3.5"
+version = "2.4.0"
 repository = "https://github.com/brmmm3/scandir-rs"
 
 [build-system]

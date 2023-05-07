@@ -39,9 +39,13 @@ For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct
 **Please note:**
 > Due to limitations of jwalk the returned errors just contain the error message without any information to which files the errors correspond to.
 
+### ``clear()``
+
+Clear all results.
+
 ### ``start()``
 
-Start parsing the directory tree in background. Raises an expception if a task is already running.
+Start parsing the directory tree in background. Raises an exception if a task is already running.
 
 ### ``join()``
 
@@ -51,21 +55,26 @@ Wait for task to finish.
 
 Stop task.
 
-### ``collect() -> Toc``
+### ``collect(store: bool | None = True) -> Toc``
 
-Collect directories, files, etc. and return a ``Toc`` object when the task has finished. This method is blocking and releases the GIL.
+Collect directories, files, etc. and return a ``Toc`` object when the task has finished. This method is blocking and releases the GIL. Method ``start`` will be called if not already done.
 
-### ``has_results(only_new: Optional[bool] = False) -> bool``
+If the optional parameter ``store`` is ``False`` then the results are not saved in the local data structure to save RAM.
+
+### ``has_results(only_new: bool | None = True) -> bool``
 
 Returns ``True`` if new entries are available and ``only_new`` is ``False`` or in case ``only_new`` is ``False`` and any entries have been collected since task start.
 
-### ``results_cnt(update: Optional[bool] = False) -> int``
+### ``results_cnt(only_new: bool | None = True) -> int``
 
 Returns number of results collected so far. If ``update`` is ``True`` then new results are counted too.
 
-### ``results(return_all: Optional[bool] = False) -> List[Tuple[str, Toc]]``
+### ``results(ronly_new: bool | None = True, store: bool | None = True) -> List[Tuple[str, Toc]]``
 
-If ``return_all`` is ``True`` then return all results collected so far else return only new results. Each result consists of root directory and ``Toc``.
+Returns entries and errors.
+
+If ``only_new`` is ``True`` (default) then return all ``Toc`` collected so far else return only new ``Toc``.
+If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
 
 ### ``has_errors() -> bool``
 

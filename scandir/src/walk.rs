@@ -307,20 +307,24 @@ impl Walk {
         !self.entries.is_empty()
     }
 
-    pub fn results_cnt(&mut self) -> usize {
+    pub fn results_cnt(&mut self, only_new: bool) -> usize {
         if let Some(ref rx) = self.rx {
-            self.entries.len() + rx.len()
+            if only_new {
+                rx.len()
+            } else {
+                self.entries.len() + rx.len()
+            }
         } else {
             self.entries.len()
         }
     }
 
-    pub fn results(&mut self, return_all: bool, store: bool) -> Vec<(String, Toc)> {
+    pub fn results(&mut self, only_new: bool, store: bool) -> Vec<(String, Toc)> {
         let entries = self.receive_all();
         if store {
             self.entries.extend_from_slice(&entries);
         }
-        if return_all && store {
+        if !only_new && store {
             return self.entries.clone();
         }
         entries

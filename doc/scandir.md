@@ -7,7 +7,6 @@ Is an enum which can be:
 ``DirEntry``
 ``DirEntryExt``
 
-
 ## ``DirEntry``
 
 - ``path`` relative path
@@ -66,48 +65,89 @@ For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct
 - ``ReturnType.Base`` return ``DirEntry`` objects.
 - ``ReturnType.Ext`` return ``DirEntryExt`` objects.
 
+### ``clear()``
+
+Clear all results.
+
 ### ``start()``
 
 Start parsing the directory tree in background. Raises an expception if a task is already running.
 
 ### ``join()``
 
-Wait for task to finish.
+Wait for parsing task to finish.
 
 ### ``stop()``
 
-Stop task.
+Stop parsing task.
 
-### ``collect() -> Tuple[List[ScandirResult], List[Tuple[str, str]]]``
+### ``collect(store: bool | None = True) -> Tuple[List[ScandirResult], List[Tuple[str, str]]]``
 
+Parse file tree and wait until parsing has finished. Method ``start`` will be called if not already done. This method returns the same as the ``results`` method. It is blocking and releases the GIL.
+
+If the optional parameter ``store`` is ``False`` then the results are not saved in the local data structure to save RAM.
 ``Error`` contains a tuple with 2 strings. First string contains path to file. Second string is the error message.
 
-This does the same as the call of the ``entries`` method. It returns an ``Entries`` object and in addition the results are available also within the class instance through the ``entries`` property. This method is blocking and releases the GIL.
+### ``has_results(only_new: bool | None = True) -> bool``
 
-### ``has_results(only_new: Optional[bool] = False) -> bool``
+Returns ``True`` if new entries or errors are available and ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` and any entries and errors have been collected since the start of the parse task.
 
-Returns ``True`` if new entries are available and ``only_new`` is ``False`` or in case ``only_new`` is ``False`` and any entries have been collected since task start.
+### ``results_cnt(only_new: bool | None = True) -> int``
 
-### ``results_cnt(update: Optional[bool] = False) -> int``
+Returns the number of new entries and errors if ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` the number of entries and errors since the start of the parse task.
 
-Returns number of results collected so far. If ``update`` is ``True`` then new results are counted too.
+### ``results(only_new: bool | None = True, store: bool | None = True) -> Tuple[List[ScandirResult], List[str, str]]``
 
-### ``results(return_all: Optional[bool] = False) -> List[Tuple[str, Toc]]``
+Returns entries and errors.
 
-If ``return_all`` is ``True`` then return all results collected so far else return only new results. Each result consists of root directory and ``Toc``.
+If ``only_new`` is ``True`` (default) then return all results and errors collected so far else return only new results and errors.
+If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
+
+### ``has_entries(only_new: bool | None = True) -> bool``
+
+Returns ``True`` if new entries are available and ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` and any entries have been collected since the start of the parse task.
+
+### ``entries_cnt(only_new: bool | None = True) -> int``
+
+Returns the number of new entries if ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` the number of entries since the start of the parse task.
+
+### ``entries(only_new: bool | None = True, store: bool | None = True) -> List[Tuple[str, Toc]]``
+
+Returns entries.
+
+If ``only_new`` is ``True`` (default) then return all results and errors collected so far else return only new results and errors.
+If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
 
 ### ``has_errors() -> bool``
 
-Returns ``True`` if errors occured while walking through the directory tree. The error messages can be found in ``Toc`` objects returned.
+Returns ``True`` if new errors are available and ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` and any errors have been collected since the start of the parse task.
+
+### ``errors_cnt(only_new: bool | None = True) -> int``
+
+Returns the number of new errors if ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` the number of errors since the start of the parse task.
+
+### ``errors(only_new: bool | None = True, store: bool | None = True) -> List[Tuple[str, str]]``
+
+Returns errors.
+
+If ``only_new`` is ``True`` (default) then return all results and errors collected so far else return only new results and errors.
+If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
+
+### ``as_dict(only_new: bool | None = True, store: bool | None = True) -> Dict[str, DirEntry | DirEntryExt | str]``
+
+Returns entries and errors as dictionary.
+
+If ``only_new`` is ``True`` then return all results collected so far else return only new results. Each result consists of root directory and ``Toc``.
+If the optional parameter ``store`` is ``False`` then the results are not saved in the local data structure to save RAM.
 
 ### ``duration() -> float``
 
-Returns the duration of the task. As long as the task is running it will return 0.
+Returns the duration of the parsing task. As long as the task is running it will return 0.
 
 ### ``finished() -> bool``
 
-Returns ``True`` after the task has finished.
+Returns ``True`` after the parsing task has finished.
 
 ### ``busy()``
 
-Returns ``True`` while a task is running.
+Returns ``True`` while a parsing task is running.

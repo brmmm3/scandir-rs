@@ -468,21 +468,27 @@ impl Scandir {
         !self.entries.is_empty() && !self.errors.is_empty()
     }
 
-    pub fn results_cnt(&mut self) -> usize {
+    pub fn results_cnt(&mut self, only_new: bool) -> usize {
         if let Some(ref rx) = self.rx {
-            self.entries.len() + self.errors.len() + rx.len()
+            if only_new {
+                rx.len()
+            } else {
+                self.entries.len() + self.errors.len() + rx.len()
+            }
+        } else if only_new {
+            0
         } else {
             self.entries.len() + self.errors.len()
         }
     }
 
-    pub fn results(&mut self, return_all: bool, store: bool) -> (ScandirResultsType, ErrorsType) {
+    pub fn results(&mut self, only_new: bool, store: bool) -> (ScandirResultsType, ErrorsType) {
         let (entries, errors) = self.receive_all();
         if store {
             self.entries.extend_from_slice(&entries);
             self.errors.extend(errors.clone());
         }
-        if return_all && store {
+        if !only_new && store {
             return (self.entries.clone(), self.errors.clone());
         }
         (entries, errors)
@@ -500,31 +506,31 @@ impl Scandir {
         !self.entries.is_empty()
     }
 
-    pub fn entries_cnt(&mut self) -> usize {
+    pub fn entries_cnt(&mut self, only_new: bool) -> usize {
         if let Some(ref rx) = self.rx {
+            if only_new {
+                return rx.len();
+            }
             self.entries.len() + rx.len()
         } else {
             self.entries.len()
         }
     }
 
-    pub fn entries(&mut self, return_all: bool, store: bool) -> ScandirResultsType {
-        self.results(return_all, store).0
+    pub fn entries(&mut self, only_new: bool, store: bool) -> ScandirResultsType {
+        self.results(only_new, store).0
     }
 
     pub fn has_errors(&mut self) -> bool {
         !self.errors.is_empty()
     }
 
-    pub fn errors_cnt(&mut self, update: bool, store: bool) -> usize {
-        if update {
-            self.results(false, store);
-        }
+    pub fn errors_cnt(&mut self) -> usize {
         self.errors.len()
     }
 
-    pub fn errors(&mut self, return_all: bool, store: bool) -> ErrorsType {
-        self.results(return_all, store).1
+    pub fn errors(&mut self, only_new: bool, store: bool) -> ErrorsType {
+        self.results(only_new, store).1
     }
 
     pub fn duration(&mut self) -> f64 {

@@ -95,11 +95,11 @@ impl Walk {
     }
 
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
-        self.instance.has_results(only_new.unwrap_or(false))
+        self.instance.has_results(only_new.unwrap_or(true))
     }
 
-    pub fn results_cnt(&mut self) -> usize {
-        self.instance.results_cnt()
+    pub fn results_cnt(&mut self, only_new: Option<bool>) -> usize {
+        self.instance.results_cnt(only_new.unwrap_or(true))
     }
 
     pub fn results(

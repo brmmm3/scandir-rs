@@ -71,7 +71,7 @@ pub enum ScandirResult {
 }
 
 pub type ScandirResultsType = Vec<ScandirResult>;
-pub type ErrorsType = Vec<(String, String)>;
+pub type ErrorsType = Vec<(String, String)>; // Tuple with file path and error message
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]

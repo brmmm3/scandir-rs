@@ -41,6 +41,21 @@ pub struct DirEntry {
     pub st_size: u64,
 }
 
+impl Default for DirEntry {
+    fn default() -> Self {
+        DirEntry {
+            path: "".to_owned(),
+            is_symlink: false,
+            is_dir: false,
+            is_file: false,
+            st_ctime: 0.0,
+            st_mtime: 0.0,
+            st_atime: 0.0,
+            st_size: 0,
+        }
+    }
+}
+
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct DirEntryExt {
@@ -63,7 +78,7 @@ pub struct DirEntryExt {
     pub st_rdev: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ScandirResult {
     DirEntry(DirEntry),
     DirEntryExt(DirEntryExt),

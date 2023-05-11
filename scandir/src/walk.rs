@@ -215,7 +215,7 @@ impl Walk {
         self
     }
 
-    /// Set extended file type counting
+    /// Set extended file type
     pub fn return_type(mut self, return_type: ReturnType) -> Self {
         self.options.return_type = return_type;
         self

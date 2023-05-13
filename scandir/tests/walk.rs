@@ -7,7 +7,7 @@ mod common;
 #[test]
 fn test_walk() -> Result<(), Error> {
     let temp_dir = common::create_temp_file_tree(3, 3, 4, 5, 6, 7)?;
-    let toc = Walk::new(temp_dir.path())?.collect(true)?;
+    let toc = Walk::new(temp_dir.path(), Some(true))?.collect()?;
     assert_eq!(12, toc.dirs.len());
     assert_eq!(63, toc.files.len());
     assert_eq!(54, toc.symlinks.len());
@@ -19,9 +19,9 @@ fn test_walk() -> Result<(), Error> {
 #[test]
 fn test_walk_not_skip_hidden() -> Result<(), Error> {
     let temp_dir = common::create_temp_file_tree(3, 3, 4, 5, 6, 7)?;
-    let toc = Walk::new(temp_dir.path())?
+    let toc = Walk::new(temp_dir.path(), Some(true))?
         .skip_hidden(false)
-        .collect(true)?;
+        .collect()?;
     assert_eq!(12, toc.dirs.len());
     assert_eq!(81, toc.files.len());
     assert_eq!(54, toc.symlinks.len());

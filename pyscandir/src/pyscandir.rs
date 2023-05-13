@@ -45,10 +45,11 @@ impl Scandir {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<ReturnType>,
+        store: Option<bool>,
     ) -> PyResult<Self> {
         let return_type = return_type.unwrap_or(ReturnType::Base).from_object();
         Ok(Scandir {
-            instance: match scandir::Scandir::new(root_path) {
+            instance: match scandir::Scandir::new(root_path, store) {
                 Ok(s) => s
                     .sorted(sorted.unwrap_or(false))
                     .skip_hidden(skip_hidden.unwrap_or(false))
@@ -97,13 +98,8 @@ impl Scandir {
         Ok(true)
     }
 
-    pub fn collect(
-        &mut self,
-        store: Option<bool>,
-        py: Python,
-    ) -> PyResult<(Vec<PyObject>, ErrorsType)> {
-        let (entries, errors) =
-            py.allow_threads(|| self.instance.collect(store.unwrap_or(true)))?;
+    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, ErrorsType)> {
+        let (entries, errors) = py.allow_threads(|| self.instance.collect())?;
         let results = entries.iter().filter_map(|r| result2py(r, py)).collect();
         Ok((results, errors))
     }
@@ -116,15 +112,8 @@ impl Scandir {
         self.instance.results_cnt(only_new.unwrap_or(true))
     }
 
-    pub fn results(
-        &mut self,
-        only_new: Option<bool>,
-        store: Option<bool>,
-        py: Python,
-    ) -> (Vec<PyObject>, ErrorsType) {
-        let (entries, errors) = self
-            .instance
-            .results(only_new.unwrap_or(true), store.unwrap_or(true));
+    pub fn results(&mut self, only_new: Option<bool>, py: Python) -> (Vec<PyObject>, ErrorsType) {
+        let (entries, errors) = self.instance.results(only_new.unwrap_or(true));
         let results = entries.iter().filter_map(|e| result2py(e, py)).collect();
         (results, errors)
     }
@@ -137,14 +126,9 @@ impl Scandir {
         self.instance.entries_cnt(only_new.unwrap_or(true))
     }
 
-    pub fn entries(
-        &mut self,
-        only_new: Option<bool>,
-        store: Option<bool>,
-        py: Python,
-    ) -> Vec<PyObject> {
+    pub fn entries(&mut self, only_new: Option<bool>, py: Python) -> Vec<PyObject> {
         self.instance
-            .entries(only_new.unwrap_or(true), store.unwrap_or(true))
+            .entries(only_new.unwrap_or(true))
             .iter()
             .filter_map(|e| result2py(e, py))
             .collect()
@@ -158,16 +142,13 @@ impl Scandir {
         self.instance.errors_cnt()
     }
 
-    pub fn errors(&mut self, only_new: Option<bool>, store: Option<bool>) -> ErrorsType {
-        self.instance
-            .errors(only_new.unwrap_or(true), store.unwrap_or(true))
+    pub fn errors(&mut self, only_new: Option<bool>) -> ErrorsType {
+        self.instance.errors(only_new.unwrap_or(true))
     }
 
-    pub fn as_dict(&mut self, only_new: Option<bool>, store: Option<bool>, py: Python) -> PyObject {
+    pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyObject {
         let pyresults = PyDict::new(py);
-        let (entries, errors) = self
-            .instance
-            .results(only_new.unwrap_or(true), store.unwrap_or(true));
+        let (entries, errors) = self.instance.results(only_new.unwrap_or(true));
         for entry in entries {
             let _ = match entry {
                 ScandirResult::DirEntry(e) => pyresults.set_item(
@@ -254,7 +235,7 @@ impl Scandir {
             if let Some(error) = self.errors.pop() {
                 return Ok(Some(error.to_object(py)));
             }
-            let (entries, errors) = self.instance.results(false, true);
+            let (entries, errors) = self.instance.results(true);
             if entries.is_empty() && errors.is_empty() {
                 if !self.instance.busy() {
                     break;

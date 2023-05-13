@@ -37,7 +37,7 @@ Is an enum which can be:
 - ``st_gid`` groud id (only for Unix).
 - ``st_rdev`` device number (for character and block devices on Unix).
 
-## ``Scandir(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True, return_type: int = RETURN_TYPE_WALK)``
+## ``Scandir(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True, return_type: int = RETURN_TYPE_WALK, store: bool = true)``
 
 Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method ``start`` has to be called or a context has to be created (``with ClassInstance:``). When the context is closed the background thread is stopped.
 
@@ -57,6 +57,7 @@ The returned results are tuples with absolute path and `DirEntry`, `DirEntryExt`
 - ``file_exclude`` list of patterns for files to exclude.
 - ``case_sensitive`` if `True` then do case sensitive pattern matching.
 - ``return_type`` defines type of data returned.
+- ``store`` store results in local structure.
 
 For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
 
@@ -81,11 +82,9 @@ Wait for parsing task to finish.
 
 Stop parsing task.
 
-### ``collect(store: bool | None = True) -> Tuple[List[ScandirResult], List[Tuple[str, str]]]``
+### ``collect() -> Tuple[List[ScandirResult], List[Tuple[str, str]]]``
 
 Parse file tree and wait until parsing has finished. Method ``start`` will be called if not already done. This method returns the same as the ``results`` method. It is blocking and releases the GIL.
-
-If the optional parameter ``store`` is ``False`` then the results are not saved in the local data structure to save RAM.
 ``Error`` contains a tuple with 2 strings. First string contains path to file. Second string is the error message.
 
 ### ``has_results(only_new: bool | None = True) -> bool``
@@ -96,12 +95,11 @@ Returns ``True`` if new entries or errors are available and ``only_new`` is ``Tr
 
 Returns the number of new entries and errors if ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` the number of entries and errors since the start of the parse task.
 
-### ``results(only_new: bool | None = True, store: bool | None = True) -> Tuple[List[ScandirResult], List[str, str]]``
+### ``results(only_new: bool | None = True) -> Tuple[List[ScandirResult], List[str, str]]``
 
 Returns entries and errors.
 
 If ``only_new`` is ``True`` (default) then return all results and errors collected so far else return only new results and errors.
-If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
 
 ### ``has_entries(only_new: bool | None = True) -> bool``
 
@@ -111,12 +109,11 @@ Returns ``True`` if new entries are available and ``only_new`` is ``True`` (defa
 
 Returns the number of new entries if ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` the number of entries since the start of the parse task.
 
-### ``entries(only_new: bool | None = True, store: bool | None = True) -> List[Tuple[str, Toc]]``
+### ``entries(only_new: bool | None = True) -> List[Tuple[str, Toc]]``
 
 Returns entries.
 
 If ``only_new`` is ``True`` (default) then return all results and errors collected so far else return only new results and errors.
-If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
 
 ### ``has_errors() -> bool``
 
@@ -126,19 +123,17 @@ Returns ``True`` if new errors are available and ``only_new`` is ``True`` (defau
 
 Returns the number of new errors if ``only_new`` is ``True`` (default) or in case ``only_new`` is ``False`` the number of errors since the start of the parse task.
 
-### ``errors(only_new: bool | None = True, store: bool | None = True) -> List[Tuple[str, str]]``
+### ``errors(only_new: bool | None = True) -> List[Tuple[str, str]]``
 
 Returns errors.
 
 If ``only_new`` is ``True`` (default) then return all results and errors collected so far else return only new results and errors.
-If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
 
-### ``as_dict(only_new: bool | None = True, store: bool | None = True) -> Dict[str, DirEntry | DirEntryExt | str]``
+### ``as_dict(only_new: bool | None = True) -> Dict[str, DirEntry | DirEntryExt | str]``
 
 Returns entries and errors as dictionary.
 
 If ``only_new`` is ``True`` then return all results collected so far else return only new results. Each result consists of root directory and ``Toc``.
-If the optional parameter ``store`` is ``False`` then the results are not saved in the local data structure to save RAM.
 
 ### ``duration() -> float``
 

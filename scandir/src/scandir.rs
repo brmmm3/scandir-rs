@@ -261,6 +261,7 @@ fn entries_thread(
 pub struct Scandir {
     // Options
     options: Options,
+    store: bool,
     // Results
     entries: ScandirResultsType,
     errors: ErrorsType,
@@ -272,7 +273,7 @@ pub struct Scandir {
 }
 
 impl Scandir {
-    pub fn new<P: AsRef<Path>>(root_path: P) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path>>(root_path: P, store: Option<bool>) -> Result<Self, Error> {
         Ok(Scandir {
             options: Options {
                 root_path: check_and_expand_path(root_path)?,
@@ -287,6 +288,7 @@ impl Scandir {
                 case_sensitive: false,
                 return_type: ReturnType::Base,
             },
+            store: store.unwrap_or(true),
             entries: Vec::new(),
             errors: Vec::new(),
             duration: Arc::new(Mutex::new(0.0)),
@@ -446,14 +448,14 @@ impl Scandir {
         (entries, errors)
     }
 
-    pub fn collect(&mut self, store: bool) -> Result<(ScandirResultsType, ErrorsType), Error> {
+    pub fn collect(&mut self) -> Result<(ScandirResultsType, ErrorsType), Error> {
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
             }
             self.join();
         }
-        Ok(self.results(true, store))
+        Ok(self.results(true))
     }
 
     pub fn has_results(&mut self, only_new: bool) -> bool {
@@ -482,13 +484,13 @@ impl Scandir {
         }
     }
 
-    pub fn results(&mut self, only_new: bool, store: bool) -> (ScandirResultsType, ErrorsType) {
+    pub fn results(&mut self, only_new: bool) -> (ScandirResultsType, ErrorsType) {
         let (entries, errors) = self.receive_all();
-        if store {
+        if self.store {
             self.entries.extend_from_slice(&entries);
             self.errors.extend(errors.clone());
         }
-        if !only_new && store {
+        if !only_new && self.store {
             return (self.entries.clone(), self.errors.clone());
         }
         (entries, errors)
@@ -517,8 +519,8 @@ impl Scandir {
         }
     }
 
-    pub fn entries(&mut self, only_new: bool, store: bool) -> ScandirResultsType {
-        self.results(only_new, store).0
+    pub fn entries(&mut self, only_new: bool) -> ScandirResultsType {
+        self.results(only_new).0
     }
 
     pub fn has_errors(&mut self) -> bool {
@@ -529,8 +531,8 @@ impl Scandir {
         self.errors.len()
     }
 
-    pub fn errors(&mut self, only_new: bool, store: bool) -> ErrorsType {
-        self.results(only_new, store).1
+    pub fn errors(&mut self, only_new: bool) -> ErrorsType {
+        self.results(only_new).1
     }
 
     pub fn duration(&mut self) -> f64 {

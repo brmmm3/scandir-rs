@@ -12,7 +12,7 @@ The ``Toc`` class is the return value of class method ``results`` and ``collect`
 - ``other`` list of names of all other entry types.
 - ``errors`` list of access errors (list of strings).
 
-## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, max_file_cnt: int = 0, dir_include: List[str] = None, dir_exclude: List[str] = None, file_include: List[str] = None, file_exclude: List[str] = None, case_sensitive: bool = True, return_type: ReturnType = ReturnType.Base)``
+## ``Walk(root_path: str, sorted: bool = False, skip_hidden: bool = False, max_depth: int = 0, max_file_cnt: int = 0, dir_include: List[str] = None, dir_exclude: List[str] = None, file_include: List[str] = None, file_exclude: List[str] = None, case_sensitive: bool = True, return_type: ReturnType = ReturnType.Base, store: bool = true)``
 
 Creates a class instance for calculating statistics. The class instance initially does nothing. To start the scan either the method ``start``  or the method ``collect`` has to be called or a context has to be created (``with Walk(...) as instance:``). When the context is closed the background thread is stopped.
 
@@ -28,6 +28,7 @@ Creates a class instance for calculating statistics. The class instance initiall
 - ``file_exclude`` list of patterns for files to exclude.
 - ``case_sensitive`` if `True` then do case sensitive pattern matching.
 - ``return_type`` defines type of data returned.
+- ``store`` store results in local structure.
 
 For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct.Pattern.html).
 
@@ -55,11 +56,9 @@ Wait for task to finish.
 
 Stop task.
 
-### ``collect(store: bool | None = True) -> Toc``
+### ``collect() -> Toc``
 
 Collect directories, files, etc. and return a ``Toc`` object when the task has finished. This method is blocking and releases the GIL. Method ``start`` will be called if not already done.
-
-If the optional parameter ``store`` is ``False`` then the results are not saved in the local data structure to save RAM.
 
 ### ``has_results(only_new: bool | None = True) -> bool``
 
@@ -69,12 +68,11 @@ Returns ``True`` if new entries are available and ``only_new`` is ``False`` or i
 
 Returns number of results collected so far. If ``update`` is ``True`` then new results are counted too.
 
-### ``results(ronly_new: bool | None = True, store: bool | None = True) -> List[Tuple[str, Toc]]``
+### ``results(ronly_new: bool | None = True) -> List[Tuple[str, Toc]]``
 
 Returns entries and errors.
 
 If ``only_new`` is ``True`` (default) then return all ``Toc`` collected so far else return only new ``Toc``.
-If the optional parameter ``store`` is ``False`` (default is ``True``) then the results are not saved in the local data structure to save RAM.
 
 ### ``has_errors() -> bool``
 

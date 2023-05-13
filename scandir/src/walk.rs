@@ -112,6 +112,7 @@ pub fn toc_thread(
 pub struct Walk {
     // Options
     options: Options,
+    store: bool,
     // Results
     entries: Vec<(String, Toc)>,
     duration: Arc<Mutex<f64>>,
@@ -123,7 +124,7 @@ pub struct Walk {
 }
 
 impl Walk {
-    pub fn new<P: AsRef<Path>>(root_path: P) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path>>(root_path: P, store: Option<bool>) -> Result<Self, Error> {
         Ok(Walk {
             options: Options {
                 root_path: check_and_expand_path(root_path)?,
@@ -138,6 +139,7 @@ impl Walk {
                 case_sensitive: false,
                 return_type: ReturnType::Base,
             },
+            store: store.unwrap_or(true),
             entries: Vec::new(),
             duration: Arc::new(Mutex::new(0.0)),
             has_errors: false,
@@ -281,7 +283,7 @@ impl Walk {
         entries
     }
 
-    pub fn collect(&mut self, store: bool) -> Result<Toc, Error> {
+    pub fn collect(&mut self) -> Result<Toc, Error> {
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
@@ -289,7 +291,7 @@ impl Walk {
             self.join();
         }
         let mut toc = Toc::new();
-        for (root_dir, dir_toc) in self.results(true, store) {
+        for (root_dir, dir_toc) in self.results(true) {
             toc.extend(&root_dir, &dir_toc);
         }
         Ok(toc)
@@ -319,12 +321,12 @@ impl Walk {
         }
     }
 
-    pub fn results(&mut self, only_new: bool, store: bool) -> Vec<(String, Toc)> {
+    pub fn results(&mut self, only_new: bool) -> Vec<(String, Toc)> {
         let entries = self.receive_all();
-        if store {
+        if self.store {
             self.entries.extend_from_slice(&entries);
         }
-        if !only_new && store {
+        if !only_new && self.store {
             return self.entries.clone();
         }
         entries

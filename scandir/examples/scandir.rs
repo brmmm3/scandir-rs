@@ -6,13 +6,13 @@ use scandir::{self, ReturnType, Scandir};
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
-    let mut instance = Scandir::new(&args[1])?;
+    let mut instance = Scandir::new(&args[1], Some(true))?;
     instance = instance.max_file_cnt(100);
     if args.len() > 2 {
         instance = instance.return_type(ReturnType::Ext);
     }
-    let (_results, _errors) = instance.collect(true)?;
-    let mut result = format!("{:#?}", instance.results(true, true));
+    let (_results, _errors) = instance.collect()?;
+    let mut result = format!("{:#?}", instance.results(true,));
     if result.len() > 2000 {
         result = result[..2000].to_string();
     }

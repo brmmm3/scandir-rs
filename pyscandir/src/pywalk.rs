@@ -35,10 +35,11 @@ impl Walk {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<ReturnType>,
+        store: Option<bool>,
     ) -> PyResult<Self> {
         let return_type = return_type.unwrap_or(ReturnType::Base);
         Ok(Walk {
-            instance: match scandir::Walk::new(root_path) {
+            instance: match scandir::Walk::new(root_path, store) {
                 Ok(s) => s
                     .sorted(sorted.unwrap_or(false))
                     .skip_hidden(skip_hidden.unwrap_or(false))
@@ -88,10 +89,10 @@ impl Walk {
         Ok(true)
     }
 
-    pub fn collect(&mut self, store: Option<bool>, py: Python) -> PyResult<Toc> {
-        Ok(Toc::new(Some(py.allow_threads(|| {
-            self.instance.collect(store.unwrap_or(true))
-        })?)))
+    pub fn collect(&mut self, py: Python) -> PyResult<Toc> {
+        Ok(Toc::new(Some(
+            py.allow_threads(|| self.instance.collect())?,
+        )))
     }
 
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
@@ -102,17 +103,9 @@ impl Walk {
         self.instance.results_cnt(only_new.unwrap_or(true))
     }
 
-    pub fn results(
-        &mut self,
-        return_all: Option<bool>,
-        store: Option<bool>,
-        py: Python,
-    ) -> Vec<(String, PyObject)> {
+    pub fn results(&mut self, return_all: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
         let mut results = Vec::new();
-        for result in self
-            .instance
-            .results(return_all.unwrap_or(false), store.unwrap_or(true))
-        {
+        for result in self.instance.results(return_all.unwrap_or(false)) {
             results.push((
                 result.0,
                 PyCell::new(py, Toc::new(Some(result.1)))
@@ -196,7 +189,7 @@ impl Walk {
             } else {
                 self.entries.clear();
                 self.entries
-                    .extend_from_slice(&self.instance.results(false, true)[..]);
+                    .extend_from_slice(&self.instance.results(true)[..]);
                 if self.entries.is_empty() {
                     if !self.instance.busy() {
                         break;

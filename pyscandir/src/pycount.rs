@@ -2,8 +2,7 @@ use std::io::ErrorKind;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyType};
-use pyo3::Python;
+use pyo3::types::PyType;
 
 use crate::def::{ReturnType, Statistics};
 

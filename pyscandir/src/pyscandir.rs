@@ -4,11 +4,10 @@ use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyType};
-use pyo3::Python;
+use pyo3::types::{PyDict, PyType};
 
 use crate::def::{DirEntry, DirEntryExt, ReturnType};
-use scandir::{self, ErrorsType, ScandirResult, ScandirResultsType};
+use scandir::{ErrorsType, ScandirResult, ScandirResultsType};
 
 fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
     match result {

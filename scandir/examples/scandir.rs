@@ -1,8 +1,7 @@
 use std::env;
 use std::io::Error;
-use std::result::Result;
 
-use scandir::{self, ReturnType, Scandir};
+use scandir::{ReturnType, Scandir};
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();

@@ -1,10 +1,9 @@
 use std::env;
 use std::io::Error;
-use std::result::Result;
 use std::thread;
 use std::time::Duration;
 
-use scandir::{self, ReturnType, Walk};
+use scandir::{ReturnType, Walk};
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();

@@ -24,7 +24,7 @@ name = "scandir_rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-scandir = { path = "../scandir" }
+scandir = { path = "../scandir", version = "2.4.2" }
 
 [dependencies.pyo3]
 version = "0.20"

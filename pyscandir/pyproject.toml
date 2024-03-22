@@ -1,6 +1,6 @@
 [project]
 name = "scandir-rs"
-version = "2.4.2"
+version = "2.5.0"
 authors = [{ name = "Martin Bammer", email = "mrbm74@gmail.com" }]
 description = "A Rust library for parsing and generating A2L files."
 dependencies = []

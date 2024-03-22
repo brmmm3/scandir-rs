@@ -1,6 +1,6 @@
 [package]
 name = "scandir_rs"
-version = "2.4.2"
+version = "2.5.0"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -24,7 +24,7 @@ name = "scandir_rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-scandir = { path = "../scandir", version = "2.4.2" }
+scandir = { path = "../scandir", version = "2.5.0" }
 
 [dependencies.pyo3]
 version = "0.20"

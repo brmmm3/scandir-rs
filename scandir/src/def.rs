@@ -85,6 +85,80 @@ pub enum ScandirResult {
     Error((String, String)),
 }
 
+impl ScandirResult {
+    pub fn path(&self) -> &str {
+        match self {
+            Self::DirEntry(e) => &e.path,
+            Self::DirEntryExt(e) => &e.path,
+            Self::Error(e) => &e.0,
+        }
+    }
+
+    pub fn error(&self) -> Option<&str> {
+        match self {
+            Self::DirEntry(_) => None,
+            Self::DirEntryExt(_) => None,
+            Self::Error(e) => Some(&e.1),
+        }
+    }
+
+    pub fn is_dir(&self) -> bool {
+        match self {
+            Self::DirEntry(e) => e.is_dir,
+            Self::DirEntryExt(e) => e.is_dir,
+            Self::Error(_) => false,
+        }
+    }
+
+    pub fn is_file(&self) -> bool {
+        match self {
+            Self::DirEntry(e) => e.is_file,
+            Self::DirEntryExt(e) => e.is_file,
+            Self::Error(_) => false,
+        }
+    }
+
+    pub fn is_symlink(&self) -> bool {
+        match self {
+            Self::DirEntry(e) => e.is_symlink,
+            Self::DirEntryExt(e) => e.is_symlink,
+            Self::Error(_) => false,
+        }
+    }
+
+    pub fn ctime(&self) -> f64 {
+        match self {
+            Self::DirEntry(e) => e.st_ctime,
+            Self::DirEntryExt(e) => e.st_ctime,
+            Self::Error(_) => 0.0,
+        }
+    }
+
+    pub fn mtime(&self) -> f64 {
+        match self {
+            Self::DirEntry(e) => e.st_mtime,
+            Self::DirEntryExt(e) => e.st_mtime,
+            Self::Error(_) => 0.0,
+        }
+    }
+
+    pub fn atime(&self) -> f64 {
+        match self {
+            Self::DirEntry(e) => e.st_atime,
+            Self::DirEntryExt(e) => e.st_atime,
+            Self::Error(_) => 0.0,
+        }
+    }
+
+    pub fn size(&self) -> u64 {
+        match self {
+            Self::DirEntry(e) => e.st_size,
+            Self::DirEntryExt(e) => e.st_size,
+            Self::Error(_) => 0,
+        }
+    }
+}
+
 pub type ScandirResultsType = Vec<ScandirResult>;
 pub type ErrorsType = Vec<(String, String)>; // Tuple with file path and error message
 

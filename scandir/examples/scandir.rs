@@ -10,7 +10,16 @@ fn main() -> Result<(), Error> {
     if args.len() > 2 {
         instance = instance.return_type(ReturnType::Ext);
     }
-    let (_results, _errors) = instance.collect()?;
+    let (results, errors) = instance.collect()?;
+    for (path, error) in errors {
+        println!("ERROR {path}: {error}");
+    }
+    let first_result = results.iter().next().unwrap();
+    println!(
+        "First file {} has size {}",
+        first_result.path(),
+        first_result.size()
+    );
     let mut result = format!("{:#?}", instance.results(true,));
     if result.len() > 2000 {
         result = result[..2000].to_string();

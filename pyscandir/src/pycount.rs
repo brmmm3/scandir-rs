@@ -1,10 +1,10 @@
 use std::io::ErrorKind;
 
-use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use crate::def::{ReturnType, Statistics};
+use crate::def::{ ReturnType, Statistics };
 
 #[pyclass]
 #[derive(Debug)]
@@ -26,25 +26,33 @@ impl Count {
         file_include: Option<Vec<String>>,
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
-        return_type: Option<ReturnType>,
+        return_type: Option<ReturnType>
     ) -> PyResult<Self> {
         Ok(Count {
             instance: match scandir::Count::new(root_path) {
-                Ok(c) => c
-                    .skip_hidden(skip_hidden.unwrap_or(false))
-                    .max_depth(max_depth.unwrap_or(0))
-                    .max_file_cnt(max_file_cnt.unwrap_or(0))
-                    .dir_include(dir_include)
-                    .dir_exclude(dir_exclude)
-                    .file_include(file_include)
-                    .file_exclude(file_exclude)
-                    .case_sensitive(case_sensitive.unwrap_or(false))
-                    .extended(return_type.unwrap_or(ReturnType::Base) == ReturnType::Ext),
-                Err(e) => match e.kind() {
-                    ErrorKind::InvalidInput => return Err(PyValueError::new_err(e.to_string())),
-                    ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
-                    _ => return Err(PyException::new_err(e.to_string())),
-                },
+                Ok(c) =>
+                    c
+                        .skip_hidden(skip_hidden.unwrap_or(false))
+                        .max_depth(max_depth.unwrap_or(0))
+                        .max_file_cnt(max_file_cnt.unwrap_or(0))
+                        .dir_include(dir_include)
+                        .dir_exclude(dir_exclude)
+                        .file_include(file_include)
+                        .file_exclude(file_exclude)
+                        .case_sensitive(case_sensitive.unwrap_or(false))
+                        .extended(return_type.unwrap_or(ReturnType::Base) == ReturnType::Ext),
+                Err(e) =>
+                    match e.kind() {
+                        ErrorKind::InvalidInput => {
+                            return Err(PyValueError::new_err(e.to_string()));
+                        }
+                        ErrorKind::NotFound => {
+                            return Err(PyFileNotFoundError::new_err(e.to_string()));
+                        }
+                        _ => {
+                            return Err(PyException::new_err(e.to_string()));
+                        }
+                    }
             },
             busy: false,
         })
@@ -55,9 +63,7 @@ impl Count {
     }
 
     pub fn start(&mut self) -> PyResult<()> {
-        self.instance
-            .start()
-            .map_err(|e| PyException::new_err(e.to_string()))
+        self.instance.start().map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -77,9 +83,11 @@ impl Count {
 
     pub fn collect(&mut self, py: Python) -> PyResult<PyObject> {
         let results = py.allow_threads(|| self.instance.collect())?;
-        Ok(PyCell::new(py, Statistics::new(Some(results)))
-            .unwrap()
-            .to_object(py))
+        Ok(
+            Py::new(py, Statistics::new(Some(results)))
+                .unwrap()
+                .to_object(py)
+        )
     }
 
     pub fn has_results(&mut self) -> bool {
@@ -87,7 +95,7 @@ impl Count {
     }
 
     pub fn results(&mut self, py: Python) -> PyObject {
-        PyCell::new(py, Statistics::new(Some(self.instance.results())))
+        Py::new(py, Statistics::new(Some(self.instance.results())))
             .unwrap()
             .to_object(py)
     }
@@ -113,24 +121,22 @@ impl Count {
     }
 
     fn __enter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.instance
-            .start()
-            .map_err(|e| PyException::new_err(e.to_string()))?;
+        slf.instance.start().map_err(|e| PyException::new_err(e.to_string()))?;
         Ok(slf)
     }
 
     fn __exit__(
         &mut self,
-        ty: Option<&PyType>,
-        _value: Option<&PyAny>,
-        _traceback: Option<&PyAny>,
+        ty: Option<Bound<PyType>>,
+        _value: Option<Bound<PyAny>>,
+        _traceback: Option<Bound<PyAny>>
     ) -> PyResult<bool> {
         if !self.instance.stop() {
             return Ok(false);
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type_bound::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -151,11 +157,13 @@ impl Count {
         if !self.instance.busy() {
             self.busy = false;
         }
-        Ok(Some(
-            PyCell::new(py, Statistics::new(Some(self.instance.results())))
-                .unwrap()
-                .to_object(py),
-        ))
+        Ok(
+            Some(
+                Py::new(py, Statistics::new(Some(self.instance.results())))
+                    .unwrap()
+                    .to_object(py)
+            )
+        )
     }
 
     fn __str__(&self) -> PyResult<String> {

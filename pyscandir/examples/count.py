@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import os
-import time
-import sys
 
 from scandir_rs import Count
 
-dirName = "C:/Windows" if os.name == 'nt' else "/usr"
+dirName = "C:/Windows" if os.name == "nt" else "/usr"
 print(Count(dirName).collect())
 # Output is something like:
 # Statistics { dirs: 76923, files: 648585, slinks: 48089,

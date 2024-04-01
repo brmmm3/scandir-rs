@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-import time
 import threading
 
 from scandir_rs import Scandir, ReturnType
@@ -15,7 +14,7 @@ def Counter(sd):
     print(f"X={x}")
 
 
-dirName = "C:/Windows/appcompat" if os.name == 'nt' else "/tmp"
+dirName = "C:/Windows/appcompat" if os.name == "nt" else "/tmp"
 
 
 print("*** return_type=ReturnType.Base:")
@@ -29,7 +28,7 @@ for dirEntry in Scandir(dirName, return_type=ReturnType.Ext):
 
 
 print("*** Parallel Threads ***")
-sd = Scandir("~/workspace", return_type=ReturnType.Ext)
+sd = Scandir(".", return_type=ReturnType.Ext)
 thr = threading.Thread(target=Counter, args=(sd,), daemon=True)
 thr.start()
 sd.start()

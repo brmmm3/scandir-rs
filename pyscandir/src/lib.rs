@@ -11,7 +11,7 @@ mod pywalk;
 /// by parallelizing the iteration in background.
 #[pymodule]
 #[pyo3(name = "scandir_rs")]
-fn init(_py: Python, m: &PyModule) -> PyResult<()> {
+fn init(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_class::<def::ReturnType>()?;
     m.add_class::<pycount::Count>()?;

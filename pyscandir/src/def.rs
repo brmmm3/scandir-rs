@@ -53,7 +53,7 @@ impl DirEntry {
 #[pymethods]
 impl DirEntry {
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
-        let pydict = PyDict::new(py);
+        let pydict = PyDict::new_bound(py);
         pydict.set_item("path".to_object(py), self.path.clone())?;
         pydict.set_item("is_symlink".to_object(py), self.is_symlink)?;
         pydict.set_item("is_dir".to_object(py), self.is_dir)?;
@@ -135,7 +135,7 @@ impl DirEntryExt {
 #[pymethods]
 impl DirEntryExt {
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
-        let pydict = PyDict::new(py);
+        let pydict = PyDict::new_bound(py);
         pydict.set_item("path".to_object(py), self.path.clone())?;
         pydict.set_item("is_symlink".to_object(py), self.is_symlink)?;
         pydict.set_item("is_dir".to_object(py), self.is_dir)?;
@@ -211,7 +211,7 @@ impl Toc {
 #[pymethods]
 impl Toc {
     pub fn as_dict(&self, py: Python) -> PyResult<PyObject> {
-        let pydict = PyDict::new(py);
+        let pydict = PyDict::new_bound(py);
         pydict.set_item("dirs".to_object(py), self.dirs.clone())?;
         pydict.set_item("files".to_object(py), self.files.clone())?;
         pydict.set_item("symlinks".to_object(py), self.symlinks.clone())?;
@@ -285,7 +285,7 @@ impl Statistics {
 #[pymethods]
 impl Statistics {
     pub fn as_dict(&self, duration: Option<bool>, py: Python) -> PyResult<PyObject> {
-        let pyresult = PyDict::new(py);
+        let pyresult = PyDict::new_bound(py);
         if self.dirs > 0 {
             pyresult.set_item("dirs", self.dirs).unwrap();
         }

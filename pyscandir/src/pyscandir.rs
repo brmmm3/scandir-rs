@@ -2,20 +2,18 @@ use std::io::ErrorKind;
 use std::thread;
 use std::time::Duration;
 
-use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::{ PyDict, PyType };
 
-use crate::def::{DirEntry, DirEntryExt, ReturnType};
-use scandir::{ErrorsType, ScandirResult, ScandirResultsType};
+use crate::def::{ DirEntry, DirEntryExt, ReturnType };
+use scandir::{ ErrorsType, ScandirResult, ScandirResultsType };
 
 fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
     match result {
-        ScandirResult::DirEntry(e) => {
-            Some(PyCell::new(py, DirEntry::new(e)).unwrap().to_object(py))
-        }
+        ScandirResult::DirEntry(e) => { Some(Py::new(py, DirEntry::new(e)).unwrap().to_object(py)) }
         ScandirResult::DirEntryExt(e) => {
-            Some(PyCell::new(py, DirEntryExt::new(e)).unwrap().to_object(py))
+            Some(Py::new(py, DirEntryExt::new(e)).unwrap().to_object(py))
         }
         ScandirResult::Error((_path, _e)) => None,
     }
@@ -44,26 +42,32 @@ impl Scandir {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<ReturnType>,
-        store: Option<bool>,
+        store: Option<bool>
     ) -> PyResult<Self> {
         let return_type = return_type.unwrap_or(ReturnType::Base).from_object();
         Ok(Scandir {
             instance: match scandir::Scandir::new(root_path, store) {
-                Ok(s) => s
-                    .sorted(sorted.unwrap_or(false))
-                    .skip_hidden(skip_hidden.unwrap_or(false))
-                    .max_depth(max_depth.unwrap_or(0))
-                    .max_file_cnt(max_file_cnt.unwrap_or(0))
-                    .dir_include(dir_include)
-                    .dir_exclude(dir_exclude)
-                    .file_include(file_include)
-                    .file_exclude(file_exclude)
-                    .case_sensitive(case_sensitive.unwrap_or(false))
-                    .return_type(return_type),
-                Err(e) => match e.kind() {
-                    ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
-                    _ => return Err(PyException::new_err(e.to_string())),
-                },
+                Ok(s) =>
+                    s
+                        .sorted(sorted.unwrap_or(false))
+                        .skip_hidden(skip_hidden.unwrap_or(false))
+                        .max_depth(max_depth.unwrap_or(0))
+                        .max_file_cnt(max_file_cnt.unwrap_or(0))
+                        .dir_include(dir_include)
+                        .dir_exclude(dir_exclude)
+                        .file_include(file_include)
+                        .file_exclude(file_exclude)
+                        .case_sensitive(case_sensitive.unwrap_or(false))
+                        .return_type(return_type),
+                Err(e) =>
+                    match e.kind() {
+                        ErrorKind::NotFound => {
+                            return Err(PyFileNotFoundError::new_err(e.to_string()));
+                        }
+                        _ => {
+                            return Err(PyException::new_err(e.to_string()));
+                        }
+                    }
             },
             entries: Vec::new(),
             errors: Vec::new(),
@@ -77,9 +81,7 @@ impl Scandir {
     }
 
     pub fn start(&mut self) -> PyResult<()> {
-        self.instance
-            .start()
-            .map_err(|e| PyException::new_err(e.to_string()))
+        self.instance.start().map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -99,7 +101,10 @@ impl Scandir {
 
     pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, ErrorsType)> {
         let (entries, errors) = py.allow_threads(|| self.instance.collect())?;
-        let results = entries.iter().filter_map(|r| result2py(r, py)).collect();
+        let results = entries
+            .iter()
+            .filter_map(|r| result2py(r, py))
+            .collect();
         Ok((results, errors))
     }
 
@@ -113,7 +118,10 @@ impl Scandir {
 
     pub fn results(&mut self, only_new: Option<bool>, py: Python) -> (Vec<PyObject>, ErrorsType) {
         let (entries, errors) = self.instance.results(only_new.unwrap_or(true));
-        let results = entries.iter().filter_map(|e| result2py(e, py)).collect();
+        let results = entries
+            .iter()
+            .filter_map(|e| result2py(e, py))
+            .collect();
         (results, errors)
     }
 
@@ -146,18 +154,20 @@ impl Scandir {
     }
 
     pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyObject {
-        let pyresults = PyDict::new(py);
+        let pyresults = PyDict::new_bound(py);
         let (entries, errors) = self.instance.results(only_new.unwrap_or(true));
         for entry in entries {
             let _ = match entry {
-                ScandirResult::DirEntry(e) => pyresults.set_item(
-                    e.path.clone().into_py(py),
-                    PyCell::new(py, DirEntry::new(&e)).unwrap().to_object(py),
-                ),
-                ScandirResult::DirEntryExt(e) => pyresults.set_item(
-                    e.path.clone().into_py(py),
-                    PyCell::new(py, DirEntryExt::new(&e)).unwrap().to_object(py),
-                ),
+                ScandirResult::DirEntry(e) =>
+                    pyresults.set_item(
+                        e.path.clone().into_py(py),
+                        Py::new(py, DirEntry::new(&e)).unwrap().to_object(py)
+                    ),
+                ScandirResult::DirEntryExt(e) =>
+                    pyresults.set_item(
+                        e.path.clone().into_py(py),
+                        Py::new(py, DirEntryExt::new(&e)).unwrap().to_object(py)
+                    ),
                 ScandirResult::Error((path, e)) => {
                     pyresults.set_item(path.into_py(py), e.to_object(py))
                 }
@@ -182,24 +192,22 @@ impl Scandir {
     }
 
     fn __enter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.instance
-            .start()
-            .map_err(|e| PyException::new_err(e.to_string()))?;
+        slf.instance.start().map_err(|e| PyException::new_err(e.to_string()))?;
         Ok(slf)
     }
 
     fn __exit__(
         &mut self,
-        ty: Option<&PyType>,
-        _value: Option<&PyAny>,
-        _traceback: Option<&PyAny>,
+        ty: Option<Bound<PyType>>,
+        _value: Option<Bound<PyAny>>,
+        _traceback: Option<Bound<PyAny>>
     ) -> PyResult<bool> {
         if !self.instance.stop() {
             return Ok(false);
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type_bound::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -219,16 +227,14 @@ impl Scandir {
             if let Some(entry) = self.entries.pop() {
                 match entry {
                     ScandirResult::DirEntry(e) => {
-                        return Ok(Some(
-                            PyCell::new(py, DirEntry::new(&e)).unwrap().to_object(py),
-                        ))
+                        return Ok(Some(Py::new(py, DirEntry::new(&e)).unwrap().to_object(py)));
                     }
                     ScandirResult::DirEntryExt(e) => {
-                        return Ok(Some(
-                            PyCell::new(py, DirEntryExt::new(&e)).unwrap().to_object(py),
-                        ))
+                        return Ok(Some(Py::new(py, DirEntryExt::new(&e)).unwrap().to_object(py)));
                     }
-                    ScandirResult::Error(error) => return Ok(Some(error.to_object(py))),
+                    ScandirResult::Error(error) => {
+                        return Ok(Some(error.to_object(py)));
+                    }
                 }
             }
             if let Some(error) = self.errors.pop() {

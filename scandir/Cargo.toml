@@ -1,6 +1,6 @@
 [package]
 name = "scandir"
-version = "2.5.0"
+version = "2.5.1"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast directory scanner."
 edition = "2021"
@@ -17,7 +17,7 @@ crate-type = ["lib"]
 
 [dependencies]
 jwalk-meta = "0.9"
-rayon = "1.9"
+rayon = "1.10"
 flume = "0.11"
 glob-sl = "0.4"
 speedy = { version = "0.8", optional = true }

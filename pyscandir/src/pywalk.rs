@@ -3,11 +3,11 @@ use std::io::ErrorKind;
 use std::thread;
 use std::time::Duration;
 
-use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use crate::def::{ReturnType, Toc};
+use crate::def::{ ReturnType, Toc };
 
 #[pyclass]
 #[derive(Debug)]
@@ -34,26 +34,32 @@ impl Walk {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<ReturnType>,
-        store: Option<bool>,
+        store: Option<bool>
     ) -> PyResult<Self> {
         let return_type = return_type.unwrap_or(ReturnType::Base);
         Ok(Walk {
             instance: match scandir::Walk::new(root_path, store) {
-                Ok(s) => s
-                    .sorted(sorted.unwrap_or(false))
-                    .skip_hidden(skip_hidden.unwrap_or(false))
-                    .max_depth(max_depth.unwrap_or(0))
-                    .max_file_cnt(max_file_cnt.unwrap_or(0))
-                    .dir_include(dir_include)
-                    .dir_exclude(dir_exclude)
-                    .file_include(file_include)
-                    .file_exclude(file_exclude)
-                    .case_sensitive(case_sensitive.unwrap_or(false))
-                    .return_type(return_type.from_object()),
-                Err(e) => match e.kind() {
-                    ErrorKind::NotFound => return Err(PyFileNotFoundError::new_err(e.to_string())),
-                    _ => return Err(PyException::new_err(e.to_string())),
-                },
+                Ok(s) =>
+                    s
+                        .sorted(sorted.unwrap_or(false))
+                        .skip_hidden(skip_hidden.unwrap_or(false))
+                        .max_depth(max_depth.unwrap_or(0))
+                        .max_file_cnt(max_file_cnt.unwrap_or(0))
+                        .dir_include(dir_include)
+                        .dir_exclude(dir_exclude)
+                        .file_include(file_include)
+                        .file_exclude(file_exclude)
+                        .case_sensitive(case_sensitive.unwrap_or(false))
+                        .return_type(return_type.from_object()),
+                Err(e) =>
+                    match e.kind() {
+                        ErrorKind::NotFound => {
+                            return Err(PyFileNotFoundError::new_err(e.to_string()));
+                        }
+                        _ => {
+                            return Err(PyException::new_err(e.to_string()));
+                        }
+                    }
             },
             return_type,
             entries: Vec::new(),
@@ -68,9 +74,7 @@ impl Walk {
     }
 
     pub fn start(&mut self) -> PyResult<()> {
-        self.instance
-            .start()
-            .map_err(|e| PyException::new_err(e.to_string()))
+        self.instance.start().map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -89,9 +93,7 @@ impl Walk {
     }
 
     pub fn collect(&mut self, py: Python) -> PyResult<Toc> {
-        Ok(Toc::new(Some(
-            py.allow_threads(|| self.instance.collect())?,
-        )))
+        Ok(Toc::new(Some(py.allow_threads(|| self.instance.collect())?)))
     }
 
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
@@ -107,7 +109,7 @@ impl Walk {
         for result in self.instance.results(return_all.unwrap_or(false)) {
             results.push((
                 result.0,
-                PyCell::new(py, Toc::new(Some(result.1)))
+                Py::new(py, Toc::new(Some(result.1)))
                     .unwrap()
                     .to_object(py),
             ));
@@ -132,24 +134,22 @@ impl Walk {
     }
 
     fn __enter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.instance
-            .start()
-            .map_err(|e| PyException::new_err(e.to_string()))?;
+        slf.instance.start().map_err(|e| PyException::new_err(e.to_string()))?;
         Ok(slf)
     }
 
     fn __exit__(
         &mut self,
-        ty: Option<&PyType>,
-        _value: Option<&PyAny>,
-        _traceback: Option<&PyAny>,
+        exc_ty: Option<Bound<PyType>>,
+        _exc_value: Option<Bound<PyAny>>,
+        _traceback: Option<Bound<PyAny>>
     ) -> PyResult<bool> {
         if !self.instance.stop() {
             return Ok(false);
         }
         self.instance.join();
-        match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
+        match exc_ty {
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type_bound::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -169,26 +169,24 @@ impl Walk {
             if let Some((root_dir, toc)) = self.entries.get(self.idx) {
                 self.idx += 1;
                 if self.return_type == ReturnType::Base {
-                    return Ok(Some(
-                        (root_dir, toc.dirs.clone(), toc.files.clone()).to_object(py),
-                    ));
+                    return Ok(Some((root_dir, toc.dirs.clone(), toc.files.clone()).to_object(py)));
                 } else {
-                    return Ok(Some(
-                        (
-                            root_dir,
-                            toc.dirs.clone(),
-                            toc.files.clone(),
-                            toc.symlinks.clone(),
-                            toc.other.clone(),
-                            toc.errors.clone(),
+                    return Ok(
+                        Some(
+                            (
+                                root_dir,
+                                toc.dirs.clone(),
+                                toc.files.clone(),
+                                toc.symlinks.clone(),
+                                toc.other.clone(),
+                                toc.errors.clone(),
+                            ).to_object(py)
                         )
-                            .to_object(py),
-                    ));
+                    );
                 }
             } else {
                 self.entries.clear();
-                self.entries
-                    .extend_from_slice(&self.instance.results(true)[..]);
+                self.entries.extend_from_slice(&self.instance.results(true)[..]);
                 if self.entries.is_empty() {
                     if !self.instance.busy() {
                         break;

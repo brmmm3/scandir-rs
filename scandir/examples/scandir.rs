@@ -1,26 +1,24 @@
 use std::env;
 use std::io::Error;
 
-use scandir::{ReturnType, Scandir};
+use scandir::{ ReturnType, Scandir };
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
-    let mut instance = Scandir::new(&args[1], Some(true))?;
+    let default_dir = "/tmp".to_string();
+    let root_dir = &args.get(1).unwrap_or(&default_dir);
+    let mut instance = Scandir::new(&root_dir, Some(true))?;
     instance = instance.max_file_cnt(100);
     if args.len() > 2 {
         instance = instance.return_type(ReturnType::Ext);
     }
-    let (results, errors) = instance.collect()?;
-    for (path, error) in errors {
-        println!("ERROR {path}: {error}");
+    let entries = instance.collect()?;
+    for (path, error) in entries.errors {
+        println!("ERROR {path:?}: {error}");
     }
-    let first_result = results.iter().next().unwrap();
-    println!(
-        "First file {} has size {}",
-        first_result.path(),
-        first_result.size()
-    );
-    let mut result = format!("{:#?}", instance.results(true,));
+    let first_result = entries.results.iter().next().unwrap();
+    println!("First file {:?} has size {}", first_result.path(), first_result.size());
+    let mut result = format!("{:#?}", instance.results(true));
     if result.len() > 2000 {
         result = result[..2000].to_string();
     }

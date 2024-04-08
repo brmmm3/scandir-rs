@@ -5,15 +5,18 @@ use std::time::Duration;
 use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
 use pyo3::prelude::*;
 use pyo3::types::{ PyDict, PyType };
+use scandir::def::scandir::ScandirResults;
 
 use crate::def::{ DirEntry, DirEntryExt, ReturnType };
-use scandir::{ ErrorsType, ScandirResult, ScandirResultsType };
+use scandir::{ ErrorsType, ScandirResult };
 
 fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
     match result {
-        ScandirResult::DirEntry(e) => { Some(Py::new(py, DirEntry::new(e)).unwrap().to_object(py)) }
+        ScandirResult::DirEntry(e) => {
+            Some(Py::new(py, DirEntry::from(e)).unwrap().to_object(py))
+        }
         ScandirResult::DirEntryExt(e) => {
-            Some(Py::new(py, DirEntryExt::new(e)).unwrap().to_object(py))
+            Some(Py::new(py, DirEntryExt::from(e)).unwrap().to_object(py))
         }
         ScandirResult::Error((_path, _e)) => None,
     }
@@ -23,8 +26,7 @@ fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
 #[derive(Debug)]
 pub struct Scandir {
     instance: scandir::Scandir,
-    entries: ScandirResultsType,
-    errors: ErrorsType,
+    entries: ScandirResults,
 }
 
 #[pymethods]
@@ -69,15 +71,13 @@ impl Scandir {
                         }
                     }
             },
-            entries: Vec::new(),
-            errors: Vec::new(),
+            entries: ScandirResults::new(),
         })
     }
 
     pub fn clear(&mut self) {
         self.instance.clear();
         self.entries.clear();
-        self.errors.clear();
     }
 
     pub fn start(&mut self) -> PyResult<()> {
@@ -100,12 +100,12 @@ impl Scandir {
     }
 
     pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, ErrorsType)> {
-        let (entries, errors) = py.allow_threads(|| self.instance.collect())?;
-        let results = entries
+        let entries = py.allow_threads(|| self.instance.collect())?;
+        let results = entries.results
             .iter()
             .filter_map(|r| result2py(r, py))
             .collect();
-        Ok((results, errors))
+        Ok((results, entries.errors))
     }
 
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
@@ -117,12 +117,12 @@ impl Scandir {
     }
 
     pub fn results(&mut self, only_new: Option<bool>, py: Python) -> (Vec<PyObject>, ErrorsType) {
-        let (entries, errors) = self.instance.results(only_new.unwrap_or(true));
-        let results = entries
+        let entries = self.instance.results(only_new.unwrap_or(true));
+        let results = entries.results
             .iter()
             .filter_map(|e| result2py(e, py))
             .collect();
-        (results, errors)
+        (results, entries.errors)
     }
 
     pub fn has_entries(&mut self, only_new: Option<bool>) -> bool {
@@ -155,25 +155,25 @@ impl Scandir {
 
     pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyObject {
         let pyresults = PyDict::new_bound(py);
-        let (entries, errors) = self.instance.results(only_new.unwrap_or(true));
-        for entry in entries {
+        let entries = self.instance.results(only_new.unwrap_or(true));
+        for entry in entries.results {
             let _ = match entry {
                 ScandirResult::DirEntry(e) =>
                     pyresults.set_item(
                         e.path.clone().into_py(py),
-                        Py::new(py, DirEntry::new(&e)).unwrap().to_object(py)
+                        Py::new(py, DirEntry::from(&e)).unwrap().to_object(py)
                     ),
                 ScandirResult::DirEntryExt(e) =>
                     pyresults.set_item(
                         e.path.clone().into_py(py),
-                        Py::new(py, DirEntryExt::new(&e)).unwrap().to_object(py)
+                        Py::new(py, DirEntryExt::from(&e)).unwrap().to_object(py)
                     ),
                 ScandirResult::Error((path, e)) => {
                     pyresults.set_item(path.into_py(py), e.to_object(py))
                 }
             };
         }
-        for error in errors {
+        for error in entries.errors {
             let _ = pyresults.set_item(error.0.into_py(py), error.1.to_object(py));
         }
         pyresults.to_object(py)
@@ -218,43 +218,41 @@ impl Scandir {
         }
         slf.instance.start()?;
         slf.entries.clear();
-        slf.errors.clear();
         Ok(slf)
     }
 
     fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
         loop {
-            if let Some(entry) = self.entries.pop() {
+            if let Some(entry) = self.entries.results.pop() {
                 match entry {
                     ScandirResult::DirEntry(e) => {
-                        return Ok(Some(Py::new(py, DirEntry::new(&e)).unwrap().to_object(py)));
+                        return Ok(Some(Py::new(py, DirEntry::from(&e)).unwrap().to_object(py)));
                     }
                     ScandirResult::DirEntryExt(e) => {
-                        return Ok(Some(Py::new(py, DirEntryExt::new(&e)).unwrap().to_object(py)));
+                        return Ok(Some(Py::new(py, DirEntryExt::from(&e)).unwrap().to_object(py)));
                     }
                     ScandirResult::Error(error) => {
                         return Ok(Some(error.to_object(py)));
                     }
                 }
             }
-            if let Some(error) = self.errors.pop() {
+            if let Some(error) = self.entries.errors.pop() {
                 return Ok(Some(error.to_object(py)));
             }
-            let (entries, errors) = self.instance.results(true);
-            if entries.is_empty() && errors.is_empty() {
+            let entries = self.instance.results(true);
+            if entries.is_empty() {
                 if !self.instance.busy() {
                     break;
                 }
                 thread::sleep(Duration::from_millis(10));
             } else {
-                self.entries.extend_from_slice(&entries);
-                self.errors.extend_from_slice(&errors);
+                self.entries.extend(&entries);
             }
         }
         Ok(None)
     }
 
     fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{:?}", self))
+        Ok(format!("{self:?}"))
     }
 }

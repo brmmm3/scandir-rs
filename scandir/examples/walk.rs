@@ -3,12 +3,12 @@ use std::io::Error;
 use std::thread;
 use std::time::Duration;
 
-use scandir::{ReturnType, Walk};
+use scandir::{ ReturnType, Walk };
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
-    let root_dir = &args[1];
-    //let root_dir = "/tmp/1".to_owned();
+    let default_dir = "/tmp".to_string();
+    let root_dir = &args.get(1).unwrap_or(&default_dir);
     let mut instance = Walk::new(&root_dir, Some(true))?.max_file_cnt(100);
     if args.len() > 2 {
         instance = instance.return_type(ReturnType::Ext);

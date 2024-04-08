@@ -12,6 +12,8 @@
 #![cfg_attr(windows, feature(windows_by_handle))]
 
 extern crate glob_sl;
+#[macro_use]
+extern crate serde_derive;
 
 pub mod def;
 pub use def::*;
@@ -21,4 +23,4 @@ pub use count::*;
 pub mod walk;
 pub use walk::*;
 pub mod scandir;
-pub use crate::scandir::*;
+pub use scandir::*;

@@ -93,7 +93,7 @@ impl Walk {
     }
 
     pub fn collect(&mut self, py: Python) -> PyResult<Toc> {
-        Ok(Toc::new(Some(py.allow_threads(|| self.instance.collect())?)))
+        Ok(Toc::from(&py.allow_threads(|| self.instance.collect())?))
     }
 
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
@@ -107,12 +107,7 @@ impl Walk {
     pub fn results(&mut self, return_all: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
         let mut results = Vec::new();
         for result in self.instance.results(return_all.unwrap_or(false)) {
-            results.push((
-                result.0,
-                Py::new(py, Toc::new(Some(result.1)))
-                    .unwrap()
-                    .to_object(py),
-            ));
+            results.push((result.0, Py::new(py, Toc::from(&result.1)).unwrap().to_object(py)));
         }
         results
     }
@@ -201,7 +196,11 @@ impl Walk {
         Ok(None)
     }
 
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{self:?}"))
+    }
+
     fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{:?}", self))
+        Ok(format!("{self:?}"))
     }
 }

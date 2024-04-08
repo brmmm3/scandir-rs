@@ -26,7 +26,7 @@ Is an enum which can be:
 - ``st_ctime`` creation time in seconds as float.
 - ``st_mtime`` modification time in seconds as float.
 - ``st_atime`` access time in seconds as float.
-- ``st_mode`` file access mode.
+- ``st_mode`` file access mode / rights.
 - ``st_ino`` inode number (only for Unix).
 - ``st_dev`` device number (only for Unix).
 - ``st_nlink`` number of hard links.

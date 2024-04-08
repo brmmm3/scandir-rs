@@ -1,85 +1,31 @@
 use std::collections::HashSet;
 use std::fs::Metadata;
-use std::io::{Error, ErrorKind};
+use std::io::{ Error, ErrorKind };
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{ AtomicBool, AtomicUsize, Ordering };
+use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::Instant;
 
-use flume::{unbounded, Receiver, Sender};
+use flume::{ unbounded, Receiver, Sender };
 use jwalk_meta::WalkDirGeneric;
 
-use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
-use crate::def::{Filter, Options, ReturnType};
-
-#[derive(Debug, Clone)]
-pub struct Statistics {
-    pub dirs: i32,
-    pub files: i32,
-    pub slinks: i32,
-    pub hlinks: i32,
-    pub devices: i32,
-    pub pipes: i32,
-    pub size: u64,
-    pub usage: u64,
-    pub errors: Vec<String>,
-    pub duration: f64,
-}
-
-impl Statistics {
-    pub fn new() -> Self {
-        Statistics {
-            dirs: 0,
-            files: 0,
-            slinks: 0,
-            hlinks: 0,
-            devices: 0,
-            pipes: 0,
-            size: 0,
-            usage: 0,
-            errors: Vec::new(),
-            duration: 0.0,
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.dirs = 0;
-        self.files = 0;
-        self.slinks = 0;
-        self.hlinks = 0;
-        self.devices = 0;
-        self.pipes = 0;
-        self.size = 0;
-        self.usage = 0;
-        self.errors.clear();
-        self.duration = 0.0;
-    }
-}
-
-impl Default for Statistics {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use crate::common::{ check_and_expand_path, create_filter, filter_children, get_root_path_len };
+use crate::def::{ Filter, Options, ReturnType };
+use crate::Statistics;
 
 fn count_thread(
     options: Options,
     filter: Option<Filter>,
     tx: Sender<Statistics>,
-    stop: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>
 ) {
     let mut statistics = Statistics::new();
 
-    let dir_entry: jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)> =
-        jwalk_meta::DirEntry::from_path(
-            0,
-            &options.root_path,
-            true,
-            true,
-            false,
-            Arc::new(Vec::new()),
-        )
+    let dir_entry: jwalk_meta::DirEntry<
+        ((), Option<Result<Metadata, Error>>)
+    > = jwalk_meta::DirEntry
+        ::from_path(0, &options.root_path, true, true, false, Arc::new(Vec::new()))
         .unwrap();
 
     if !dir_entry.file_type.is_dir() {
@@ -136,7 +82,8 @@ fn count_thread(
     let file_cnt = Arc::new(AtomicUsize::new(0));
     let file_cnt_cloned = file_cnt.clone();
     let stop_cloned = stop.clone();
-    for entry in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>::new(&options.root_path)
+    for entry in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>
+        ::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(false)
         .max_depth(options.max_depth)
@@ -159,8 +106,7 @@ fn count_thread(
             }
             let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len();
             file_cnt_cloned.store(file_cnt_new, Ordering::Relaxed);
-        })
-    {
+        }) {
         if stop.load(Ordering::Relaxed) {
             break;
         }
@@ -235,7 +181,7 @@ fn count_thread(
                     size += 4096;
                 }
                 cnt += 1;
-                if (cnt >= 1000) || (update_time.elapsed().as_millis() >= 10) {
+                if cnt >= 1000 || update_time.elapsed().as_millis() >= 10 {
                     statistics.dirs = dirs;
                     statistics.files = files;
                     statistics.slinks = slinks;
@@ -276,7 +222,7 @@ pub struct Count {
     // Options
     options: Options,
     // Results
-    statistics: Statistics,
+    pub statistics: Statistics,
     duration: Arc<Mutex<f64>>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
@@ -396,11 +342,13 @@ impl Count {
         self.stop.store(false, Ordering::Relaxed);
         let stop = self.stop.clone();
         let duration = self.duration.clone();
-        self.thr = Some(thread::spawn(move || {
-            let start_time = Instant::now();
-            count_thread(options, filter, tx, stop);
-            *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
-        }));
+        self.thr = Some(
+            thread::spawn(move || {
+                let start_time = Instant::now();
+                count_thread(options, filter, tx, stop);
+                *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
+            })
+        );
         Ok(())
     }
 
@@ -470,11 +418,7 @@ impl Count {
     }
 
     pub fn busy(&self) -> bool {
-        if let Some(ref thr) = self.thr {
-            !thr.is_finished()
-        } else {
-            false
-        }
+        if let Some(ref thr) = self.thr { !thr.is_finished() } else { false }
     }
 
     // For debugging

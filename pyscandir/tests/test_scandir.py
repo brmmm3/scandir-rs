@@ -17,9 +17,9 @@ def test_scandir_fast(tempDir):
     sd = Scandir(tempDir.name, return_type=ReturnType.Base)
     contents = {}
     for dirEntry in sd:
-        assert dirEntry.st_atime > 0.0
-        assert dirEntry.st_ctime > 0.0
-        assert dirEntry.st_mtime > 0.0
+        assert dirEntry.atime > 0.0
+        assert dirEntry.ctime > 0.0
+        assert dirEntry.mtime > 0.0
         assert not hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
     assert len(contents) == 186
@@ -29,9 +29,9 @@ def test_scandir_ext(tempDir):
     sd = Scandir(tempDir.name, return_type=ReturnType.Ext)
     contents = {}
     for dirEntry in sd:
-        assert dirEntry.st_atime > 0.0
-        assert dirEntry.st_ctime > 0.0
-        assert dirEntry.st_mtime > 0.0
+        assert dirEntry.atime > 0.0
+        assert dirEntry.ctime > 0.0
+        assert dirEntry.mtime > 0.0
         assert hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
     assert len(contents) == 186

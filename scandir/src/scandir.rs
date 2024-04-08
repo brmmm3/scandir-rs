@@ -1,20 +1,18 @@
 use std::fs::Metadata;
-use std::io::{Error, ErrorKind};
-use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::io::{ Error, ErrorKind };
+use std::path::{ Path, PathBuf };
+use std::sync::atomic::{ AtomicBool, AtomicUsize, Ordering };
+use std::sync::{ Arc, Mutex };
 use std::thread;
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::time::{ Instant, SystemTime };
 
-use flume::{unbounded, Receiver, Sender};
+use flume::{ unbounded, Receiver, Sender };
 
 use jwalk_meta::WalkDirGeneric;
 
-use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
-use crate::def::{
-    DirEntry, DirEntryExt, ErrorsType, Filter, Options, ReturnType, ScandirResult,
-    ScandirResultsType,
-};
+use crate::common::{ check_and_expand_path, create_filter, filter_children, get_root_path_len };
+use crate::def::scandir::ScandirResults;
+use crate::def::{ DirEntry, DirEntryExt, ErrorsType, Filter, Options, ReturnType, ScandirResult };
 
 #[derive(Debug, Clone)]
 pub enum Stats {
@@ -23,25 +21,16 @@ pub enum Stats {
     Duration(f64),
 }
 
-/// Scandir result
-#[derive(Debug, Clone)]
-pub struct Entry {
-    /// Absolute file path
-    pub path: String,
-    /// File stats
-    pub entry: Stats,
-}
-
 #[inline]
 fn create_entry(
     root_path_len: usize,
     return_type: &ReturnType,
-    dir_entry: &jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>,
-) -> (bool, Entry) {
+    dir_entry: &jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>
+) -> (bool, ScandirResult) {
     let file_type = dir_entry.file_type;
-    let mut st_ctime: f64 = 0.0;
-    let mut st_mtime: f64 = 0.0;
-    let mut st_atime: f64 = 0.0;
+    let mut st_ctime: Option<SystemTime> = None;
+    let mut st_mtime: Option<SystemTime> = None;
+    let mut st_atime: Option<SystemTime> = None;
     let mut st_mode: u32 = 0;
     let mut st_ino: u64 = 0;
     let mut st_dev: u64 = 0;
@@ -65,24 +54,9 @@ fn create_entry(
     #[cfg(windows)]
     let st_rdev: u64 = 0;
     if let Some(ref metadata) = dir_entry.metadata {
-        let duration = metadata
-            .created
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        st_ctime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        let duration = metadata
-            .modified
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        st_mtime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
-        let duration = metadata
-            .accessed
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        st_atime = duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9;
+        st_ctime = metadata.created;
+        st_mtime = metadata.modified;
+        st_atime = metadata.accessed;
         st_size = metadata.size;
         if let Some(ref metadata) = dir_entry.metadata_ext {
             #[cfg(unix)]
@@ -117,84 +91,66 @@ fn create_entry(
         }
     }
     let is_file = file_type.is_file();
-    let mut key = dir_entry.parent_path.to_path_buf();
-    let file_name = match dir_entry.file_name.clone().into_string() {
-        Ok(s) => s,
-        Err(_) => {
-            return (
-                is_file,
-                Entry {
-                    path: key.to_str().unwrap().to_string(), // Absolute file path
-                    entry: Stats::ScandirResult(ScandirResult::Error((
-                        format!("{:?}", dir_entry.file_name),
-                        "Invalid file name!".to_string(),
-                    ))),
-                },
-            );
-        }
+    let path_str = dir_entry.parent_path.to_str().unwrap();
+    let mut path = if path_str.len() > root_path_len {
+        PathBuf::from(&path_str[root_path_len..])
+    } else {
+        PathBuf::new()
     };
-    key.push(&file_name);
-    let key = key.to_str().unwrap().to_string();
-    let path = key.get(root_path_len..).unwrap_or(&file_name).to_string();
+    path.push(&dir_entry.file_name);
     let entry: ScandirResult = match return_type {
-        ReturnType::Base => ScandirResult::DirEntry(DirEntry {
-            path,
-            is_symlink: file_type.is_symlink(),
-            is_dir: file_type.is_dir(),
-            is_file,
-            st_ctime,
-            st_mtime,
-            st_atime,
-            st_size,
-        }),
-        ReturnType::Ext => ScandirResult::DirEntryExt(DirEntryExt {
-            path,
-            is_symlink: file_type.is_symlink(),
-            is_dir: file_type.is_dir(),
-            is_file,
-            st_ctime,
-            st_mtime,
-            st_atime,
-            st_mode,
-            st_ino,
-            st_dev,
-            st_nlink,
-            st_size,
-            st_blksize,
-            st_blocks,
-            st_uid,
-            st_gid,
-            st_rdev,
-        }),
-        _ => ScandirResult::Error((path, "Wrong return type!".to_string())),
+        ReturnType::Base =>
+            ScandirResult::DirEntry(DirEntry {
+                path: path.to_str().unwrap().to_string(),
+                is_symlink: file_type.is_symlink(),
+                is_dir: file_type.is_dir(),
+                is_file,
+                st_ctime,
+                st_mtime,
+                st_atime,
+                st_size,
+            }),
+        ReturnType::Ext =>
+            ScandirResult::DirEntryExt(DirEntryExt {
+                path: path.to_str().unwrap().to_string(),
+                is_symlink: file_type.is_symlink(),
+                is_dir: file_type.is_dir(),
+                is_file,
+                st_ctime,
+                st_mtime,
+                st_atime,
+                st_mode,
+                st_ino,
+                st_dev,
+                st_nlink,
+                st_size,
+                st_blksize,
+                st_blocks,
+                st_uid,
+                st_gid,
+                st_rdev,
+            }),
+        _ =>
+            ScandirResult::Error((
+                path.to_str().unwrap().to_string(),
+                "Wrong return type!".to_string(),
+            )),
     };
-    (
-        is_file,
-        Entry {
-            path: key, // Absolute file path
-            entry: Stats::ScandirResult(entry),
-        },
-    )
+    (is_file, entry)
 }
 
 fn entries_thread(
     options: Options,
     filter: Option<Filter>,
-    tx: Sender<Entry>,
-    stop: Arc<AtomicBool>,
+    tx: Sender<ScandirResult>,
+    stop: Arc<AtomicBool>
 ) {
     let root_path_len = get_root_path_len(&options.root_path);
     let return_type = options.return_type.clone();
 
-    let dir_entry = jwalk_meta::DirEntry::from_path(
-        0,
-        &options.root_path,
-        true,
-        true,
-        false,
-        Arc::new(Vec::new()),
-    )
-    .unwrap();
+    let dir_entry = jwalk_meta::DirEntry
+        ::from_path(0, &options.root_path, true, true, false, Arc::new(Vec::new()))
+        .unwrap();
 
     if !dir_entry.file_type.is_dir() {
         let _ = tx.send(create_entry(root_path_len, &return_type, &dir_entry).1);
@@ -242,11 +198,10 @@ fn entries_thread(
             if local_file_cnt > 0 {
                 file_cnt_cloned.store(
                     file_cnt_cloned.load(Ordering::Relaxed) + local_file_cnt,
-                    Ordering::Relaxed,
+                    Ordering::Relaxed
                 );
             }
-        })
-    {
+        }) {
         if stop.load(Ordering::Relaxed) {
             break;
         }
@@ -263,13 +218,12 @@ pub struct Scandir {
     options: Options,
     store: bool,
     // Results
-    entries: ScandirResultsType,
-    errors: ErrorsType,
+    entries: ScandirResults,
     duration: Arc<Mutex<f64>>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     stop: Arc<AtomicBool>,
-    rx: Option<Receiver<Entry>>,
+    rx: Option<Receiver<ScandirResult>>,
 }
 
 impl Scandir {
@@ -289,8 +243,7 @@ impl Scandir {
                 return_type: ReturnType::Base,
             },
             store: store.unwrap_or(true),
-            entries: Vec::new(),
-            errors: Vec::new(),
+            entries: ScandirResults::new(),
             duration: Arc::new(Mutex::new(0.0)),
             thr: None,
             stop: Arc::new(AtomicBool::new(false)),
@@ -374,7 +327,6 @@ impl Scandir {
 
     pub fn clear(&mut self) {
         self.entries.clear();
-        self.errors.clear();
         *self.duration.lock().unwrap() = 0.0;
     }
 
@@ -383,10 +335,9 @@ impl Scandir {
             return Err(Error::new(ErrorKind::Other, "Busy"));
         }
         if self.options.return_type > ReturnType::Ext {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "Parameter return_type has invalid value",
-            ));
+            return Err(
+                Error::new(ErrorKind::InvalidInput, "Parameter return_type has invalid value")
+            );
         }
         self.clear();
         let options = self.options.clone();
@@ -396,11 +347,13 @@ impl Scandir {
         self.stop.store(false, Ordering::Relaxed);
         let stop = self.stop.clone();
         let duration = self.duration.clone();
-        self.thr = Some(thread::spawn(move || {
-            let start_time = Instant::now();
-            entries_thread(options, filter, tx, stop);
-            *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
-        }));
+        self.thr = Some(
+            thread::spawn(move || {
+                let start_time = Instant::now();
+                entries_thread(options, filter, tx, stop);
+                *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
+            })
+        );
         Ok(())
     }
 
@@ -425,30 +378,7 @@ impl Scandir {
         false
     }
 
-    fn receive_all(&mut self) -> (ScandirResultsType, ErrorsType) {
-        let mut entries: ScandirResultsType = Vec::new();
-        let mut errors: ErrorsType = Vec::new();
-        if let Some(ref rx) = self.rx {
-            while let Ok(entry) = rx.try_recv() {
-                match entry.entry {
-                    Stats::ScandirResult(ref r) => match r {
-                        ScandirResult::DirEntry(_) => entries.push(r.clone()),
-                        ScandirResult::DirEntryExt(_) => entries.push(r.clone()),
-                        ScandirResult::Error((path, e)) => {
-                            errors.push((path.to_owned(), e.to_owned()));
-                        }
-                    },
-                    Stats::Error(e) => {
-                        errors.push((entry.path, e));
-                    }
-                    Stats::Duration(d) => *self.duration.lock().unwrap() = d,
-                }
-            }
-        }
-        (entries, errors)
-    }
-
-    pub fn collect(&mut self) -> Result<(ScandirResultsType, ErrorsType), Error> {
+    pub fn collect(&mut self) -> Result<ScandirResults, Error> {
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
@@ -467,33 +397,37 @@ impl Scandir {
         if only_new {
             return false;
         }
-        !self.entries.is_empty() && !self.errors.is_empty()
+        !self.entries.is_empty()
     }
 
     pub fn results_cnt(&mut self, only_new: bool) -> usize {
         if let Some(ref rx) = self.rx {
-            if only_new {
-                rx.len()
-            } else {
-                self.entries.len() + self.errors.len() + rx.len()
-            }
+            if only_new { rx.len() } else { self.entries.len() + rx.len() }
         } else if only_new {
             0
         } else {
-            self.entries.len() + self.errors.len()
+            self.entries.len()
         }
     }
 
-    pub fn results(&mut self, only_new: bool) -> (ScandirResultsType, ErrorsType) {
-        let (entries, errors) = self.receive_all();
+    pub fn results(&mut self, only_new: bool) -> ScandirResults {
+        let mut results = ScandirResults::new();
+        if let Some(ref rx) = self.rx {
+            while let Ok(entry) = rx.try_recv() {
+                if let ScandirResult::Error(e) = entry {
+                    results.errors.push(e);
+                } else {
+                    results.results.push(entry);
+                }
+            }
+        }
         if self.store {
-            self.entries.extend_from_slice(&entries);
-            self.errors.extend(errors.clone());
+            self.entries.extend(&results);
         }
         if !only_new && self.store {
-            return (self.entries.clone(), self.errors.clone());
+            return self.entries.clone();
         }
-        (entries, errors)
+        results
     }
 
     pub fn has_entries(&mut self, only_new: bool) -> bool {
@@ -519,20 +453,20 @@ impl Scandir {
         }
     }
 
-    pub fn entries(&mut self, only_new: bool) -> ScandirResultsType {
-        self.results(only_new).0
+    pub fn entries(&mut self, only_new: bool) -> Vec<ScandirResult> {
+        self.results(only_new).results
     }
 
     pub fn has_errors(&mut self) -> bool {
-        !self.errors.is_empty()
+        !self.entries.errors.is_empty()
     }
 
     pub fn errors_cnt(&mut self) -> usize {
-        self.errors.len()
+        self.entries.errors.len()
     }
 
     pub fn errors(&mut self, only_new: bool) -> ErrorsType {
-        self.results(only_new).1
+        self.results(only_new).errors
     }
 
     pub fn duration(&mut self) -> f64 {
@@ -544,11 +478,7 @@ impl Scandir {
     }
 
     pub fn busy(&self) -> bool {
-        if let Some(ref thr) = self.thr {
-            !thr.is_finished()
-        } else {
-            false
-        }
+        if let Some(ref thr) = self.thr { !thr.is_finished() } else { false }
     }
 
     // For debugging

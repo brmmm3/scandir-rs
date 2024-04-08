@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import os
-import sys
 import time
 
 from scandir_rs import Count, Walk, Scandir, ReturnType
@@ -19,13 +18,13 @@ def scantree(path):
         return
 
 
-if os.name == 'nt':
+if os.name == "nt":
     dirName = "C:/Windows"
 else:
     dirName = "/usr"
 
 print(f"Benchmarking directory: {dirName}")
-if os.name != 'nt':
+if os.name != "nt":
     dirName = os.path.expanduser(dirName)
 print(Count(dirName).collect())
 print(Count(dirName, return_type=ReturnType.Ext).collect())
@@ -85,7 +84,8 @@ instance = Walk(dirName)
 toc = instance.collect()
 dt = time.time() - t1
 print(
-    f"Walk.collect: {dt:.3f} dirs={len(toc.dirs)} files=={len(toc.files)} Walk().duration={instance.duration()}")
+    f"Walk.collect: {dt:.3f} dirs={len(toc.dirs)} files=={len(toc.files)} Walk().duration={instance.duration()}"
+)
 
 t1 = time.time()
 toc = Walk(dirName, return_type=ReturnType.Ext).collect()
@@ -109,8 +109,7 @@ t1 = time.time()
 instance = Scandir(dirName)
 toc = instance.collect()
 dt = time.time() - t1
-print(
-    f"Scandir.collect: {dt:.3f} {len(toc)} Scandir().duration={instance.duration()}")
+print(f"Scandir.collect: {dt:.3f} {len(toc)} Scandir().duration={instance.duration()}")
 
 t1 = time.time()
 entries = Scandir(dirName, return_type=ReturnType.Ext).collect()

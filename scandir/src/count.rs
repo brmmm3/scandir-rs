@@ -119,15 +119,7 @@ fn count_thread(
                     continue;
                 }
                 let file_type = v.file_type;
-                if file_type.is_dir() {
-                    dirs += 1;
-                    usage += 4096;
-                    size += 4096;
-                } else if file_type.is_symlink() {
-                    slinks += 1;
-                    usage += 4096;
-                    size += 4096;
-                } else if file_type.is_file() {
+                if file_type.is_file() {
                     files += 1;
                     if let Some(ref metadata) = v.metadata {
                         let file_size = metadata.size;
@@ -166,6 +158,14 @@ fn count_thread(
                             }
                         }
                     }
+                } else if file_type.is_dir() {
+                    dirs += 1;
+                    usage += 4096;
+                    size += 4096;
+                } else if file_type.is_symlink() {
+                    slinks += 1;
+                    usage += 4096;
+                    size += 4096;
                 } else {
                     #[cfg(unix)]
                     if let Some(ref metadata) = v.metadata_ext {

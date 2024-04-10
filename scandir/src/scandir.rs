@@ -80,12 +80,15 @@ fn create_entry(
                 if st_blocks << 12 < st_size {
                     st_blocks += 1;
                 }
+                // file_index is saved in st_ino
                 if let Some(ino) = metadata.file_index {
                     st_ino = ino;
                 }
+                // volume_serial_number is saved in st_dev
                 if let Some(dev) = metadata.volume_serial_number {
                     st_dev = dev as u64;
                 }
+                // number_of_links is saved in st_nlink
                 if let Some(nlink) = metadata.number_of_links {
                     st_nlink = nlink as u64;
                 }
@@ -495,30 +498,12 @@ impl Scandir {
                 statistics.size += entry.size();
                 if let Some(ext) = entry.ext() {
                     statistics.usage += ext.st_blocks << 9;
-                    #[cfg(unix)]
-                    {
-                        if ext.st_nlink > 1 {
-                            if file_indexes.contains(&ext.st_ino) {
-                                statistics.hlinks += 1;
-                                statistics.files -= 1;
-                            } else {
-                                file_indexes.insert(ext.st_ino);
-                            }
-                        }
-                    }
-                    #[cfg(windows)]
-                    {
-                        if let Some(nlink) = ext.number_of_links {
-                            if nlink > 1 {
-                                if let Some(ino) = ext.file_index {
-                                    if file_indexes.contains(&ino) {
-                                        statistics.hlinks += 1;
-                                        statistics.files -= 1;
-                                    } else {
-                                        file_indexes.insert(ino);
-                                    }
-                                }
-                            }
+                    if ext.st_nlink > 1 {
+                        if file_indexes.contains(&ext.st_ino) {
+                            statistics.hlinks += 1;
+                            statistics.files -= 1;
+                        } else {
+                            file_indexes.insert(ext.st_ino);
                         }
                     }
                 }

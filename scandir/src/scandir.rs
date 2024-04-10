@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::Metadata;
 use std::io::{ Error, ErrorKind };
 use std::path::{ Path, PathBuf };
@@ -13,6 +14,7 @@ use jwalk_meta::WalkDirGeneric;
 use crate::common::{ check_and_expand_path, create_filter, filter_children, get_root_path_len };
 use crate::def::scandir::ScandirResults;
 use crate::def::{ DirEntry, DirEntryExt, ErrorsType, Filter, Options, ReturnType, ScandirResult };
+use crate::Statistics;
 
 #[derive(Debug, Clone)]
 pub enum Stats {
@@ -467,6 +469,83 @@ impl Scandir {
 
     pub fn errors(&mut self, only_new: bool) -> ErrorsType {
         self.results(only_new).errors
+    }
+
+    #[cfg(feature = "speedy")]
+    pub fn to_speedy(&self) -> Result<Vec<u8>, speedy::Error> {
+        self.entries.to_speedy()
+    }
+
+    #[cfg(feature = "bincode")]
+    pub fn to_bincode(&self) -> bincode::Result<Vec<u8>> {
+        self.entries.to_bincode()
+    }
+
+    #[cfg(feature = "json")]
+    pub fn to_json(&self) -> serde_json::Result<String> {
+        self.entries.to_json()
+    }
+
+    pub fn statistics(&self) -> Statistics {
+        let mut statistics = Statistics::new();
+        let mut file_indexes: HashSet<u64> = HashSet::new();
+        for entry in self.entries.results.iter() {
+            if entry.is_file() {
+                statistics.files += 1;
+                statistics.size += entry.size();
+                if let Some(ext) = entry.ext() {
+                    statistics.usage += ext.st_blocks << 9;
+                    #[cfg(unix)]
+                    {
+                        if ext.st_nlink > 1 {
+                            if file_indexes.contains(&ext.st_ino) {
+                                statistics.hlinks += 1;
+                                statistics.files -= 1;
+                            } else {
+                                file_indexes.insert(ext.st_ino);
+                            }
+                        }
+                    }
+                    #[cfg(windows)]
+                    {
+                        if let Some(nlink) = ext.number_of_links {
+                            if nlink > 1 {
+                                if let Some(ino) = ext.file_index {
+                                    if file_indexes.contains(&ino) {
+                                        statistics.hlinks += 1;
+                                        statistics.files -= 1;
+                                    } else {
+                                        file_indexes.insert(ino);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if entry.is_dir() {
+                statistics.dirs += 1;
+                statistics.size += 4096;
+                statistics.usage += 4096;
+            } else if entry.is_symlink() {
+                statistics.slinks += 1;
+                statistics.size += 4096;
+                statistics.usage += 4096;
+            } else {
+                #[cfg(unix)]
+                if let Some(ext) = entry.ext() {
+                    {
+                        if ext.st_rdev > 0 {
+                            statistics.devices += 1;
+                        } else if (ext.st_mode & 4096) != 0 {
+                            statistics.pipes += 1;
+                        }
+                    }
+                }
+                statistics.size += 4096;
+                statistics.usage += 4096;
+            }
+        }
+        statistics
     }
 
     pub fn duration(&mut self) -> f64 {

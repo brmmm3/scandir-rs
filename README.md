@@ -130,87 +130,116 @@ See [examples/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/pys
 In the below table the line **Walk.iter** returns comparable
 results to os.walk.
 
-### Linux with Ryzen 5 2400G and SSD
+### Linux with Ryzen 5 2400G (4 phys cores, 8 total cores) and Samsung SSD 960 EVO 250GB (NVME, ext4)
 
 #### Directory */usr* with
 
-- 110171 directories
-- 862634 files
-- 47804 symlinks
-- 12275 hardlinks
-- 12 devices
+- 45060 directories
+- 388518 files
+- 34937 symlinks
+- 177 hardlinks
+- 0 devices
 - 0 pipes
-- 32.7GB size and 34.8GB usage on disk
+- 23.16GB size and 24.02GB usage on disk
 
-| Time [s] | Method                          |
-| -------- | ------------------------------- |
-| 3.450    | os.walk (Python 3.10)           |
-| 6.021    | scantree (Python 3.10)          |
-| 1.186    | Count.collect                   |
-| 1.416    | Count(ReturnType=Ext).collect   |
-| 1.089    | Walk.iter                       |
-| 1.350    | Walk.collect                    |
-| 1.336    | Walk(ReturnType=Ext).collect    |
-| 2.232    | Scandir.collect                 |
-| 1.839    | Scandir.iter                    |
-| 2.437    | Scandir(ReturnType=Ext).collect |
+|   Time [s] | Method                               |
+|------------|--------------------------------------|
+|   0.931535 | Count.collect                        |
+|   1.48159  | Count(ReturnType=Ext).collect        |
+|   4.09372  | os.walk (Python 3.12.2)              |
+|  11.3418   | os.walk (stat) (Python 3.12.2)       |
+|   0.925864 | Walk.iter                            |
+|   0.96183  | Walk(ReturnType=Ext).iter            |
+|   1.47056  | Walk.collect                         |
+|   1.36103  | Walk(ReturnType=Ext).collect         |
+|   8.75475  | scantree (os.scandir, Python 3.12.2) |
+|   1.37387  | Scandir.iter                         |
+|   1.87683  | Scandir(ReturnType=Ext).iter         |
+|   2.16722  | Scandir.collect                      |
+|   2.92552  | Scandir(ReturnType=Ext).collect      |
 
-Around **~3 times faster** on Linux (os.walk compared to Walk.iter).
-
-### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
-
-#### Directory *C:\Windows* with
-
-- 132604 directories
-- 349911 files
-- 44.4GB size and 45.2GB usage on disk
-
-| Time [s] | Method                          |
-| -------- | ------------------------------- |
-| 21.779   | os.walk (Python 3.10)           |
-| 13.085   | scantree (Python 3.10)          |
-| 3.257    | Count.collect                   |
-| 16.605   | Count(ReturnType=Ext).collect   |
-| 4.102    | Walk.iter                       |
-| 4.056    | Walk.collect                    |
-| 4.190    | Walk(ReturnType=Ext).collect    |
-| 3.993    | Scandir.collect                 |
-| 8.921    | Scandir.iter                    |
-| 17.616   | Scandir(ReturnType=Ext).collect |
-
-Around **~5.3 times faster** on Windows 10 (os.walk compared to Walk.iter).
+Walk.iter **~4.4 times faster** than os.walk.
+Walk(Ext).iter **~11.8 times faster** than os.walk(stat).
+Scandir.iter **~6.4 times faster** than scantree(os.scandir).
 
 #### Directory *linux-5.9* with
 
 - 4711 directories
 - 69973 files
+- 38 symlinks
 - 1.08GB size and 1.23GB usage on disk
 
-| Time [s] | Method                                                     |
-| -------- | ---------------------------------------------------------- |
-| 0.411    | os.walk (Python 3.10)                                      |
-| 1.203    | os.walk (stat)                                             |
-| 0.218    | scandir.Count()                                            |
-| 0.278    | scandir.Count(return_type=ReturnType.Ext).collect()        |
-| 0.227    | scandir_rs.Walk().collect()                                |
-| 0.164    | scandir.Walk(return_type=scandir.ReturnType.Ext) (iter)    |
-| 0.204    | scandir.Walk(return_type=scandir.ReturnType.Ext) (collect) |
-| 0.350    | scandir.Scandir(return_type=ReturnType.Base).collect()     |
-| 0.426    | scandir.Scandir(return_type=ReturnType.Ext).collect()      |
+|   Time [s] | Method                               |
+|------------|--------------------------------------|
+|   0.153199 | Count.collect                        |
+|   0.249917 | Count(ReturnType=Ext).collect        |
+|   0.448813 | os.walk (Python 3.12.2)              |
+|   1.64711  | os.walk (stat) (Python 3.12.2)       |
+|   0.149128 | Walk.iter                            |
+|   0.143961 | Walk(ReturnType=Ext).iter            |
+|   0.213981 | Walk.collect                         |
+|   0.211384 | Walk(ReturnType=Ext).collect         |
+|   1.4078   | scantree (os.scandir, Python 3.12.2) |
+|   0.251858 | Scandir.iter                         |
+|   0.339001 | Scandir(ReturnType=Ext).iter         |
+|   0.298834 | Scandir.collect                      |
+|   0.431882 | Scandir(ReturnType=Ext).collect      |
 
-Around **~2.5 times faster** on Linux (os.walk compared to Walk.iter).
+Walk.iter **~3.0 times faster** than os.walk.
+Walk(Ext).iter **~11.4 times faster** than os.walk(stat).
+Scandir.iter **~5.6 times faster** than scantree(os.scandir).
 
+### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
 
-| Time [s] | Method                                                     |
-| -------- | ---------------------------------------------------------- |
-| 1.998    | os.walk (Python 3.10)                                      |
-| 14.875   | os.walk (stat)                                             |
-| 0.278    | scandir.Count()                                            |
-| 2.114    | scandir.Count(return_type=ReturnType.Ext).collect()        |
-| 0.464    | scandir_rs.Walk().collect()                                |
-| 0.313    | scandir.Walk(return_type=scandir.ReturnType.Ext) (iter)    |
-| 0.455    | scandir.Walk(return_type=scandir.ReturnType.Ext) (collect) |
-| 0.624    | scandir.Scandir(return_type=ReturnType.Base).collect()     |
-| 2.409    | scandir.Scandir(return_type=ReturnType.Ext).collect()      |
+#### Directory *C:\Windows* with
 
-Around **~6.4 times faster** on Windows 10 (os.walk compared to Walk.iter).
+- 165926 directories
+- 316866 files
+- 35364 hardlinks
+- 39.68GB size and 40.53GB usage on disk
+
+|   Time [s] | Method                               |
+|------------|--------------------------------------|
+|    10.1644 | Count.collect                        |
+|    38.04   | Count(ReturnType=Ext).collect        |
+|    99.0955 | os.walk (Python 3.12.2)              |
+|   238.835  | os.walk (stat) (Python 3.12.2)       |
+|    10.0431 | Walk.iter                            |
+|    10.007  | Walk(ReturnType=Ext).iter            |
+|    11.8813 | Walk.collect                         |
+|    11.8674 | Walk(ReturnType=Ext).collect         |
+|    66.8014 | scantree (os.scandir, Python 3.12.2) |
+|    10.1068 | Scandir.iter                         |
+|    37.7527 | Scandir(ReturnType=Ext).iter         |
+|    11.3297 | Scandir.collect                      |
+|    38.5138 | Scandir(ReturnType=Ext).collect      |
+
+Walk.iter **~9.9 times faster** than os.walk.
+Walk(Ext).iter **~23.9 times faster** than os.walk(stat).
+Scandir.iter **~6.6 times faster** than scantree(os.scandir).
+
+#### Directory *linux-5.9* with
+
+- 4712 directories
+- 69998 files
+- 1.08GB size and 1.23GB usage on disk
+
+|   Time [s] | Method                               |
+|------------|--------------------------------------|
+|   0.237721 | Count.collect                        |
+|   1.86161  | Count(ReturnType=Ext).collect        |
+|   2.29283  | os.walk (Python 3.12.2)              |
+|  17.6911   | os.walk (stat) (Python 3.12.2)       |
+|   0.247534 | Walk.iter                            |
+|   0.250716 | Walk(ReturnType=Ext).iter            |
+|   0.386362 | Walk.collect                         |
+|   0.39245  | Walk(ReturnType=Ext).collect         |
+|   1.96715  | scantree (os.scandir, Python 3.12.2) |
+|   0.26433  | Scandir.iter                         |
+|   1.86403  | Scandir(ReturnType=Ext).iter         |
+|   0.375734 | Scandir.collect                      |
+|   2.08924  | Scandir(ReturnType=Ext).collect      |
+
+Walk.iter **~9.3 times faster** than os.walk.
+Walk(Ext).iter **~70.6 times faster** than os.walk(stat).
+Scandir.iter **~7.4 times faster** than scantree(os.scandir).

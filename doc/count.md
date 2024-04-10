@@ -84,18 +84,36 @@ Return a ``Statistics`` object with the current statistics.
 
 Returns ``True`` if errors occured while scanning the directory tree. The errors can be found in the statistics object.
 
-### ``duration() -> float``
+### ``duration -> float``
 
-Returns the duration of the task. As long as the task is running it will return 0.
+Returns the duration of the task in seconds as float. As long as the task is running it will return 0.
 
-### ``finished() -> bool``
+### ``finished -> bool``
 
 Returns ``True`` after the task has finished.
 
-### ``busy()``
+### ``busy -> bool``
 
 Returns ``True`` while a task is running.
 
-### ``as_dict()``
+### ``as_dict() -> dict``
 
 Returns statistics as a ``dict``. Result will only contain the keys of which the values are non zero.
+
+### ``to_speedy() -> bytes``
+
+Feature `speedy` enabled.
+
+Returns statistics as [speedy](https://docs.rs/speedy/latest/speedy) encoded byte string.
+
+### ``to_bincode() -> bytes``
+
+Feature `bincode` enabled.
+
+Returns statistics as [bincode](https://docs.rs/bincode/latest/bincode) encoded byte string.
+
+### ``to_json() -> str``
+
+Feature `json` enabled.
+
+Returns statistics as [json](https://docs.rs/serde_json/latest/serde_json) encoded string.

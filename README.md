@@ -31,7 +31,11 @@ cargo install maturin
 
 IMPORTANT: In order to build this project at least Rust version 1.61 is needed!
 
-Build wheel (not on Windows):
+**Build wheel:**
+
+Change to directory `pyscandir`.
+
+Build wheel (on Linux):
 
 ```sh
 maturin build --release --strip
@@ -45,10 +49,26 @@ maturin build --release --strip --no-sdist
 
 ``maturin`` will build the wheels for all Python versions installed on your system.
 
-## Building and running tests for different Python versions
+Alternatively you can use the build script `build_wheels.py`. The precondition to run this script is to have `pyenv` installed.
+The script can build the wheel for specific Python versions or for all Python versions installed by `pyenv`.
+In addition it runs ``pytest`` after successfull creation of each wheel.
 
-To make it easier to build wheels for several different Python versions the script ``build_wheels.sh`` has been added.
-It creates wheels for Python versions 3.7, 3.8, 3.9, 3.10 and 3.11. In addition it runs ``pytest`` after successfull creation of each wheel.
+```sh
+python build_wheels.py
+```
+
+By default the script will build the wheel for the current Python interpreter.
+If you want to build the wheel for specific Python version(s) by providing the argument `--versions`.
+
+```sh
+python build_wheels.py --versions 3.11.8,3.12.2
+```
+
+To build the wheel for all installed Python versions:
+
+```sh
+python build_wheels.py --versions *
+```
 
 Instruction how to install ``pyenv`` can be found [here](https://github.com/pyenv/pyenv).
 
@@ -69,8 +89,8 @@ The same, but asynchronously in background using a class instance:
 ```python
 from scandir_rs import Count, ReturnType
 
-instance = Count("/usr", return_type=ReturnType.Ext))
-instance.start())  # Start scanning the directory
+instance = Count("/usr", return_type=ReturnType.Ext)
+instance.start()  # Start scanning the directory in background
 ...
 values = instance.results()  # Returns the current statistics. Can be read at any time
 ...
@@ -125,7 +145,7 @@ for path, entry in Scandir("~/workspace", return_type=ReturnType.Ext):
 
 ## Benchmarks
 
-See [examples/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/examples/benchmark.py)
+See [examples/benches/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/examples/benches/benchmark.py)
 
 In the below table the line **Walk.iter** returns comparable
 results to os.walk.

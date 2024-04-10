@@ -129,20 +129,42 @@ Returns errors.
 
 If ``only_new`` is ``True`` (default) then return all results and errors collected so far else return only new results and errors.
 
+### ``duration -> float``
+
+Returns the duration of the parsing task. As long as the task is running it will return 0.
+
+### ``finished -> bool``
+
+Returns ``True`` after the parsing task has finished.
+
+### ``busy -> bool``
+
+Returns ``True`` while a parsing task is running.
+
+### ``statistics -> Statistics``
+
+Returns the statistics for all currently collected results.
+
 ### ``as_dict(only_new: bool | None = True) -> Dict[str, DirEntry | DirEntryExt | str]``
 
 Returns entries and errors as dictionary.
 
 If ``only_new`` is ``True`` then return all results collected so far else return only new results. Each result consists of root directory and ``Toc``.
 
-### ``duration() -> float``
+### ``to_speedy() -> bytes``
 
-Returns the duration of the parsing task. As long as the task is running it will return 0.
+Feature `speedy` enabled.
 
-### ``finished() -> bool``
+Returns statistics as [speedy](https://docs.rs/speedy/latest/speedy) encoded byte string.
 
-Returns ``True`` after the parsing task has finished.
+### ``to_bincode() -> bytes``
 
-### ``busy()``
+Feature `bincode` enabled.
 
-Returns ``True`` while a parsing task is running.
+Returns statistics as [bincode](https://docs.rs/bincode/latest/bincode) encoded byte string.
+
+### ``to_json() -> str``
+
+Feature `json` enabled.
+
+Returns statistics as [json](https://docs.rs/serde_json/latest/serde_json) encoded string.

@@ -78,14 +78,14 @@ If ``only_new`` is ``True`` (default) then return all ``Toc`` collected so far e
 
 Returns ``True`` if errors occured while walking through the directory tree. The error messages can be found in ``Toc`` objects returned.
 
-### ``duration() -> float``
+### ``duration -> float``
 
-Returns the duration of the task. As long as the task is running it will return 0.
+Returns the duration of the task in seconds as float. As long as the task is running it will return 0.
 
-### ``finished() -> bool``
+### ``finished -> bool``
 
 Returns ``True`` after the task has finished.
 
-### ``busy()``
+### ``busy -> bool``
 
 Returns ``True`` while a task is running.

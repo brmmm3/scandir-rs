@@ -3,14 +3,11 @@
 import os
 import sys
 import timeit
-import tarfile
-import traceback
+import shutil
 import platform
 from typing import Dict
 
-import requests
 import psutil
-from diskinfo import DiskInfo
 from tabulate import tabulate
 
 import scandir_rs as scandir
@@ -25,6 +22,7 @@ else:
 
 
 def GetDiskInfo():
+    from diskinfo import DiskInfo
     partition = [
         p for p in psutil.disk_partitions(all=False) if p.mountpoint in ("/", "C:\\")
     ][0]
@@ -43,12 +41,13 @@ def CreateTestData():
     if not os.path.exists(tempDir):
         os.makedirs(tempDir)
     if not os.path.exists(LINUX_KERNEL_ARCHIVE):
+        import requests
         proxies = None
         userDnsDomain = os.environ.get("USERDNSDOMAIN")
-        if userDnsDomain and userDnsDomain.ends_with("SCH.COM"):
+        if userDnsDomain and userDnsDomain.endswith("SCH.COM"):
             proxies = {
                 "http": "http://127.0.0.1:3129",
-                "https": "https://127.0.0.1:3129",
+                "http": "https://127.0.0.1:3129",
             }
         r = requests.get(
             "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz",
@@ -60,18 +59,12 @@ def CreateTestData():
             for chunk in r.iter_content(chunk_size=4096):
                 F.write(chunk)
     if not os.path.exists(LINUX_DIR):
-        abspath = os.path.abspath
         print("Extracting linux-5.9.tar.gz...")
-        try:
-            with tarfile.open(LINUX_KERNEL_ARCHIVE, "r:gz") as Z:
-                destDir = os.path.dirname(LINUX_DIR)
-                for member in Z.getmembers():
-                    member_path = os.path.join(destDir, member.name)
-                    if not abspath(member_path).startswith(abspath(destDir)):
-                        raise Exception("Attempted Path Traversal in Tar File")
-                Z.extractall(destDir)
-        except:
-            traceback.print_exc()
+        os.makedirs(LINUX_DIR)
+        # cmdLine = f"tar xzf {LINUX_KERNEL_ARCHIVE} -C {LINUX_DIR}"
+        cmdLine = f"7z x {LINUX_KERNEL_ARCHIVE} -so | 7z x -aoa -si -ttar -o{LINUX_DIR}"
+        print(f"Running: {cmdLine}")
+        os.system(cmdLine)
     return tempDir
 
 
@@ -275,8 +268,9 @@ def BenchmarkDir(path: str):
     print("Total cores:", psutil.cpu_count(logical=True))
     cpufreq = psutil.cpu_freq()
     print(f"Max Frequency: {cpufreq.max:.2f}Mhz")
-    disk = GetDiskInfo()
-    print(f"Disk: {disk[0]} ({disk[1]}, {disk[2]})")
+    if os.name == 'posix:':
+        disk = GetDiskInfo()
+        print(f"Disk: {disk[0]} ({disk[1]}, {disk[2]})")
     print()
     s = stats["stats"]
     print(f"Directory {path} with:")

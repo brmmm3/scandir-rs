@@ -104,14 +104,17 @@ impl Count {
         self.instance.has_errors()
     }
 
+    #[getter]
     pub fn duration(&mut self) -> f64 {
         self.instance.duration()
     }
 
+    #[getter]
     pub fn finished(&mut self) -> bool {
         self.instance.finished()
     }
 
+    #[getter]
     pub fn busy(&self) -> bool {
         self.instance.busy()
     }

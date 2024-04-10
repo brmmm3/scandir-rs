@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import os
+import sys
 import time
 import platform
 
@@ -41,6 +42,7 @@ if os.name == "nt":
     dirName = "C:/Windows"
 else:
     dirName = "/usr"
+pyVersion = sys.version.split(" ")[0]
 
 print(f"Benchmarking directory: {dirName}")
 if os.name != "nt":
@@ -67,17 +69,17 @@ t1 = time.time()
 cnt = 0
 for root, dirs, files in os.walk(os.path.expanduser(dirName)):
     cnt += 1
-dt = time.time() - t1
-print(f"os.walk: {dt:.3f} {cnt}")
-table.append([f"{dt:.3}", "os.walk"])
+dtOsWalk = time.time() - t1
+print(f"os.walk: {dtOsWalk:.3f} {cnt}")
+table.append([f"{dtOsWalk:.3}", f"os.walk (Python {pyVersion})"])
 
 t1 = time.time()
 cnt = 0
 for result in Walk(dirName):
     cnt += 1
-dt = time.time() - t1
-print(f"Walk.iter: {dt:.3f} {cnt}")
-table.append([f"{dt:.3}", "Walk.iter"])
+dtWalkIter = time.time() - t1
+print(f"Walk.iter: {dtWalkIter:.3f} {cnt}")
+table.append([f"{dtWalkIter:.3}", "Walk.iter"])
 
 t1 = time.time()
 toc = Walk(dirName).collect()
@@ -116,9 +118,9 @@ for entry in scantree(os.path.expanduser(dirName)):
     elif entry.is_symlink():
         symlinks += 1
     size += st.st_size
-dt = time.time() - t1
-print(f"scantree (os.scandir): {dt:.3f} {dirs=} {files=} {symlinks=} {size=}")
-table.append([f"{dt:.3}", "scantree (os.scandir)"])
+dtScantree = time.time() - t1
+print(f"scantree (os.scandir): {dtScantree:.3f} {dirs=} {files=} {symlinks=} {size=}")
+table.append([f"{dtScantree:.3}", f"scantree (os.scandir, Python {pyVersion})"])
 
 t1 = time.time()
 entries = Scandir(dirName).collect()
@@ -131,9 +133,9 @@ instance = Scandir(dirName)
 cnt = 0
 for entry in instance:
     cnt += 1
-dt = time.time() - t1
-print(f"Scandir.iter: {dt:.3f} {cnt}")
-table.append([f"{dt:.3}", "Scandir.iter"])
+dtScandirIter = time.time() - t1
+print(f"Scandir.iter: {dtScandirIter:.3f} {cnt}")
+table.append([f"{dtScandirIter:.3}", "Scandir.iter"])
 
 t1 = time.time()
 instance = Scandir(dirName)
@@ -156,4 +158,9 @@ print(f"Max Frequency: {cpufreq.max:.2f}Mhz")
 disk = GetDiskInfo()
 print(f"Disk: {disk[0]} ({disk[1]}, {disk[2]})")
 print()
-print(tabulate(table, headers=["Method", "Time [s]"]))
+print(tabulate(table, headers=["Time [s]", "Method"], tablefmt="github"))
+print()
+print(f"Walk.iter **~{dtOsWalk / dtWalkIter:.1f} times faster** than os.walk.")
+print(
+    f"Scandir.iter **~{dtScantree / dtScandirIter:.1f} times faster** than scantree(os.scandir)."
+)

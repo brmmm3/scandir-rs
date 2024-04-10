@@ -36,3 +36,10 @@ thr.join()
 results = sd.results()
 print("Finished", sd.busy(), sd.finished(), sd.has_errors(), len(results))
 print(str(results)[:200])
+print(sd.statistics)
+# Need to be compiled with feature "speedy"
+# print(sd.to_speedy())
+# Need to be compiled with feature "bincode"
+# print(sd.to_bincode())
+# Need to be compiled with feature "json"
+# print(sd.to_json())

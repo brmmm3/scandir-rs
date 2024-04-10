@@ -38,10 +38,7 @@ def GetDiskInfo():
             )
 
 
-if os.name == "nt":
-    dirName = "C:/Windows"
-else:
-    dirName = "/usr"
+dirName = "C:/Windows" if os.name == "nt" else "/usr"
 pyVersion = sys.version.split(" ")[0]
 
 print(f"Benchmarking directory: {dirName}")

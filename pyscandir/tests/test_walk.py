@@ -28,7 +28,7 @@ def test_walk_toc(tempDir):
 def test_walk_toc_iter(tempDir):
     sd = Walk(tempDir.name, return_type=ReturnType.Base)
     sd.start()
-    while sd.busy():
+    while sd.busy:
         time.sleep(0.01)
     toc = sd.collect()
     assert not toc.errors

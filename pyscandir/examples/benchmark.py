@@ -89,7 +89,7 @@ instance = Walk(dirName)
 toc = instance.collect()
 dt = time.time() - t1
 print(
-    f"Walk.collect: {dt:.3f} dirs={len(toc.dirs)} files=={len(toc.files)} Walk().duration={instance.duration()}"
+    f"Walk.collect: {dt:.3f} dirs={len(toc.dirs)} files=={len(toc.files)} Walk().duration={instance.duration}"
 )
 
 t1 = time.time()
@@ -138,7 +138,7 @@ t1 = time.time()
 instance = Scandir(dirName)
 toc = instance.collect()
 dt = time.time() - t1
-print(f"Scandir.collect: {dt:.3f} {len(toc)} Scandir().duration={instance.duration()}")
+print(f"Scandir.collect: {dt:.3f} {len(toc)} Scandir().duration={instance.duration}")
 
 t1 = time.time()
 entries = Scandir(dirName, return_type=ReturnType.Ext).collect()

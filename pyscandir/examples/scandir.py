@@ -9,7 +9,7 @@ from scandir_rs import Scandir, ReturnType
 def Counter(sd):
     print("Counter started...")
     x = 0
-    while not sd.finished():
+    while not sd.finished:
         x += 1
     print(f"X={x}")
 
@@ -34,7 +34,7 @@ thr.start()
 sd.start()
 thr.join()
 results = sd.results()
-print("Finished", sd.busy(), sd.finished(), sd.has_errors(), len(results))
+print("Finished", sd.busy, sd.finished, sd.has_errors(), len(results))
 print(str(results)[:200])
 print(sd.statistics)
 # Need to be compiled with feature "speedy"

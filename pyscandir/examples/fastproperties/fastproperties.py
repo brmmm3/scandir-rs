@@ -18,6 +18,7 @@ GB = MB * KB
 
 def GetFileIconWin(pathName):
     import io
+
     # noinspection PyUnresolvedReferences
     from win32com.shell import shell
     from PIL import Image, ImageTk
@@ -31,7 +32,8 @@ def GetFileIconWin(pathName):
     SHIL_SIZE = 0x00001  # Small icon
 
     ret, info = shell.SHGetFileInfo(
-        pathName, 0, SHGFI_ICONLOCATION | SHGFI_ICON | SHIL_SIZE)
+        pathName, 0, SHGFI_ICONLOCATION | SHGFI_ICON | SHIL_SIZE
+    )
     hIcon, iIcon, dwAttr, name, typeName = info
     ico_x = win32api.GetSystemMetrics(win32con.SM_CXICON)
     hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
@@ -42,24 +44,34 @@ def GetFileIconWin(pathName):
     hdc.DrawIcon((0, 0), hIcon)
     win32gui.DestroyIcon(hIcon)
     bmpinfo = hbmp.GetInfo()
-    img = Image.frombuffer("RGBA", (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),
-                           hbmp.GetBitmapBits(True), "raw", "BGRA", 0, 1)
+    img = Image.frombuffer(
+        "RGBA",
+        (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),
+        hbmp.GetBitmapBits(True),
+        "raw",
+        "BGRA",
+        0,
+        1,
+    )
     img = img.resize((16, 16), Image.ANTIALIAS)
     buf = io.BytesIO()
-    img.save(buf, format='GIF')
+    img.save(buf, format="GIF")
     return ImageTk.PhotoImage(img)
 
 
 def GetFileOwnerWin(pathName):
     import win32security
+
     sid = win32security.GetFileSecurity(
-        pathName, win32security.OWNER_SECURITY_INFORMATION).GetSecurityDescriptorOwner()
+        pathName, win32security.OWNER_SECURITY_INFORMATION
+    ).GetSecurityDescriptorOwner()
     name, domain, _ = win32security.LookupAccountSid(None, sid)
     return f"{domain}\\{name}"
 
 
 def GetFileOwnerLin(pathName):
     from pwd import getpwuid
+
     return getpwuid(os.lstat(pathName).st_uid).pw_name
 
 
@@ -73,71 +85,109 @@ class FastProperties(Tk):
         self.configure(background=Style().lookup("CheckButton", "background"))
         self.lblRootDir = Label(self, text="Analyzing...", background="yellow")
         self.lblRootDir.grid(row=0, columnspan=3)
-        if os.name == 'nt':
+        if os.name == "nt":
             fileIcon = GetFileIconWin(pathName)
             fileOwner = GetFileOwnerWin(pathName)
-            self.iconbitmap(os.path.join(
-                getattr(sys, "_MEIPASS", "."), "fastproperties.ico"))
+            self.iconbitmap(
+                os.path.join(getattr(sys, "_MEIPASS", "."), "fastproperties.ico")
+            )
         else:
             fileIcon = ""
             fileOwner = GetFileOwnerLin(pathName)
-            image = PhotoImage(file=os.path.join(
-                getattr(sys, "_MEIPASS", "."), 'fastproperties.gif'))
+            image = PhotoImage(
+                file=os.path.join(getattr(sys, "_MEIPASS", "."), "fastproperties.gif")
+            )
             self.iconphoto(False, image)
         self.addCell(1, fileIcon, os.path.basename(pathName))
-        Separator(self, orient="horizontal").grid(
-            row=2, columnspan=3, sticky="we")
+        Separator(self, orient="horizontal").grid(row=2, columnspan=3, sticky="we")
         self.addCell(3, "Type:", self.getType(pathName))
         self.addCell(4, "Location:", os.path.dirname(pathName))
         self.addCell(5, "Owner:", fileOwner)
         self.lblSizeTitle, self.lblSize = self.addCell(6, "Size:")
         self.lblUsageTitle, self.lblUsage = self.addCell(7, "Size on disk:")
         self.lblStatsTitle, self.lblStats = self.addCell(8, "Contains:")
-        Separator(self, orient="horizontal").grid(
-            row=9, columnspan=3, sticky="we")
+        Separator(self, orient="horizontal").grid(row=9, columnspan=3, sticky="we")
         stats = os.lstat(pathName)
-        self.addCell(10, "Created:", datetime.fromtimestamp(
-            stats.st_ctime).strftime("%A, %d. %B %Y, %H:%M:%S"))
-        self.addCell(11, "Modified:", datetime.fromtimestamp(
-            stats.st_mtime).strftime("%A, %d. %B %Y, %H:%M:%S"))
-        self.addCell(12, "Accessed:", datetime.fromtimestamp(
-            stats.st_atime).strftime("%A, %d. %B %Y, %H:%M:%S"))
-        Separator(self, orient="horizontal").grid(
-            row=13, columnspan=3, sticky="we")
+        self.addCell(
+            10,
+            "Created:",
+            datetime.fromtimestamp(stats.st_ctime).strftime("%A, %d. %B %Y, %H:%M:%S"),
+        )
+        self.addCell(
+            11,
+            "Modified:",
+            datetime.fromtimestamp(stats.st_mtime).strftime("%A, %d. %B %Y, %H:%M:%S"),
+        )
+        self.addCell(
+            12,
+            "Accessed:",
+            datetime.fromtimestamp(stats.st_atime).strftime("%A, %d. %B %Y, %H:%M:%S"),
+        )
+        Separator(self, orient="horizontal").grid(row=13, columnspan=3, sticky="we")
         self.addCell(14, "Attributes:", "")
         if os.name == "nt":
             self.bReadOnly = self.addCheckButton(
-                15, 0, "Read-only", stats.st_file_attributes & stat.FILE_ATTRIBUTE_READONLY)
+                15,
+                0,
+                "Read-only",
+                stats.st_file_attributes & stat.FILE_ATTRIBUTE_READONLY,
+            )
             self.bArchive = self.addCheckButton(
-                15, 2, "Archive", stats.st_file_attributes & stat.FILE_ATTRIBUTE_ARCHIVE)
+                15, 2, "Archive", stats.st_file_attributes & stat.FILE_ATTRIBUTE_ARCHIVE
+            )
             self.bHidden = self.addCheckButton(
-                16, 0, "Hidden", stats.st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+                16, 0, "Hidden", stats.st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN
+            )
             self.bCompressed = self.addCheckButton(
-                16, 2, "Compressed", stats.st_file_attributes & stat.FILE_ATTRIBUTE_COMPRESSED)
+                16,
+                2,
+                "Compressed",
+                stats.st_file_attributes & stat.FILE_ATTRIBUTE_COMPRESSED,
+            )
             self.bEncrypted = self.addCheckButton(
-                17, 0, "Encrypted", stats.st_file_attributes & stat.FILE_ATTRIBUTE_ENCRYPTED)
+                17,
+                0,
+                "Encrypted",
+                stats.st_file_attributes & stat.FILE_ATTRIBUTE_ENCRYPTED,
+            )
             self.bEncrypted = self.addCheckButton(
-                17, 2, "Reparse Point", stats.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+                17,
+                2,
+                "Reparse Point",
+                stats.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT,
+            )
         else:
             self.bReadOnly = self.addCheckButton(
-                15, 0, "Set UID", stats.st_mode & stat.S_ISUID)
+                15, 0, "Set UID", stats.st_mode & stat.S_ISUID
+            )
             self.bArchive = self.addCheckButton(
-                15, 1, "Set GID", stats.st_mode & stat.S_ISGID)
+                15, 1, "Set GID", stats.st_mode & stat.S_ISGID
+            )
             self.bArchive = self.addCheckButton(
-                15, 2, "Sticky", stats.st_mode & stat.S_ISVTX)
+                15, 2, "Sticky", stats.st_mode & stat.S_ISVTX
+            )
             mode = stats.st_mode
-            self.owner = self.addCell(16, "Owner:",
-                                      f"{'r' if mode & stat.S_IRUSR else '-'}"
-                                      f"{'w' if mode & stat.S_IWUSR else '-'}"
-                                      f"{'x' if mode & stat.S_IXUSR else '-'}")
-            self.group = self.addCell(17, "Group:",
-                                      f"{'r' if mode & stat.S_IRGRP else '-'}"
-                                      f"{'w' if mode & stat.S_IWGRP else '-'}"
-                                      f"{'x' if mode & stat.S_IXGRP else '-'}")
-            self.others = self.addCell(18, "Others:",
-                                       f"{'r' if mode & stat.S_IROTH else '-'}"
-                                       f"{'w' if mode & stat.S_IWOTH else '-'}"
-                                       f"{'x' if mode & stat.S_IXOTH else '-'}")
+            self.owner = self.addCell(
+                16,
+                "Owner:",
+                f"{'r' if mode & stat.S_IRUSR else '-'}"
+                f"{'w' if mode & stat.S_IWUSR else '-'}"
+                f"{'x' if mode & stat.S_IXUSR else '-'}",
+            )
+            self.group = self.addCell(
+                17,
+                "Group:",
+                f"{'r' if mode & stat.S_IRGRP else '-'}"
+                f"{'w' if mode & stat.S_IWGRP else '-'}"
+                f"{'x' if mode & stat.S_IXGRP else '-'}",
+            )
+            self.others = self.addCell(
+                18,
+                "Others:",
+                f"{'r' if mode & stat.S_IROTH else '-'}"
+                f"{'w' if mode & stat.S_IWOTH else '-'}"
+                f"{'x' if mode & stat.S_IXOTH else '-'}",
+            )
         # Catch window deletion event
         self.protocol("WM_DELETE_WINDOW", self._delete_window)
         self.bind("<Destroy>", self._destroy)
@@ -182,8 +232,9 @@ class FastProperties(Tk):
     @staticmethod
     def addCheckButton(row, col, title, value):
         var = BooleanVar(value=bool(value))
-        Checkbutton(text=title, variable=var, command=lambda: var.set(
-            1 - var.get())).grid(row=row, column=col, sticky="nw")
+        Checkbutton(
+            text=title, variable=var, command=lambda: var.set(1 - var.get())
+        ).grid(row=row, column=col, sticky="nw")
         return var
 
     @staticmethod
@@ -210,14 +261,20 @@ class FastProperties(Tk):
 
     @staticmethod
     def formatBigNumbers(nr: int):
-        return str(nr) if nr < 1000 else f"{FastProperties.formatBigNumbers(nr // 1000)}.{str(nr)[-3:]}"
+        return (
+            str(nr)
+            if nr < 1000
+            else f"{FastProperties.formatBigNumbers(nr // 1000)}.{str(nr)[-3:]}"
+        )
 
     def update(self):
         stats = self.scanner.results()
         self.lblSize.config(
-            text=f"{self.formatByteSize(stats.size)} ({self.formatBigNumbers(stats.size)} bytes)")
+            text=f"{self.formatByteSize(stats.size)} ({self.formatBigNumbers(stats.size)} bytes)"
+        )
         self.lblUsage.config(
-            text=f"{self.formatByteSize(stats.usage)} ({self.formatBigNumbers(stats.usage)} bytes)")
+            text=f"{self.formatByteSize(stats.usage)} ({self.formatBigNumbers(stats.usage)} bytes)"
+        )
         line1 = []
         line2 = []
         line3 = []
@@ -233,15 +290,21 @@ class FastProperties(Tk):
             line3.append(f"{self.formatBigNumbers(stats.devices)} Devices")
         if stats.pipes > 0:
             line3.append(f"{self.formatBigNumbers(stats.pipes)} Pipes")
-        text = ["\n".join([line for line in (
-            ", ".join(line1), ", ".join(line2), ", ".join(line3)) if line])]
+        text = [
+            "\n".join(
+                [
+                    line
+                    for line in (", ".join(line1), ", ".join(line2), ", ".join(line3))
+                    if line
+                ]
+            )
+        ]
         if stats.errors:
-            text.append(
-                f"{self.formatBigNumbers(len(stats.errors))} Failed to read")
+            text.append(f"{self.formatBigNumbers(len(stats.errors))} Failed to read")
         self.lblStats.config(text="\n".join(text))
 
     def updater(self):
-        if self.scanner.busy():
+        if self.scanner.busy:
             self.update()
             self.timerId = self.after(300, self.updater)
             return
@@ -250,13 +313,15 @@ class FastProperties(Tk):
             self.timerId = None
         self.update()
         self.lblRootDir.config(
-            text=f"Finished analyzing after {time.time() - self.startTime:.2f}s", background="lawn green")
+            text=f"Finished analyzing after {time.time() - self.startTime:.2f}s",
+            background="lawn green",
+        )
 
 
 def ShowMessageBox(cbFunc, message):
     root = Tk()  # We need a main window
-    root.attributes('-alpha', 0.0)
-    root.wm_state('iconic')
+    root.attributes("-alpha", 0.0)
+    root.wm_state("iconic")
     if not sys.platform.lower().startswith("win"):
         root.withdraw()
     cbFunc("Fast Properties", message)
@@ -265,11 +330,10 @@ def ShowMessageBox(cbFunc, message):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        ShowMessageBox(messagebox.showinfo,
-                       "Usage: fastproperties <Directory>")
+        ShowMessageBox(messagebox.showinfo, "Usage: fastproperties <Directory>")
         sys.exit(1)
     pathName = sys.argv[1]
-    if os.name == 'posix':
+    if os.name == "posix":
         pathName = os.path.expanduser(pathName)
     if not os.path.exists(pathName):
         ShowMessageBox(messagebox.showerror, "Invalid directory!")

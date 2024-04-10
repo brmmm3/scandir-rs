@@ -199,11 +199,11 @@ impl Walk {
         Ok(None)
     }
 
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("{self:?}"))
+    fn __repr__(&self) -> String {
+        format!("{self:?}")
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{self:?}"))
+    fn __str__(&self) -> String {
+        format!("{self:?}")
     }
 }

@@ -304,6 +304,7 @@ def BenchmarkDir(path: str):
     print(tabulate(table, headers=["Time [s]", "Method"], tablefmt="github"))
     print()
     print(f"Walk.iter **~{stats["dtOsWalk"] / stats["dtScandirWalkIter"]:.1f} times faster** than os.walk.")
+    print(f"Walk(Ext).iter **~{stats["dtOsWalkStat"] / stats["dtScandirWalkIterExt"]:.1f} times faster** than os.walk(stat).")
     print(
         f"Scandir.iter **~{stats["dtOsScandir"] / stats["dtScandirScandirIter"]:.1f} times faster** than scantree(os.scandir)."
     )

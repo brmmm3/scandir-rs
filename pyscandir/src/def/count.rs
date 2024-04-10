@@ -10,7 +10,7 @@ use speedy::Writable;
 
 #[pyclass]
 #[derive(Debug, Clone)]
-pub struct Statistics(scandir::Statistics);
+pub struct Statistics(pub scandir::Statistics);
 
 impl Statistics {
     pub fn from(entry: &scandir::Statistics) -> Self {

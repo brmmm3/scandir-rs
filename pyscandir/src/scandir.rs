@@ -4,10 +4,10 @@ use std::time::Duration;
 
 use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
 use pyo3::prelude::*;
-use pyo3::types::{ PyDict, PyType };
+use pyo3::types::{ PyDict, PyType, PyBytes };
 use scandir::def::scandir::ScandirResults;
 
-use crate::def::{ DirEntry, DirEntryExt, ReturnType };
+use crate::def::{ DirEntry, DirEntryExt, ReturnType, Statistics };
 use scandir::{ ErrorsType, ScandirResult };
 
 fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
@@ -177,6 +177,46 @@ impl Scandir {
             let _ = pyresults.set_item(error.0.into_py(py), error.1.to_object(py));
         }
         pyresults.to_object(py)
+    }
+
+    #[cfg(feature = "speedy")]
+    pub fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
+        self.instance
+            .to_speedy()
+            .map(|v| {
+                PyBytes::new_bound_with(py, v.len(), |b| {
+                    b.copy_from_slice(&v);
+                    Ok(())
+                })
+                    .unwrap()
+                    .into()
+            })
+            .map_err(|e| PyException::new_err(e.to_string()))
+    }
+
+    #[cfg(feature = "bincode")]
+    pub fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
+        self.instance
+            .to_bincode()
+            .map(|v| {
+                PyBytes::new_bound_with(py, v.len(), |b| {
+                    b.copy_from_slice(&v);
+                    Ok(())
+                })
+                    .unwrap()
+                    .into()
+            })
+            .map_err(|e| PyException::new_err(e.to_string()))
+    }
+
+    #[cfg(feature = "json")]
+    pub fn to_json(&self) -> PyResult<String> {
+        self.instance.to_json().map_err(|e| PyException::new_err(e.to_string()))
+    }
+
+    #[getter]
+    pub fn statistics(&self) -> Statistics {
+        Statistics(self.instance.statistics())
     }
 
     pub fn duration(&mut self) -> f64 {

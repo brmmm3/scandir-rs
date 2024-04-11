@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Benchmarks</title>
+    <style type="text/css">
+        body {
+            font: 14px Helvetica Neue;
+            text-rendering: optimizelegibility;
+        }
+
+        .body {
+            width: 960px;
+            margin: auto;
+        }
+
+        a:link {
+            color: #1F78B4;
+            text-decoration: none;
+        }
+
+        h2 {
+            font-size: 36px;
+            font-weight: 300;
+        }
+
+        h3 {
+            font-size: 24px;
+            font-weight: 300;
+        }
+
+        #footer {
+            height: 40px;
+            background: #888;
+            color: white;
+            font-size: larger;
+            font-weight: 300;
+        }
+
+        #footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        #footer p {
+            text-align: center
+        }
+    </style>
+</head>
+
+<body>
+    <div class="body">
+        <h1>Benchmarks</h1>
+        <p>These are the results of the benchmarks.rs run.</p>
+        <h2>Benchmark results on Linux</h2>
+        <h3>Walk linux-5.9</h3>
+        <p>Benchmark results for linux-5.9 file tree for walkdir crate including a metadata call for each entry and
+            scandir::Walk call.</p>
+        <img src="images/linux_walk_linux-5.9.svg" />
+        <h3>Walk usr</h3>
+        <p>Benchmark results for /usr file tree for walkdir crate including a metadata call for each entry and
+            scandir::Walk call.</p>
+        <img src="images/linux_walk_usr.svg" />
+        <h3>Scandir linux-5.9</h3>
+        <p>Benchmark results for linux-5.9 file tree for scan_dir crate including a metadata call for each entry and
+            scandir::Scandir call with and without collecting extended metadata information.</p>
+        <img src="images/linux_scandir_linux-5.9.svg" />
+        <h3>Scandir usr</h3>
+        <p>Benchmark results for /usr file tree for scan_dir crate including a metadata call for each entry and
+            scandir::Scandir call with and without collecting extended metadata information.</p>
+        <img src="images/linux_scandir_usr.svg" />
+    </div>
+</body>
+
+</html>

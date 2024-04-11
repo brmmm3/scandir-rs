@@ -1,22 +1,22 @@
 use std::fmt::Debug;
-use std::fs::{self, Metadata};
-use std::io::{Error, ErrorKind};
+use std::fs::{ self, Metadata };
+use std::io::{ Error, ErrorKind };
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{ AtomicBool, AtomicUsize, Ordering };
+use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::Instant;
 
-use flume::{unbounded, Receiver, Sender};
+use flume::{ unbounded, Receiver, Sender };
 use jwalk_meta::WalkDirGeneric;
 
-use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
+use crate::common::{ check_and_expand_path, create_filter, filter_children, get_root_path_len };
 use crate::def::*;
 
 #[inline]
 fn update_toc(
     dir_entry: &jwalk_meta::DirEntry<((), Option<Result<fs::Metadata, Error>>)>,
-    toc: &mut Toc,
+    toc: &mut Toc
 ) {
     let file_type = dir_entry.file_type;
     let key = dir_entry.file_name.clone().into_string().unwrap();
@@ -35,19 +35,14 @@ pub fn toc_thread(
     options: Options,
     filter: Option<Filter>,
     tx: Sender<(String, Toc)>,
-    stop: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>
 ) {
     let root_path_len = get_root_path_len(&options.root_path);
 
-    let dir_entry: jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)> =
-        jwalk_meta::DirEntry::from_path(
-            0,
-            &options.root_path,
-            true,
-            true,
-            false,
-            Arc::new(Vec::new()),
-        )
+    let dir_entry: jwalk_meta::DirEntry<
+        ((), Option<Result<Metadata, Error>>)
+    > = jwalk_meta::DirEntry
+        ::from_path(0, &options.root_path, true, true, false, Arc::new(Vec::new()))
         .unwrap();
 
     if !dir_entry.file_type.is_dir() {
@@ -97,8 +92,7 @@ pub fn toc_thread(
             }
             let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len();
             file_cnt_cloned.store(file_cnt_new, Ordering::Relaxed);
-        })
-    {
+        }) {
         if stop.load(Ordering::Relaxed) {
             break;
         }
@@ -130,8 +124,8 @@ impl Walk {
                 root_path: check_and_expand_path(root_path)?,
                 sorted: false,
                 skip_hidden: true,
-                max_depth: std::usize::MAX,
-                max_file_cnt: std::usize::MAX,
+                max_depth: usize::MAX,
+                max_file_cnt: usize::MAX,
                 dir_include: None,
                 dir_exclude: None,
                 file_include: None,
@@ -172,7 +166,7 @@ impl Walk {
     /// exceeded.
     pub fn max_depth(mut self, depth: usize) -> Self {
         self.options.max_depth = match depth {
-            0 => std::usize::MAX,
+            0 => usize::MAX,
             _ => depth,
         };
         self
@@ -181,7 +175,7 @@ impl Walk {
     /// Set maximum number of files to collect
     pub fn max_file_cnt(mut self, max_file_cnt: usize) -> Self {
         self.options.max_file_cnt = match max_file_cnt {
-            0 => std::usize::MAX,
+            0 => usize::MAX,
             _ => max_file_cnt,
         };
         self
@@ -241,11 +235,13 @@ impl Walk {
         self.stop.store(false, Ordering::Relaxed);
         let stop = self.stop.clone();
         let duration = self.duration.clone();
-        self.thr = Some(thread::spawn(move || {
-            let start_time = Instant::now();
-            toc_thread(options, filter, tx, stop);
-            *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
-        }));
+        self.thr = Some(
+            thread::spawn(move || {
+                let start_time = Instant::now();
+                toc_thread(options, filter, tx, stop);
+                *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
+            })
+        );
         Ok(())
     }
 
@@ -311,11 +307,7 @@ impl Walk {
 
     pub fn results_cnt(&mut self, only_new: bool) -> usize {
         if let Some(ref rx) = self.rx {
-            if only_new {
-                rx.len()
-            } else {
-                self.entries.len() + rx.len()
-            }
+            if only_new { rx.len() } else { self.entries.len() + rx.len() }
         } else {
             self.entries.len()
         }
@@ -345,11 +337,7 @@ impl Walk {
     }
 
     pub fn busy(&self) -> bool {
-        if let Some(ref thr) = self.thr {
-            !thr.is_finished()
-        } else {
-            false
-        }
+        if let Some(ref thr) = self.thr { !thr.is_finished() } else { false }
     }
 
     // For debugging

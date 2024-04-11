@@ -237,8 +237,8 @@ impl Count {
                 root_path: check_and_expand_path(root_path)?,
                 sorted: false,
                 skip_hidden: true,
-                max_depth: std::usize::MAX,
-                max_file_cnt: std::usize::MAX,
+                max_depth: usize::MAX,
+                max_file_cnt: usize::MAX,
                 dir_include: None,
                 dir_exclude: None,
                 file_include: None,
@@ -271,7 +271,7 @@ impl Count {
     /// exceeded.
     pub fn max_depth(mut self, depth: usize) -> Self {
         self.options.max_depth = match depth {
-            0 => std::usize::MAX,
+            0 => usize::MAX,
             _ => depth,
         };
         self
@@ -280,7 +280,7 @@ impl Count {
     /// Set maximum number of files to collect
     pub fn max_file_cnt(mut self, max_file_cnt: usize) -> Self {
         self.options.max_file_cnt = match max_file_cnt {
-            0 => std::usize::MAX,
+            0 => usize::MAX,
             _ => max_file_cnt,
         };
         self

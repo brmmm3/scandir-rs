@@ -63,14 +63,14 @@ impl Walk {
             },
             return_type,
             entries: Vec::new(),
-            idx: std::usize::MAX,
+            idx: usize::MAX,
         })
     }
 
     pub fn clear(&mut self) {
         self.instance.clear();
         self.entries.clear();
-        self.idx = std::usize::MAX;
+        self.idx = usize::MAX;
     }
 
     pub fn start(&mut self) -> PyResult<()> {
@@ -153,7 +153,7 @@ impl Walk {
     }
 
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        if slf.idx < std::usize::MAX {
+        if slf.idx < usize::MAX {
             return Err(PyRuntimeError::new_err("Busy"));
         }
         slf.instance.start()?;
@@ -195,7 +195,7 @@ impl Walk {
                 self.idx = 0;
             }
         }
-        self.idx = std::usize::MAX;
+        self.idx = usize::MAX;
         Ok(None)
     }
 

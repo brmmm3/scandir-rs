@@ -103,7 +103,7 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     group.bench_function("scan_dir.ScanDir", |b|
         b.iter(|| {
             let mut entries = Vec::new();
-            let _ = scan_dir::ScanDir::all().walk("/usr", |iter| {
+            let _ = scan_dir::ScanDir::all().walk(path, |iter| {
                 for (entry, _name) in iter {
                     entries.push(entry.metadata().unwrap());
                 }

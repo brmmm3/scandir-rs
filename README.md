@@ -150,7 +150,7 @@ See [examples/benches/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/ma
 In the below table the line **Walk.iter** returns comparable
 results to os.walk.
 
-### Linux with Ryzen 5 2400G (4 phys cores, 8 total cores) and Samsung SSD 960 EVO 250GB (NVME, ext4)
+### Linux with Tower Ryzen 5 2400G @ 3.6GHz (4/8 cores) and Samsung SSD 960 EVO 250GB (NVME, EXT4)
 
 #### Directory */usr* with
 
@@ -209,7 +209,7 @@ Walk.iter **~3.0 times faster** than os.walk.
 Walk(Ext).iter **~11.4 times faster** than os.walk(stat).  
 Scandir.iter **~5.6 times faster** than scantree(os.scandir).
 
-### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
+### Windows 10 with Laptop Core i7-11850H @ 2.5GHz (8/16 cores) and Samsung MZVLB1T0HBLR-000H1 (NVME, NTFS)
 
 #### Directory *C:\Windows* with
 

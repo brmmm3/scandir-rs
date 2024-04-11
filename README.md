@@ -178,8 +178,8 @@ results to os.walk.
 |   2.16722  | Scandir.collect                      |
 |   2.92552  | Scandir(ReturnType=Ext).collect      |
 
-Walk.iter **~4.4 times faster** than os.walk.
-Walk(Ext).iter **~11.8 times faster** than os.walk(stat).
+Walk.iter **~4.4 times faster** than os.walk.  
+Walk(Ext).iter **~11.8 times faster** than os.walk(stat).  
 Scandir.iter **~6.4 times faster** than scantree(os.scandir).
 
 #### Directory *linux-5.9* with
@@ -205,8 +205,8 @@ Scandir.iter **~6.4 times faster** than scantree(os.scandir).
 |   0.298834 | Scandir.collect                      |
 |   0.431882 | Scandir(ReturnType=Ext).collect      |
 
-Walk.iter **~3.0 times faster** than os.walk.
-Walk(Ext).iter **~11.4 times faster** than os.walk(stat).
+Walk.iter **~3.0 times faster** than os.walk.  
+Walk(Ext).iter **~11.4 times faster** than os.walk(stat).  
 Scandir.iter **~5.6 times faster** than scantree(os.scandir).
 
 ### Windows 10 with Laptop Core i7-4810MQ @ 2.8GHz Laptop, MTF SSD
@@ -234,8 +234,8 @@ Scandir.iter **~5.6 times faster** than scantree(os.scandir).
 |    11.3297 | Scandir.collect                      |
 |    38.5138 | Scandir(ReturnType=Ext).collect      |
 
-Walk.iter **~9.9 times faster** than os.walk.
-Walk(Ext).iter **~23.9 times faster** than os.walk(stat).
+Walk.iter **~9.9 times faster** than os.walk.  
+Walk(Ext).iter **~23.9 times faster** than os.walk(stat).  
 Scandir.iter **~6.6 times faster** than scantree(os.scandir).
 
 #### Directory *linux-5.9* with
@@ -260,6 +260,6 @@ Scandir.iter **~6.6 times faster** than scantree(os.scandir).
 |   0.375734 | Scandir.collect                      |
 |   2.08924  | Scandir(ReturnType=Ext).collect      |
 
-Walk.iter **~9.3 times faster** than os.walk.
-Walk(Ext).iter **~70.6 times faster** than os.walk(stat).
+Walk.iter **~9.3 times faster** than os.walk.  
+Walk(Ext).iter **~70.6 times faster** than os.walk(stat).  
 Scandir.iter **~7.4 times faster** than scantree(os.scandir).

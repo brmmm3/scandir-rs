@@ -1,5 +1,8 @@
 use std::{ path::Path, time::Duration };
 
+#[cfg(windows)]
+use std::path::PathBuf;
+
 use criterion::{ criterion_group, criterion_main, Criterion };
 
 fn create_test_data() -> String {

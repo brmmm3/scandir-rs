@@ -47,12 +47,12 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     // Count
     let mut group = c.benchmark_group(format!("Count {dir}"));
     group.measurement_time(Duration::from_secs(10));
+    group.sample_size(20);
     group.bench_function("scandir.Count (collect)", |b|
         b.iter(|| {
             let mut instance = scandir::Count
                 ::new(&path)
                 .expect(&format!("Failed to create Count instance for {path}"));
-            instance.start().unwrap();
             instance.collect().unwrap();
         })
     );
@@ -62,7 +62,6 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
                 ::new(&path)
                 .expect(&format!("Failed to create Count instance for {path}"))
                 .extended(true);
-            instance.start().unwrap();
             instance.collect().unwrap();
         })
     );
@@ -70,6 +69,7 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     // Walk
     let mut group = c.benchmark_group(format!("Walk {dir}"));
     group.measurement_time(Duration::from_secs(30));
+    group.sample_size(20);
     group.bench_function("walkdir.WalkDir", |b|
         b.iter(|| {
             let _ = walkdir::WalkDir::new(&path).into_iter().collect::<Vec<_>>();
@@ -80,7 +80,6 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
             let mut instance = scandir::Walk
                 ::new(&path, Some(true))
                 .expect(&format!("Failed to create Walk instance for {path}"));
-            instance.start().unwrap();
             instance.collect().unwrap();
         })
     );
@@ -90,7 +89,6 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
                 ::new(&path, Some(true))
                 .expect(&format!("Failed to create Walk instance for {path}"))
                 .return_type(scandir::ReturnType::Ext);
-            instance.start().unwrap();
             instance.collect().unwrap();
         })
     );
@@ -98,12 +96,13 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     // Scandir
     let mut group = c.benchmark_group(format!("Scandir {dir}"));
     group.measurement_time(Duration::from_secs(60));
+    group.sample_size(20);
     group.bench_function("scan_dir.ScanDir", |b|
         b.iter(|| {
             let mut entries = Vec::new();
             let _ = scan_dir::ScanDir::all().walk("/usr", |iter| {
                 for (entry, _name) in iter {
-                    entries.push(entry);
+                    entries.push(entry.metadata().unwrap());
                 }
             });
         })
@@ -113,7 +112,6 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
             let mut instance = scandir::Scandir
                 ::new(&path, Some(true))
                 .expect(&format!("Failed to create Scandir instance for {path}"));
-            instance.start().unwrap();
             instance.collect().unwrap();
         })
     );
@@ -123,7 +121,6 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
                 ::new(&path, Some(true))
                 .expect(&format!("Failed to create Scandir instance for {path}"))
                 .return_type(scandir::ReturnType::Ext);
-            instance.start().unwrap();
             instance.collect().unwrap();
         })
     );

@@ -145,7 +145,7 @@ for path, entry in Scandir("~/workspace", return_type=ReturnType.Ext):
 
 ## Benchmarks
 
-See [examples/benches/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/examples/benches/benchmark.py)
+See [examples/benches/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/benches/benchmark.py)
 
 In the below table the line **Walk.iter** returns comparable
 results to os.walk.

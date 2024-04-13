@@ -13,9 +13,9 @@ If you are just interested in directory statistics you can use the `Count`.
 
 For the API see:
 
-- Class `Count` [doc/count.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/count.md)
-- Class `Walk` [doc/walk.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/walk.md)
-- Class `Scandir` [doc/scandir.md](https://github.com/brmmm3/scandir-rs/blob/master/doc/scandir.md)
+- Class [Count](doc/count.md)
+- Class [Walk](doc/walk.md)
+- Class [Scandir](doc/scandir.md)
 
 ## Installation
 

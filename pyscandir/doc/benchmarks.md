@@ -1,13 +1,13 @@
 # Benchmarks
 
-See [examples/benches/benchmark.py](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/benches/benchmark.py)
+Benchmarking code see [benches/benchmark.py](../benches/benchmark.py)
 
 In the below table the line **Walk.iter** returns comparable
 results to os.walk.
 
 ## Linux with Tower Ryzen 5 2400G @ 3.6GHz (4/8 cores) and Samsung SSD 960 EVO 250GB (NVME, EXT4)
 
-### Directory */usr* with
+### Directory /usr with
 
 - 45060 directories
 - 388518 files
@@ -37,7 +37,15 @@ Walk.iter **~4.4 times faster** than os.walk.
 Walk(Ext).iter **~11.8 times faster** than os.walk(stat).  
 Scandir.iter **~6.4 times faster** than scantree(os.scandir).
 
-### Directory *linux-5.9* with
+#### Walk /usr
+
+![](images/linux_walk_usr.png)
+
+#### Scandir /usr
+
+![](images/linux_scandir_usr.png)
+
+### Directory linux-5.9 with
 
 - 4711 directories
 - 69973 files
@@ -64,9 +72,17 @@ Walk.iter **~3.0 times faster** than os.walk.
 Walk(Ext).iter **~11.4 times faster** than os.walk(stat).  
 Scandir.iter **~5.6 times faster** than scantree(os.scandir).
 
+#### Walk linux-5.9
+
+![](images/linux_walk_linux-5.9.png)
+
+#### Scandir linux-5.9
+
+![](images/linux_scandir_linux-5.9.png)
+
 ## Windows 10 with Laptop Core i7-11850H @ 2.5GHz (8/16 cores) and Samsung MZVLB1T0HBLR-000H1 (NVME, NTFS)
 
-### Directory *C:\Windows* with
+### Directory C:\Windows with
 
 - 165926 directories
 - 316866 files
@@ -93,7 +109,15 @@ Walk.iter **~9.9 times faster** than os.walk.
 Walk(Ext).iter **~23.9 times faster** than os.walk(stat).  
 Scandir.iter **~6.6 times faster** than scantree(os.scandir).
 
-### Directory *linux-5.9* with
+#### Walk C:\Windows
+
+![](images/windows_walk_windows.png)
+
+#### Scandir C:\Windows
+
+![](images/windows_scandir_windows.png)
+
+### Directory linux-5.9 with
 
 - 4712 directories
 - 69998 files
@@ -118,3 +142,11 @@ Scandir.iter **~6.6 times faster** than scantree(os.scandir).
 Walk.iter **~9.3 times faster** than os.walk.  
 Walk(Ext).iter **~70.6 times faster** than os.walk(stat).  
 Scandir.iter **~7.4 times faster** than scantree(os.scandir).
+
+#### Walk linux-5.9
+
+![](images/windows_walk_linux-5.9.png)
+
+#### Scandir linux-5.9
+
+![](images/windows_scandir_linux-5.9.png)

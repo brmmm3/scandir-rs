@@ -49,4 +49,5 @@ unix-named-pipe = "0.2"
 
 [[bench]]
 name = "benchmark"
+path = "benches/benchmark.rs"
 harness = false

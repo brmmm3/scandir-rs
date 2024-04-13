@@ -36,6 +36,7 @@ results to os.walk.
 Walk.iter **~4.4 times faster** than os.walk.  
 Walk(Ext).iter **~11.8 times faster** than os.walk(stat).  
 Scandir.iter **~6.4 times faster** than scantree(os.scandir).
+Scandir(Ext).iter **~3.0 times faster** than scantree(os.scandir).
 
 #### Walk /usr
 
@@ -71,6 +72,7 @@ Scandir.iter **~6.4 times faster** than scantree(os.scandir).
 Walk.iter **~3.0 times faster** than os.walk.  
 Walk(Ext).iter **~11.4 times faster** than os.walk(stat).  
 Scandir.iter **~5.6 times faster** than scantree(os.scandir).
+Scandir(Ext).iter **~3.3 times faster** than scantree(os.scandir).
 
 #### Walk linux-5.9
 
@@ -108,6 +110,7 @@ Scandir.iter **~5.6 times faster** than scantree(os.scandir).
 Walk.iter **~9.9 times faster** than os.walk.  
 Walk(Ext).iter **~23.9 times faster** than os.walk(stat).  
 Scandir.iter **~6.6 times faster** than scantree(os.scandir).
+Scandir(Ext).iter **~1.7 times faster** than scantree(os.scandir).
 
 #### Walk C:\Windows
 
@@ -141,7 +144,8 @@ Scandir.iter **~6.6 times faster** than scantree(os.scandir).
 
 Walk.iter **~9.3 times faster** than os.walk.  
 Walk(Ext).iter **~70.6 times faster** than os.walk(stat).  
-Scandir.iter **~7.4 times faster** than scantree(os.scandir).
+Scandir.iter **~7.4 times faster** than scantree(os.scandir).  
+Scandir(Ext).iter **~0.9 times faster** than scantree(os.scandir).
 
 #### Walk linux-5.9
 

@@ -18,12 +18,12 @@ For the API see:
 
 ## Examples
 
-Get statistics of a directory:
+`Collect` examples:
 
 ```rust
 use scandir::Count;
 
-// Get basic statistics
+// collect() starts the worker thread and waits until it has finished. The line below is blocking.
 println!(Count::new("/usr")?.collect()?);
 // Get extended statistics
 println!(Count::new("/usr", return_type=ReturnType.Ext)?.collect()?);
@@ -46,15 +46,46 @@ instance.stop();  // If you want to cancel the task
 instance.join();  // Wait for the instance to finish.
 ```
 
+```rust
+let mut instance = Count::new(&path)?;
+instance.start()?;
+loop {
+    if !instance.busy() {
+        break;
+    }
+    // Do something
+    thread::sleep(Duration::from_millis(10));
+}
+// collect() immediately returns because the worker thread has already finished.
+let statistics = instance.collect()?;
+```
+
 `Walk` example:
 
 ```rust
 use scandir::Walk;
 
-// Get basic statistics
+// Get basic file tree
 println!(Walk::new("/usr")?.collect()?);
-// Get extended statistics
+// Get file tree with extended file type identification. This is slower.
 println!(Walk::new("/usr", return_type=ReturnType.Ext)?.collect()?);
+```
+
+If you want to have intermediate results, e.g. you want to show the progress to the user, the use the example below.
+
+```rust
+let mut instance = Walk::new(&path, None)?;
+instance.start()?;
+loop {
+    if !instance.busy() {
+        break;
+    }
+    let new_results = instance.results(true);
+    // Do something
+    thread::sleep(Duration::from_millis(10));
+}
+// collect() immediately returns because the worker thread has already finished.
+let results = instance.collect()?;
 ```
 
 `Scandir` example:
@@ -62,8 +93,25 @@ println!(Walk::new("/usr", return_type=ReturnType.Ext)?.collect()?);
 ```rust
 use scandir::Scandir;
 
-// Get basic statistics
+// Get basic file metadata
 println!(Scandir::new("/usr")?.collect()?);
-// Get extended statistics
+// Get extended file metadata
 println!(Scandir::new("/usr", return_type=ReturnType.Ext, None)?.collect()?);
+```
+
+If you want to have intermediate results, e.g. you want to show the progress to the user, the use the example below.
+
+```rust
+let mut instance = Scandir::new(&path, None)?;
+instance.start()?;
+loop {
+    if !instance.busy() {
+        break;
+    }
+    let new_results = instance.results(true);
+    // Do something
+    thread::sleep(Duration::from_millis(10));
+}
+// collect() immediately returns because the worker thread has already finished.
+let results = instance.collect()?;
 ```

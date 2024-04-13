@@ -1,4 +1,4 @@
-# `scandir-rs`
+# scandir-rs
 
 The Python module is called `scandir_rs` and installable via `pip`. It is an alternative to `os.walk()` and `os.scandir()` with more features and higher speed. On Linux it is **3 - 11 times faster** and on Windows **6 - 70 time faster** (see [benchmarks](doc/benchmarks.md)).  
 It releases the GIL and the scanning is done in a background thread. With different methods intermediate results can be read.

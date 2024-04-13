@@ -1,6 +1,6 @@
 # Benchmarks
 
-Benchmarking code see [benches/benchmark.py](../benches/benchmark.py)
+Benchmarking code see [benches/benchmark.rs](../benches/benchmark.rs)
 
 ## Linux with Tower Ryzen 5 2400G @ 3.6GHz (4/8 cores) and Samsung SSD 960 EVO 250GB (NVME, EXT4)
 

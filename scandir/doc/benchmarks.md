@@ -114,7 +114,7 @@ Scandir(Ext).collect **~1.5 times faster** than scan_dir.ScanDir.
 Walk.collect **~4.8 times faster** than walkdir.WalkDir.  
 Walk(Ext).collect  **~4.9 times faster** than walkdir.WalkDir.  
 Scandir.collect **~5.1 times faster** than scan_dir.ScanDir.
-Scandir(Ext).collect **~0.6 times faster** than scan_dir.ScanDir.
+Scandir(Ext).collect **slower** than scan_dir.ScanDir.
 
 #### Walk linux-5.9
 

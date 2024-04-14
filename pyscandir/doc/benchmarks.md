@@ -145,7 +145,7 @@ Scandir(Ext).iter **~1.7 times faster** than scantree(os.scandir).
 Walk.iter **~9.3 times faster** than os.walk.  
 Walk(Ext).iter **~70.6 times faster** than os.walk(stat).  
 Scandir.iter **~7.4 times faster** than scantree(os.scandir).  
-Scandir(Ext).iter **~0.9 times faster** than scantree(os.scandir).
+Scandir(Ext).iter **slower** than scantree(os.scandir).
 
 #### Walk linux-5.9
 

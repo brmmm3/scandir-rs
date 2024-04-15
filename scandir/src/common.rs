@@ -122,6 +122,7 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
     Ok(Some(filter))
 }
 
+#[inline]
 pub fn filter_direntry(
     key: &str,
     filter: &Vec<Pattern>,
@@ -166,6 +167,7 @@ pub fn filter_direntry(
     false
 }
 
+#[inline]
 pub fn filter_dir(
     root_path_len: usize,
     dir_entry: &jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>,
@@ -188,6 +190,7 @@ pub fn filter_dir(
     true
 }
 
+#[inline]
 pub fn filter_children(
     children: &mut Vec<
         Result<jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>, jwalk_meta::Error>

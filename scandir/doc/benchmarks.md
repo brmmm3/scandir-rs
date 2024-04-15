@@ -18,35 +18,35 @@ Benchmarking code see [benches/benchmark.rs](../benches/benchmark.rs)
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
 |   0.046    | Count.collect                        |
-|   0.081    | Count(Ext).collect                   |
+|   0.081    | Count.collect(Ext)                   |
 
 #### Walk linux-5.9
 
 |   Time [s]    | Method                            |
 |---------------|-----------------------------------|
 |   0.082       | walkdir.WalkDir                   |
-|   0.462       | walkdir.WalkDir(Ext)              |
 |   0.056       | Walk.collect                      |
-|   0.055       | Walk(Ext).collect                 |
+|   0.462       | walkdir.WalkDir(Ext)              |
+|   0.055       | Walk.collect(Ext)                 |
 
 Walk.collect **~1.5 times faster** than walkdir.WalkDir.  
-Walk(Ext).collect  **~8.4 times faster** than walkdir.WalkDir(Ext).  
+Walk.collect(Ext)  **~8.4 times faster** than walkdir.WalkDir(Ext).  
 
-![](images/linux_walk_linux-5.9.png)
+![images/linux_walk_linux-5.9.png](images/linux_walk_linux-5.9.png)
 
 #### Scandir linux-5.9
 
 |   Time [s]    | Method                            |
 |---------------|-----------------------------------|
 |   0.199       | scan_dir.ScanDir                  |
-|   0.383       | scan_dir.ScanDir(Ext)             |
 |   0.073       | Scandir.collect                   |
-|   0.116       | Scandir(Ext).collect              |
+|   0.383       | scan_dir.ScanDir(Ext)             |
+|   0.116       | Scandir.collect(Ext)              |
 
 Scandir.collect **~2.7 times faster** than scan_dir.ScanDir.
-Scandir(Ext).collect **~3.3 times faster** than scan_dir.ScanDir(Ext).
+Scandir.collect(Ext) **~3.3 times faster** than scan_dir.ScanDir(Ext).
 
-![](images/linux_scandir_linux-5.9.png)
+![images/linux_scandir_linux-5.9.png](images/linux_scandir_linux-5.9.png)
 
 ### Directory /usr with
 
@@ -63,35 +63,35 @@ Scandir(Ext).collect **~3.3 times faster** than scan_dir.ScanDir(Ext).
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
 |   0.306    | Count.collect                        |
-|   0.515    | Count(Ext).collect                   |
+|   0.515    | Count.collect(Ext)                   |
 
 #### Walk /usr
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
 |   0.671    | walkdir.WalkDir                      |
-|   2.829    | walkdir.WalkDir(Ext)                 |
 |   0.405    | Walk.collect                         |
-|   0.404    | Walk(Ext).collect                    |
+|   2.829    | walkdir.WalkDir(Ext)                 |
+|   0.404    | Walk.collect(Ext)                    |
 
 Walk.collect **~1.7 times faster** than walkdir.WalkDir.  
-Walk(Ext).collect  **~7.0 times faster** than walkdir.WalkDir(Ext).
+Walk.collect(Ext)  **~7.0 times faster** than walkdir.WalkDir(Ext).
 
-![](images/linux_walk_usr.png)
+![images/linux_walk_usr.png](images/linux_walk_usr.png)
 
 #### Scandir /usr
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
 |   1.474    | scan_dir.ScanDir                     |
-|   2.575    | scan_dir.ScanDir(Ext)                |
 |   0.615    | Scandir.collect                      |
-|   0.822    | Scandir(Ext).collect                 |
+|   2.575    | scan_dir.ScanDir(Ext)                |
+|   0.822    | Scandir.collect(Ext)                 |
 
 Scandir.collect **~2.4 times faster** than scan_dir.ScanDir.  
-Scandir(Ext).collect **~3.1 times faster** than scan_dir.ScanDir(Ext).
+Scandir.collect(Ext) **~3.1 times faster** than scan_dir.ScanDir(Ext).
 
-![](images/linux_scandir_usr.png)
+![images/linux_scandir_usr.png](images/linux_scandir_usr.png)
 
 ## Windows 10 with Laptop Core i7-11850H @ 2.5GHz (8/16 cores) and Samsung MZVLB1T0HBLR-000H1 (NVME, NTFS)
 
@@ -105,36 +105,36 @@ Scandir(Ext).collect **~3.1 times faster** than scan_dir.ScanDir(Ext).
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
-|   0.688    | Count.collect                        |
-|   0.0908   | Count(Ext).collect                   |
+|   0.070    | Count.collect                        |
+|   0.826    | Count.collect(Ext)                   |
 
 #### Walk linux-5.9
 
-|   Time [s] | Method                               |
+|   Time [s]    | Method                            |
 |---------------|-----------------------------------|
-|   0.484       | walkdir.WalkDir                   |
-|   0.090843    | walkdir.WalkDir(Ext)              |
-|   0.1         | Walk.collect                      |
-|   0.099       | Walk(Ext).collect                 |
+|   0.456       | walkdir.WalkDir                   |
+|   0.100       | Walk.collect                      |
+|   4.343       | walkdir.WalkDir(Ext)              |
+|   0.103       | Walk.collect(Ext)                 |
 
-Walk.collect **~4.8 times faster** than walkdir.WalkDir.  
-Walk(Ext).collect  **~4.9 times faster** than walkdir.WalkDir.  
+Walk.collect **~4.6 times faster** than walkdir.WalkDir.  
+Walk.collect(Ext)  **~42.2 times faster** than walkdir.WalkDir(Ext).
 
-![](images/windows_walk_linux-5.9.png)
+![images/windows_walk_linux-5.9.png](images/windows_walk_linux-5.9.png)
 
 #### Scandir linux-5.9
 
 |   Time [s] | Method                               |
 |---------------|-----------------------------------|
-|   0.436       | scan_dir.ScanDir                  |
-|   0.20626     | scan_dir.ScanDir(Ext)             |
-|   0.086       | Scandir.collect                   |
-|   0.779       | Scandir(Ext).collect              |
+|   0.707       | scan_dir.ScanDir                  |
+|   0.107       | Scandir.collect                   |
+|   7.483       | scan_dir.ScanDir(Ext)             |
+|   0.864       | Scandir.collect(Ext)              |
 
-Scandir.collect **~5.1 times faster** than scan_dir.ScanDir.
-Scandir(Ext).collect **slower** than scan_dir.ScanDir.
+Scandir.collect **~6.6 times faster** than scan_dir.ScanDir.  
+Scandir.collect(Ext) **~8.7 times faster** than scan_dir.ScanDir(Ext).
 
-![](images/windows_scandir_linux-5.9.png)
+![images/windows_scandir_linux-5.9.png](images/windows_scandir_linux-5.9.png)
 
 ### Directory C:\Windows with
 
@@ -147,33 +147,33 @@ Scandir(Ext).collect **slower** than scan_dir.ScanDir.
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
-|   0.688    | Count.collect                        |
-|   0.0908   | Count(Ext).collect                   |
+|   3.018    | Count.collect                        |
+|  11.622    | Count.collect(Ext)                   |
 
 #### Walk C:\Windows
 
 |   Time [s] | Method                               |
 |---------------|-----------------------------------|
-|   15.257      | walkdir.WalkDir                   |
-|   0.090843    | walkdir.WalkDir(Ext)              |
-|   3.046       | Walk.collect                      |
-|   2.961       | Walk(Ext).collect                 |
+|  15.512       | walkdir.WalkDir                   |
+|   0.046       | Walk.collect                      |
+|   0.090       | walkdir.WalkDir(Ext)              |
+|   0.961       | Walk.collect(Ext)                 |
 
 Walk.collect **~5.0 times faster** than walkdir.WalkDir.  
-Walk(Ext).collect  **~5.2 times faster** than walkdir.WalkDir.  
+Walk.collect(Ext)  **~5.2 times faster** than walkdir.WalkDir.  
 
-![](images/windows_walk_windows.png)
+![images/windows_walk_windows.png](images/windows_walk_windows.png)
 
 #### Scandir C:\Windows
 
-|   Time [s] | Method                               |
+|   Time [s]    | Method                            |
 |---------------|-----------------------------------|
-|   15.13       | scan_dir.ScanDir                  |
-|   0.20626     | scan_dir.ScanDir(Ext)             |
-|   2.784       | Scandir.collect                   |
-|   10.162      | Scandir(Ext).collect              |
+|  16.818       | scan_dir.ScanDir                  |
+|   2.999       | Scandir.collect                   |
+|  47.740       | scan_dir.ScanDir(Ext)             |
+|  10.632       | Scandir.collect(Ext)              |
 
-Scandir.collect **~5.4 times faster** than scan_dir.ScanDir.
-Scandir(Ext).collect **~1.5 times faster** than scan_dir.ScanDir.
+Scandir.collect **~5.6 times faster** than scan_dir.ScanDir.
+Scandir.collect(Ext) **~4.5 times faster** than scan_dir.ScanDir.
 
-![](images/windows_scandir_windows.png)
+![images/windows_scandir_windows.png](images/windows_scandir_windows.png)

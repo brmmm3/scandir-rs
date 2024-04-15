@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs::Metadata;
 use std::io::{ Error, ErrorKind };
 use std::path::Path;
-use std::sync::atomic::{ AtomicBool, AtomicUsize, Ordering };
+use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::Instant;
@@ -78,11 +78,8 @@ fn count_thread(
     let mut update_time = start_time;
     let mut file_indexes: HashSet<u64> = HashSet::new();
     let root_path_len = get_root_path_len(&options.root_path);
-    let max_file_cnt = options.max_file_cnt;
-    let file_cnt = Arc::new(AtomicUsize::new(0));
-    let file_cnt_cloned = file_cnt.clone();
-    let stop_cloned = stop.clone();
-    for entry in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>
+    let max_file_cnt = options.max_file_cnt as i32;
+    for result in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>
         ::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(false)
@@ -90,9 +87,6 @@ fn count_thread(
         .read_metadata(true)
         .read_metadata_ext(options.return_type == ReturnType::Ext)
         .process_read_dir(move |_, root_dir, _, children| {
-            if stop_cloned.load(Ordering::Relaxed) {
-                return;
-            }
             if let Some(root_dir) = root_dir.to_str() {
                 if root_dir.len() + 1 < root_path_len {
                     return;
@@ -101,19 +95,11 @@ fn count_thread(
                 return;
             }
             filter_children(children, &filter, root_path_len);
-            if children.is_empty() {
-                return;
-            }
-            let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len();
-            file_cnt_cloned.store(file_cnt_new, Ordering::Relaxed);
         }) {
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        if max_file_cnt > 0 && file_cnt.load(Ordering::Relaxed) > max_file_cnt {
-            break;
-        }
-        match &entry {
+        match &result {
             Ok(v) => {
                 if v.depth == 0 {
                     continue;
@@ -197,6 +183,9 @@ fn count_thread(
                     let _ = tx.send(statistics.clone());
                     cnt = 0;
                     update_time = Instant::now();
+                }
+                if !file_type.is_dir() && max_file_cnt > 0 && files > max_file_cnt {
+                    break;
                 }
             }
             Err(e) => statistics.errors.push(e.to_string()), // TODO: Need to fetch failed path from somewhere

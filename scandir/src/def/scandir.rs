@@ -1,5 +1,6 @@
 use speedy::{ Readable, Writable };
 
+use crate::ErrorsType;
 use crate::direntry::{ DirEntry, DirEntryExt };
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
@@ -115,8 +116,6 @@ impl ScandirResult {
         serde_json::to_string(self)
     }
 }
-
-pub type ErrorsType = Vec<(String, String)>; // Tuple with file path and error message
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]

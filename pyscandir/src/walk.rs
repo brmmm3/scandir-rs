@@ -5,9 +5,10 @@ use std::time::Duration;
 
 use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
 use pyo3::prelude::*;
-use pyo3::types::PyType;
+use pyo3::types::{ PyBytes, PyType };
+use scandir::ErrorsType;
 
-use crate::def::{ ReturnType, Toc };
+use crate::def::{ ReturnType, Toc, Statistics };
 
 #[pyclass]
 #[derive(Debug)]
@@ -119,6 +120,54 @@ impl Walk {
     #[getter]
     pub fn duration(&mut self) -> f64 {
         self.instance.duration()
+    }
+
+    pub fn errors_cnt(&mut self) -> usize {
+        self.instance.errors_cnt()
+    }
+
+    pub fn errors(&mut self, only_new: Option<bool>) -> ErrorsType {
+        self.instance.errors(only_new.unwrap_or(true))
+    }
+
+    #[cfg(feature = "speedy")]
+    pub fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
+        self.instance
+            .to_speedy()
+            .map(|v| {
+                PyBytes::new_bound_with(py, v.len(), |b| {
+                    b.copy_from_slice(&v);
+                    Ok(())
+                })
+                    .unwrap()
+                    .into()
+            })
+            .map_err(|e| PyException::new_err(e.to_string()))
+    }
+
+    #[cfg(feature = "bincode")]
+    pub fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
+        self.instance
+            .to_bincode()
+            .map(|v| {
+                PyBytes::new_bound_with(py, v.len(), |b| {
+                    b.copy_from_slice(&v);
+                    Ok(())
+                })
+                    .unwrap()
+                    .into()
+            })
+            .map_err(|e| PyException::new_err(e.to_string()))
+    }
+
+    #[cfg(feature = "json")]
+    pub fn to_json(&self) -> PyResult<String> {
+        self.instance.to_json().map_err(|e| PyException::new_err(e.to_string()))
+    }
+
+    #[getter]
+    pub fn statistics(&self) -> Statistics {
+        Statistics(self.instance.statistics())
     }
 
     #[getter]

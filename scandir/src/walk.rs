@@ -2,13 +2,14 @@ use std::fmt::Debug;
 use std::fs::{ self, Metadata };
 use std::io::{ Error, ErrorKind };
 use std::path::Path;
-use std::sync::atomic::{ AtomicBool, AtomicUsize, Ordering };
+use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::Instant;
 
 use flume::{ unbounded, Receiver, Sender };
 use jwalk_meta::WalkDirGeneric;
+use speedy::Writable;
 
 use crate::common::{ check_and_expand_path, create_filter, filter_children, get_root_path_len };
 use crate::def::*;
@@ -54,17 +55,12 @@ pub fn toc_thread(
     }
 
     let max_file_cnt = options.max_file_cnt;
-    let file_cnt = Arc::new(AtomicUsize::new(0));
-    let file_cnt_cloned = file_cnt.clone();
-    let stop_cloned = stop.clone();
-    for _ in WalkDirGeneric::new(&options.root_path)
+    let mut file_cnt = 0;
+    for result in WalkDirGeneric::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(options.sorted)
         .max_depth(options.max_depth)
         .process_read_dir(move |_, root_dir, _, children| {
-            if stop_cloned.load(Ordering::Relaxed) {
-                return;
-            }
             let root_dir = root_dir.to_str();
             if root_dir.is_none() {
                 return;
@@ -90,14 +86,17 @@ pub fn toc_thread(
                     let _ = tx.send(("".to_owned(), toc));
                 }
             }
-            let file_cnt_new = file_cnt_cloned.load(Ordering::Relaxed) + children.len();
-            file_cnt_cloned.store(file_cnt_new, Ordering::Relaxed);
         }) {
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        if max_file_cnt > 0 && file_cnt.load(Ordering::Relaxed) > max_file_cnt {
-            break;
+        if let Ok(dir_entry) = result {
+            if !dir_entry.file_type.is_dir() {
+                file_cnt += 1;
+                if max_file_cnt > 0 && file_cnt > max_file_cnt {
+                    break;
+                }
+            }
         }
     }
 }
@@ -326,6 +325,52 @@ impl Walk {
 
     pub fn has_errors(&mut self) -> bool {
         !self.has_errors
+    }
+
+    pub fn errors_cnt(&mut self) -> usize {
+        self.entries
+            .iter()
+            .map(|e| e.1.errors.len())
+            .sum()
+    }
+
+    pub fn errors(&mut self, only_new: bool) -> ErrorsType {
+        self.results(only_new)
+            .iter()
+            .flat_map(|e|
+                e.1.errors
+                    .iter()
+                    .map(|err| (e.0.clone(), err.to_string()))
+                    .collect::<Vec<_>>()
+            )
+            .collect::<Vec<_>>()
+    }
+
+    #[cfg(feature = "speedy")]
+    pub fn to_speedy(&self) -> Result<Vec<u8>, speedy::Error> {
+        self.entries.write_to_vec()
+    }
+
+    #[cfg(feature = "bincode")]
+    pub fn to_bincode(&self) -> bincode::Result<Vec<u8>> {
+        bincode::serialize(&self.entries)
+    }
+
+    #[cfg(feature = "json")]
+    pub fn to_json(&self) -> serde_json::Result<String> {
+        serde_json::to_string(&self.entries)
+    }
+
+    pub fn statistics(&self) -> Statistics {
+        let mut statistics = Statistics::new();
+        for (_dir, toc) in self.entries.iter() {
+            statistics.dirs += toc.dirs.len() as i32;
+            statistics.files += toc.files.len() as i32;
+            statistics.slinks += toc.symlinks.len() as i32;
+            statistics.devices += toc.other.len() as i32;
+            statistics.errors.extend(toc.errors.clone());
+        }
+        statistics
     }
 
     pub fn duration(&mut self) -> f64 {

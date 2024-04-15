@@ -2,13 +2,15 @@ use std::path::PathBuf;
 
 use glob_sl::{ MatchOptions, Pattern };
 
+pub type ErrorsType = Vec<(String, String)>; // Tuple with file path and error message
+
 pub mod count;
 pub use count::Statistics;
 pub mod walk;
 pub mod direntry;
 pub use direntry::{ DirEntry, DirEntryExt };
 pub mod scandir;
-pub use scandir::{ ScandirResult, ErrorsType };
+pub use scandir::ScandirResult;
 pub mod toc;
 pub use toc::Toc;
 

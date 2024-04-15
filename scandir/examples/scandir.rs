@@ -1,32 +1,38 @@
-use std::env;
+use std::time::Duration;
+use std::{ env, time::Instant };
 use std::io::Error;
 
 use scandir::{ ReturnType, Scandir };
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
-    let default_dir = "/tmp".to_string();
+    let default_dir = "/usr".to_string();
     let root_dir = &args.get(1).unwrap_or(&default_dir);
     let mut instance = Scandir::new(&root_dir, Some(true))?;
-    instance = instance.max_file_cnt(100);
-    if args.len() > 2 {
+    //instance = instance.max_file_cnt(100);
+    if args.contains(&"--ext".to_string()) {
         instance = instance.return_type(ReturnType::Ext);
     }
+    println!("options {:#?}", instance.options());
+    instance.start()?;
+    let now = Instant::now();
+    std::thread::sleep(Duration::from_millis(100));
+    //instance.stop();
     let entries = instance.collect()?;
-    for (path, error) in entries.errors {
+    println!("dt={}", now.elapsed().as_secs_f64());
+    for (path, error) in entries.errors.iter() {
         println!("ERROR {path:?}: {error}");
     }
     let first_result = entries.results.iter().next().unwrap();
     println!("First file {:?} has size {}", first_result.path(), first_result.size());
-    let mut result = format!("{:#?}", instance.results(true));
-    if result.len() > 2000 {
-        result = result[..2000].to_string();
-    }
-    println!("options {:#?}", instance.options());
-    println!("result {}", &format!("{:#?}", result));
+    let result = format!("{:#?}", instance.results(false));
+    let result_str = format!("{result:#?}");
+    println!("result {}", &result_str[..std::cmp::min(result_str.len(), 500)]);
     println!("finished {:?}", instance.finished());
     println!("has more entries {:?}", instance.has_entries(true));
-    println!("has more errors {:?}", instance.has_errors());
+    println!("has_errors {:?}", instance.has_errors());
+    println!("results {}", entries.results.len());
+    println!("error_cnt {}", entries.errors.len());
     println!("duration {:?}", instance.duration());
     Ok(())
 }

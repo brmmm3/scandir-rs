@@ -119,6 +119,33 @@ If `only_new` is `false` this method returns total results,
 
 Returns `true` if errors occured while scanning the directory tree. The errors can be found in the statistics object.
 
+### `errors_cnt(&mut self) -> usize`
+
+Returns number of errors occured while scanning the file tree.
+
+### `errors(&mut self, only_new: bool) -> ErrorsType`
+
+Returns the errors.
+
+### `to_speedy(&self) -> Result<Vec<u8>, speedy::Error>`
+
+Returns the results serialized with `speedy`.
+For this method the feature `speedy` needs to be enabled.
+
+### `to_bincode(&self) -> bincode::Result<Vec<u8>>`
+
+Returns the results serialized with `bincode`.
+For this method the feature `bincode` needs to be enabled.
+
+### `to_json(&self) -> serde_json::Result<String>`
+
+Returns the results serialized as `json`.
+For this method the feature `json` needs to be enabled.
+
+### `statistics(&self) -> Statistics`
+
+Returns the statistics of the results. Please note that file types `other` are counted in member `devices`.
+
 ### `duration(&mut self) -> f64`
 
 Returns the duration of the task in seconds as float. As long as the task is running it will return 0.

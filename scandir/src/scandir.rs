@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs::Metadata;
 use std::io::{ Error, ErrorKind };
 use std::path::{ Path, PathBuf };
-use std::sync::atomic::{ AtomicBool, AtomicUsize, Ordering };
+use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::{ Instant, SystemTime };
@@ -28,7 +28,7 @@ fn create_entry(
     root_path_len: usize,
     return_type: &ReturnType,
     dir_entry: &jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>
-) -> (bool, ScandirResult) {
+) -> ScandirResult {
     let file_type = dir_entry.file_type;
     let mut st_ctime: Option<SystemTime> = None;
     let mut st_mtime: Option<SystemTime> = None;
@@ -141,7 +141,7 @@ fn create_entry(
                 "Wrong return type!".to_string(),
             )),
     };
-    (is_file, entry)
+    entry
 }
 
 fn entries_thread(
@@ -158,25 +158,20 @@ fn entries_thread(
         .unwrap();
 
     if !dir_entry.file_type.is_dir() {
-        let _ = tx.send(create_entry(root_path_len, &return_type, &dir_entry).1);
+        let _ = tx.send(create_entry(root_path_len, &return_type, &dir_entry));
         return;
     }
 
     let max_file_cnt = options.max_file_cnt;
-    let file_cnt = Arc::new(AtomicUsize::new(0));
-    let file_cnt_cloned = file_cnt.clone();
-    let stop_cloned = stop.clone();
+    let mut file_cnt = 0;
 
-    for _ in WalkDirGeneric::new(&options.root_path)
+    for result in WalkDirGeneric::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(options.sorted)
         .max_depth(options.max_depth)
         .read_metadata(true)
         .read_metadata_ext(options.return_type == ReturnType::Ext)
         .process_read_dir(move |_, root_dir, _, children| {
-            if stop_cloned.load(Ordering::Relaxed) {
-                return;
-            }
             if let Some(root_dir) = root_dir.to_str() {
                 if root_dir.len() + 1 < root_path_len {
                     return;
@@ -185,33 +180,24 @@ fn entries_thread(
                 return;
             }
             filter_children(children, &filter, root_path_len);
-            if children.is_empty() {
-                return;
-            }
-            let mut local_file_cnt: usize = 0;
             children.iter_mut().for_each(|dir_entry_result| {
                 if let Ok(dir_entry) = dir_entry_result {
-                    let (is_file, entry) = create_entry(root_path_len, &return_type, dir_entry);
-                    if tx.send(entry).is_err() {
+                    if tx.send(create_entry(root_path_len, &return_type, dir_entry)).is_err() {
                         return;
-                    }
-                    if is_file {
-                        local_file_cnt += 1;
                     }
                 }
             });
-            if local_file_cnt > 0 {
-                file_cnt_cloned.store(
-                    file_cnt_cloned.load(Ordering::Relaxed) + local_file_cnt,
-                    Ordering::Relaxed
-                );
-            }
         }) {
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        if max_file_cnt > 0 && file_cnt.load(Ordering::Relaxed) > max_file_cnt {
-            break;
+        if let Ok(dir_entry) = result {
+            if !dir_entry.file_type.is_dir() {
+                file_cnt += 1;
+                if max_file_cnt > 0 && file_cnt > max_file_cnt {
+                    break;
+                }
+            }
         }
     }
 }

@@ -1,9 +1,65 @@
-use std::{ path::Path, time::Duration };
+use std::path::Path;
+use std::time::Duration;
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
 
 #[cfg(windows)]
 use std::path::PathBuf;
 
 use criterion::{ criterion_group, criterion_main, Criterion };
+
+#[cfg(unix)]
+#[derive(Debug, Clone)]
+pub struct MetaDataExt {
+    pub st_mode: u32,
+    pub st_ino: u64,
+    pub st_dev: u64,
+    pub st_nlink: u64,
+    pub st_blksize: u64,
+    pub st_blocks: u64,
+    pub st_uid: u32,
+    pub st_gid: u32,
+    pub st_rdev: u64,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone)]
+pub struct MetaDataExt {
+    pub file_attributes: u32,
+    pub volume_serial_number: Option<u32>,
+    pub number_of_links: Option<u32>,
+    pub file_index: Option<u64>,
+}
+
+#[inline]
+pub fn get_metadata_ext(metadata: &fs::Metadata) -> MetaDataExt {
+    #[cfg(unix)]
+    {
+        MetaDataExt {
+            st_mode: metadata.mode(),
+            st_ino: metadata.ino(),
+            st_dev: metadata.dev(),
+            st_nlink: metadata.nlink(),
+            st_blksize: metadata.blksize(),
+            st_blocks: metadata.blocks(),
+            st_uid: metadata.uid(),
+            st_gid: metadata.gid(),
+            st_rdev: metadata.rdev(),
+        }
+    }
+    #[cfg(windows)]
+    {
+        MetaDataExt {
+            file_attributes: metadata.file_attributes(),
+            volume_serial_number: metadata.volume_serial_number(),
+            number_of_links: metadata.number_of_links(),
+            file_index: metadata.file_index(),
+        }
+    }
+}
 
 fn create_test_data() -> String {
     let temp_dir;
@@ -47,56 +103,6 @@ fn create_test_data() -> String {
 fn benchmark_dir(c: &mut Criterion, path: &str) {
     println!("Running benchmarks for {path}...");
     let dir = Path::new(path).file_name().unwrap().to_str().unwrap();
-    // Count
-    let mut group = c.benchmark_group(format!("Count {dir}"));
-    group.measurement_time(Duration::from_secs(10));
-    group.sample_size(20);
-    group.bench_function("scandir.Count (collect)", |b|
-        b.iter(|| {
-            let mut instance = scandir::Count
-                ::new(&path)
-                .expect(&format!("Failed to create Count instance for {path}"));
-            instance.collect().unwrap();
-        })
-    );
-    group.bench_function("scandir.Count(Ext) (collect)", |b|
-        b.iter(|| {
-            let mut instance = scandir::Count
-                ::new(&path)
-                .expect(&format!("Failed to create Count instance for {path}"))
-                .extended(true);
-            instance.collect().unwrap();
-        })
-    );
-    group.finish();
-    // Walk
-    let mut group = c.benchmark_group(format!("Walk {dir}"));
-    group.measurement_time(Duration::from_secs(30));
-    group.sample_size(20);
-    group.bench_function("walkdir.WalkDir", |b|
-        b.iter(|| {
-            let _ = walkdir::WalkDir::new(&path).into_iter().collect::<Vec<_>>();
-        })
-    );
-    group.bench_function("scandir.Walk (collect)", |b|
-        b.iter(|| {
-            let mut instance = scandir::Walk
-                ::new(&path, Some(true))
-                .expect(&format!("Failed to create Walk instance for {path}"));
-            instance.collect().unwrap();
-        })
-    );
-    group.bench_function("scandir.Walk(Ext) (collect)", |b|
-        b.iter(|| {
-            let mut instance = scandir::Walk
-                ::new(&path, Some(true))
-                .expect(&format!("Failed to create Walk instance for {path}"))
-                .return_type(scandir::ReturnType::Ext);
-            instance.collect().unwrap();
-        })
-    );
-    group.finish();
-    // Scandir
     let mut group = c.benchmark_group(format!("Scandir {dir}"));
     group.measurement_time(Duration::from_secs(60));
     group.sample_size(20);
@@ -106,6 +112,23 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
             let _ = scan_dir::ScanDir::all().walk(path, |iter| {
                 for (entry, _name) in iter {
                     entries.push(entry.metadata().unwrap());
+                }
+            });
+        })
+    );
+    group.bench_function("scan_dir.ScanDir(Ext)", |b|
+        b.iter(|| {
+            let mut entries = Vec::new();
+            let _ = scan_dir::ScanDir::all().walk(path, |iter| {
+                for (entry, _name) in iter {
+                    if let Ok(metadata) = fs::metadata(entry.path()) {
+                        entries.push((
+                            entry.metadata().unwrap(),
+                            Some(get_metadata_ext(&metadata)),
+                        ));
+                    } else {
+                        entries.push((entry.metadata().unwrap(), None));
+                    }
                 }
             });
         })

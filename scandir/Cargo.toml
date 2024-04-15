@@ -48,6 +48,16 @@ expanduser = "1.2"
 unix-named-pipe = "0.2"
 
 [[bench]]
-name = "benchmark"
-path = "benches/benchmark.rs"
+name = "count"
+path = "benches/count.rs"
+harness = false
+
+[[bench]]
+name = "walk"
+path = "benches/walk.rs"
+harness = false
+
+[[bench]]
+name = "scandir"
+path = "benches/scandir.rs"
 harness = false

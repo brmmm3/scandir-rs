@@ -1,3 +1,5 @@
+#![cfg_attr(windows, feature(windows_by_handle))]
+
 use std::{ fs, path::Path, time::Duration };
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;

@@ -110,4 +110,4 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
         run: |
-          twine upload --repository-url https://test.pypi.org/legacy/ --skip-existing target/wheels/* --verbose
+          twine upload --repository-url https://test.pypi.org/legacy/ --skip-existing target/wheels/*

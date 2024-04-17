@@ -21,6 +21,7 @@ pub struct Count {
 
 #[pymethods]
 impl Count {
+    #[allow(clippy::too_many_arguments)]
     #[new]
     fn new(
         root_path: &str,
@@ -62,6 +63,10 @@ impl Count {
             },
             busy: false,
         })
+    }
+
+    pub fn extended(&mut self, extended: bool) {
+        self.instance.set_extended(extended);
     }
 
     pub fn clear(&mut self) {

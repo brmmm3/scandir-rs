@@ -40,8 +40,6 @@ pub struct Filter {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum ReturnType {
-    Fast,
     Base,
     Ext,
-    Walk,
 }

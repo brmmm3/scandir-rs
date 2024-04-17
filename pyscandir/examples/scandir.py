@@ -16,13 +16,24 @@ def Counter(sd):
 
 dirName = "C:/Windows/appcompat" if os.name == "nt" else "/tmp"
 
-
-print("*** return_type=ReturnType.Base:")
+# ReturnType.Base is the default
+print("\n*** return_type=ReturnType.Base:")
 for dirEntry in Scandir(dirName, return_type=ReturnType.Base):
     print(dirEntry)
 
+# Or collect all results and return them in one step
+results = Scandir(dirName).collect()
 
-print("*** return_type=ReturnType.Ext:")
+# And with extended metadata
+instance = Scandir(dirName)
+# Use method `extended` as an alternative to the above usage.
+instance.extended(True)
+results, errors = instance.collect()
+print("\n*** Scandir results_cnt=", len(results))
+for dirEntry in results:
+    print(dirEntry.path, dirEntry.ctime)
+
+print("\n*** return_type=ReturnType.Ext:")
 for dirEntry in Scandir(dirName, return_type=ReturnType.Ext):
     print(dirEntry)
 

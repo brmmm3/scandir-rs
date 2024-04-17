@@ -314,6 +314,14 @@ impl Count {
         self
     }
 
+    /// Same as method `extended`, but without moving the instance
+    pub fn set_extended(&mut self, extended: bool) {
+        self.options.return_type = match extended {
+            false => ReturnType::Base,
+            true => ReturnType::Ext,
+        };
+    }
+
     pub fn clear(&mut self) {
         self.statistics.clear();
         *self.duration.lock().unwrap() = 0.0;

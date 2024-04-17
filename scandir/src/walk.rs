@@ -210,10 +210,27 @@ impl Walk {
         self
     }
 
-    /// Set extended file type
+    /// Set extended return type
     pub fn return_type(mut self, return_type: ReturnType) -> Self {
         self.options.return_type = return_type;
         self
+    }
+
+    /// Set extended return type
+    pub fn extended(mut self, extended: bool) -> Self {
+        self.options.return_type = match extended {
+            false => ReturnType::Base,
+            true => ReturnType::Ext,
+        };
+        self
+    }
+
+    /// Same as method `extended`, but without moving the instance
+    pub fn set_extended(&mut self, extended: bool) {
+        self.options.return_type = match extended {
+            false => ReturnType::Base,
+            true => ReturnType::Ext,
+        };
     }
 
     pub fn clear(&mut self) {

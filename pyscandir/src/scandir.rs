@@ -31,6 +31,7 @@ pub struct Scandir {
 
 #[pymethods]
 impl Scandir {
+    #[allow(clippy::too_many_arguments)]
     #[new]
     pub fn new(
         root_path: &str,
@@ -73,6 +74,10 @@ impl Scandir {
             },
             entries: ScandirResults::new(),
         })
+    }
+
+    pub fn extended(&mut self, extended: bool) {
+        self.instance.set_extended(extended);
     }
 
     pub fn clear(&mut self) {

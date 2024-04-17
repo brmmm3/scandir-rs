@@ -22,6 +22,7 @@ pub struct Walk {
 
 #[pymethods]
 impl Walk {
+    #[allow(clippy::too_many_arguments)]
     #[new]
     fn new(
         root_path: &str,
@@ -66,6 +67,10 @@ impl Walk {
             entries: Vec::new(),
             idx: usize::MAX,
         })
+    }
+
+    pub fn extended(&mut self, extended: bool) {
+        self.instance.set_extended(extended);
     }
 
     pub fn clear(&mut self) {

@@ -135,11 +135,6 @@ fn create_entry(
                 st_gid,
                 st_rdev,
             }),
-        _ =>
-            ScandirResult::Error((
-                path.to_str().unwrap().to_string(),
-                "Wrong return type!".to_string(),
-            )),
     };
     entry
 }
@@ -310,10 +305,27 @@ impl Scandir {
         self
     }
 
-    /// Set extended file type counting
+    /// Set extended file type parsing
     pub fn return_type(mut self, return_type: ReturnType) -> Self {
         self.options.return_type = return_type;
         self
+    }
+
+    /// Set extended file type parsing
+    pub fn extended(mut self, extended: bool) -> Self {
+        self.options.return_type = match extended {
+            false => ReturnType::Base,
+            true => ReturnType::Ext,
+        };
+        self
+    }
+
+    /// Same as method `extended`, but without moving the instance
+    pub fn set_extended(&mut self, extended: bool) {
+        self.options.return_type = match extended {
+            false => ReturnType::Base,
+            true => ReturnType::Ext,
+        };
     }
 
     pub fn clear(&mut self) {

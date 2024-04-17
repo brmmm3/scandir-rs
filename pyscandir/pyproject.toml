@@ -3,6 +3,8 @@ name = "scandir-rs"
 version = "2.7.0"
 authors = [{ name = "Martin Bammer", email = "mrbm74@gmail.com" }]
 description = "A Rust library for parsing and generating A2L files."
+license = "MIT"
+readme = "README.md"
 dependencies = []
 requires-python = ">=3.7"
 classifiers = [
@@ -22,18 +24,15 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
     "License :: OSI Approved :: MIT License",
+    'Topic :: Software Development :: Libraries',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Utilities',
 ]
 
 [build-system]
-requires = [
-    "setuptools>=41.0.0",
-    "wheel",
-    "setuptools_rust>=0.10.2",
-    "toml",
-    "maturin>=0.12",
-]
+requires = ["setuptools", "wheel", "setuptools_rust", "maturin>=1.5.1"]
 build-backend = "maturin"
 
 [tool.maturin]
-manylinux = "off"
+manylinux = "2_34"
 strip = true

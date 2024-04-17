@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added optional serialization methods `to_json`, `to_speedy` and `to_bincode` to `Walk`. The corresponding features `json`, `speedy` and `bincode` need to be enabled.
+- Add missing `st_size` attribute to `DirEntry`.
 - Add `statistics` getter to `Walk`.
 - Add method `extended` as an alternative.
 

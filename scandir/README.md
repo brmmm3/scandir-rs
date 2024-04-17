@@ -1,6 +1,6 @@
 # scandir
 
-The Rust crate is called `scandir` and installable via `cargo`. On Linux it is **1.5 - 2.9 times faster** and on Windows **1.5 - 5.4 time faster** (see [benchmarks](doc/benchmarks.md)).
+The Rust crate is called `scandir` and installable via `cargo`. On Linux it is **1.5 - 2.9 times faster** and on Windows **1.5 - 5.4 time faster** (see [benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)).
 
 If you are just interested in directory statistics you can use the `Count`.
 
@@ -12,9 +12,9 @@ If you are just interested in directory statistics you can use the `Count`.
 
 For the API see:
 
-- Class [Count](doc/count.md)
-- Class [Walk](doc/walk.md)
-- Class [Scandir](doc/scandir.md)
+- Class [Count](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/count.md)
+- Class [Walk](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/walk.md)
+- Class [Scandir](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/scandir.md)
 
 ## Examples
 

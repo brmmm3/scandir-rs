@@ -3,7 +3,6 @@
 import os
 import sys
 import timeit
-import shutil
 import platform
 from typing import Dict
 
@@ -68,14 +67,11 @@ def CreateTestData():
     return tempDir
 
 
-def RunBenchmarks(dirName: str) -> Dict[str, float]:
-    print(f"Benchmarking directory: {dirName}")
+def RunCountBenchmarks(dirName: str) -> Dict[str, float]:
+    print(f"Running Count benchmarks in directory: {dirName}")
     print(scandir.Count(dirName).collect())
     stats = scandir.Count(dirName, return_type=scandir.ReturnType.Ext).collect()
     print(stats)
-
-    # Count
-
     dtScandirCountCollect = timeit.timeit(
         f"""
 scandir.Count('{dirName}').collect()
@@ -93,9 +89,14 @@ scandir.Count('{dirName}', return_type=scandir.ReturnType.Ext).collect()
         number=3,
     )
     print(f"scandir.Count(Ext) (collect): {dtScandirCountCollectExt}")
+    return {
+        "stats": stats,
+        "dtScandirCountCollect": dtScandirCountCollect,
+        "dtScandirCountCollectExt": dtScandirCountCollectExt}
 
-    # Walk
 
+def RunWalkBenchmarks(dirName: str) -> Dict[str, float]:
+    print(f"Running Walk benchmarks in directory: {dirName}")
     dtOsWalk = timeit.timeit(
         f"""
 for root, dirs, files in os.walk('{dirName}'):
@@ -106,7 +107,7 @@ for root, dirs, files in os.walk('{dirName}'):
     )
     print(f"os.walk {dtOsWalk}")
 
-    dtOsWalkStat = timeit.timeit(
+    dtOsWalkExt = timeit.timeit(
         f"""
 dirStats = dict()
 fileStats = dict()
@@ -127,7 +128,7 @@ for root, dirs, files in os.walk('{dirName}'):
         setup="import os",
         number=3,
     )
-    print(f"os.walk (stat) {dtOsWalkStat}")
+    print(f"os.walk(Ext) {dtOsWalkExt}")
 
     dtScandirWalkIter = timeit.timeit(
         f"""
@@ -166,9 +167,17 @@ toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext).collect()
         number=3,
     )
     print(f"scandir.Walk(Ext) (collect): {dtScandirWalkCollectExt}")
+    return {
+        "dtOsWalk": dtOsWalk,
+        "dtOsWalkExt": dtOsWalkExt,
+        "dtScandirWalkIter": dtScandirWalkIter,
+        "dtScandirWalkIterExt": dtScandirWalkIterExt,
+        "dtScandirWalkCollect": dtScandirWalkCollect,
+        "dtScandirWalkCollectExt": dtScandirWalkCollectExt}
 
-    # Scandir
 
+def RunScandirBenchmarks(dirName: str) -> Dict[str, float]:
+    print(f"Running Scandir benchmarks in directory: {dirName}")
     dtOsScandir = timeit.timeit(
         f"""
 def scantree(path):
@@ -242,26 +251,42 @@ entries = scandir.Scandir('{dirName}', return_type=scandir.ReturnType.Ext).colle
     )
     print(f"scandir.Scandir(Ext) (collect): {dtScandirScandirCollectExt}")
     return {
-        "stats": stats,
-        "dtScandirCountCollect": dtScandirCountCollect,
-        "dtScandirCountCollectExt": dtScandirCountCollectExt,
-        "dtOsWalk": dtOsWalk,
-        "dtOsWalkStat": dtOsWalkStat,
-        "dtScandirWalkIter": dtScandirWalkIter,
-        "dtScandirWalkIterExt": dtScandirWalkIterExt,
-        "dtScandirWalkCollect": dtScandirWalkCollect,
-        "dtScandirWalkCollectExt": dtScandirWalkCollectExt,
         "dtOsScandir": dtOsScandir,
         "dtScandirScandirIter": dtScandirScandirIter,
         "dtScandirScandirIterExt": dtScandirScandirIterExt,
         "dtScandirScandirCollect": dtScandirScandirCollect,
-        "dtScandirScandirCollectExt": dtScandirScandirCollectExt,
-    }
+        "dtScandirScandirCollectExt": dtScandirScandirCollectExt}
 
 
-def BenchmarkDir(path: str):
-    stats = RunBenchmarks(path)
+def BenchmarkDir(path: str, bCount: bool, bWalk: bool, bScandir: bool):
+    print()
     pyVersion = sys.version.split(" ")[0]
+    stats = {}
+    tableCount = []
+    tableWalk = []
+    tableScandir = []
+    if bCount:
+        stats.update(RunCountBenchmarks(path))
+        tableCount = [
+            [stats["dtScandirCountCollect"], "Count.collect"],
+            [stats["dtScandirCountCollectExt"], "Count(Ext).collect"]]
+    if bWalk:
+        stats.update(RunWalkBenchmarks(path))
+        tableWalk = [
+            [stats["dtOsWalk"], f"os.walk (Python {pyVersion})"],
+            [stats["dtScandirWalkIter"], "Walk.iter"],
+            [stats["dtScandirWalkCollect"], "Walk.collect"],
+            [stats["dtOsWalkExt"], f"os.walk(Ext) (Python {pyVersion})"],
+            [stats["dtScandirWalkIterExt"], "Walk(Ext).iter"],
+            [stats["dtScandirWalkCollectExt"], "Walk(Ext).collect"]]
+    if bScandir:
+        stats.update(RunScandirBenchmarks(path))
+        tableScandir = [
+            [stats["dtOsScandir"], f"scantree (os.scandir, Python {pyVersion})"],
+            [stats["dtScandirScandirIter"], "Scandir.iter"],
+            [stats["dtScandirScandirCollect"], "Scandir.collect"],
+            [stats["dtScandirScandirIterExt"], "Scandir(Ext).iter"],
+            [stats["dtScandirScandirCollectExt"], "Scandir(Ext).collect"]]
     uname = platform.uname()
     print(f"\n{uname.system} {uname.machine} (kernel={uname.release})")
     print("Physical cores:", psutil.cpu_count(logical=False))
@@ -282,30 +307,36 @@ def BenchmarkDir(path: str):
     print(f"  {s.pipes} pipes")
     print(f"  {s.size / GB:.2f}GB size and {s.usage / GB:.2f}GB usage on disk")
     print()
-    table = [[stats["dtScandirCountCollect"], "Count.collect"],
-             [stats["dtScandirCountCollectExt"], "Count(ReturnType=Ext).collect"],
-             [stats["dtOsWalk"], f"os.walk (Python {pyVersion})"],
-             [stats["dtOsWalkStat"], f"os.walk (stat) (Python {pyVersion})"],
-             [stats["dtScandirWalkIter"], "Walk.iter"],
-             [stats["dtScandirWalkIterExt"], "Walk(ReturnType=Ext).iter"],
-             [stats["dtScandirWalkCollect"], "Walk.collect"],
-             [stats["dtScandirWalkCollectExt"], "Walk(ReturnType=Ext).collect"],
-             [stats["dtOsScandir"], f"scantree (os.scandir, Python {pyVersion})"],
-             [stats["dtScandirScandirIter"], "Scandir.iter"],
-             [stats["dtScandirScandirIterExt"], "Scandir(ReturnType=Ext).iter"],
-             [stats["dtScandirScandirCollect"], "Scandir.collect"],
-             [stats["dtScandirScandirCollectExt"], "Scandir(ReturnType=Ext).collect"]]
-    print(tabulate(table, headers=["Time [s]", "Method"], tablefmt="github"))
-    print()
-    print(f"Walk.iter **~{stats["dtOsWalk"] / stats["dtScandirWalkIter"]:.1f} times faster** than os.walk.")
-    print(f"Walk(Ext).iter **~{stats["dtOsWalkStat"] / stats["dtScandirWalkIterExt"]:.1f} times faster** than os.walk(stat).")
-    print(
-        f"Scandir.iter **~{stats["dtOsScandir"] / stats["dtScandirScandirIter"]:.1f} times faster** than scantree(os.scandir)."
-    )
+    if tableCount:
+        print(tabulate(tableCount, headers=["Time [s]", "Method"], tablefmt="github"))
+        print()
+    if tableWalk:
+        print(tabulate(tableWalk, headers=["Time [s]", "Method"], tablefmt="github"))
+        print()
+        print(f"Walk.iter **~{stats["dtOsWalk"] / stats["dtScandirWalkIter"]:.1f} times faster** than os.walk.")
+        print(f"Walk(Ext).iter **~{stats["dtOsWalkExt"] / stats["dtScandirWalkIterExt"]:.1f} times faster** than os.walk(Ext).")
+        print()
+    if tableScandir:
+        print(tabulate(tableScandir, headers=["Time [s]", "Method"], tablefmt="github"))
+        print()
+        print(
+            f"Scandir.iter **~{stats["dtOsScandir"] / stats["dtScandirScandirIter"]:.1f} times faster** than scantree(os.scandir)."
+        )
+        print(
+            f"Scandir(Ext).iter **~{stats["dtOsScandir"] / stats["dtScandirScandirIterExt"]:.1f} times faster** than scantree(os.scandir)."
+        )
 
 
 if __name__ == "__main__":
     tempDir = CreateTestData()
     dirName = "C:/Windows" if os.name == "nt" else "/usr"
-    BenchmarkDir(tempDir)
-    BenchmarkDir(dirName)
+    if " --" in str(sys.argv):
+        bCount = "--count" in sys.argv
+        bWalk = "--walk" in sys.argv
+        bScandir = "--scandir" in sys.argv
+    else:
+        bCount = True
+        bWalk = True
+        bScandir = True
+    BenchmarkDir(tempDir, bCount, bWalk, bScandir)
+    BenchmarkDir(dirName, bCount, bWalk, bScandir)

@@ -1,4 +1,5 @@
 import os
+import json
 
 import plotly.graph_objects as go
 
@@ -7,20 +8,20 @@ data = {
         "Walk": {
             "Linux": {
                 "linux-5.9": {
-                    "os.walk": 0.448813,
-                    "Walk.iter": 0.149128,
-                    "Walk.collect": 0.213981,
-                    "os.walk(Ext)": 1.64711,
-                    "Walk.iter(Ext)": 0.143961,
-                    "Walk.collect(Ext)": 0.211384,
+                    "os.walk": 0.440817,
+                    "Walk.iter": 0.133679,
+                    "Walk.collect": 0.197038,
+                    "os.walk(Ext)": 1.61088,
+                    "Walk.iter(Ext)": 0.133556,
+                    "Walk.collect(Ext)": 0.191944,
                 },
                 "usr": {
-                    "os.walk": 4.09372,
-                    "Walk.iter": 0.925864,
-                    "Walk.collect": 1.47056,
-                    "os.walk(Ext)": 11.3418,
-                    "Walk.iter(Ext)": 0.96183,
-                    "Walk.collect(Ext)": 1.36103,
+                    "os.walk": 3.94502,
+                    "Walk.iter": 0.80265,
+                    "Walk.collect": 1.34461,
+                    "os.walk(Ext)": 10.7779,
+                    "Walk.iter(Ext)": 0.827304,
+                    "Walk.collect(Ext)": 1.33137,
                 },
             },
             "Windows": {
@@ -45,18 +46,18 @@ data = {
         "Scandir": {
             "Linux": {
                 "linux-5.9": {
-                    "scantree (os.scandir)": 1.4078,
-                    "Scandir.iter": 0.251858,
-                    "Scandir.collect": 0.298834,
-                    "Scandir.iter(Ext)": 0.339001,
-                    "Scandir.collect(Ext)": 0.431882,
+                    "scantree (os.scandir)": 1.31862,
+                    "Scandir.iter": 0.237867,
+                    "Scandir.collect": 0.271947,
+                    "Scandir.iter(Ext)": 0.320545,
+                    "Scandir.collect(Ext)": 0.380465,
                 },
                 "usr": {
-                    "scantree (os.scandir)": 8.75475,
-                    "Scandir.iter": 1.37387,
-                    "Scandir.collect": 2.16722,
-                    "Scandir.iter(Ext)": 1.87683,
-                    "Scandir.collect(Ext)": 2.92552,
+                    "scantree (os.scandir)": 8.25362,
+                    "Scandir.iter": 1.27802,
+                    "Scandir.collect": 2.01097,
+                    "Scandir.iter(Ext)": 1.75471,
+                    "Scandir.collect(Ext)": 2.58515,
                 },
             },
             "Windows": {
@@ -140,6 +141,31 @@ data = {
         },
     },
 }
+
+
+def UpdateData(lang: str, bs: str, path: str, newData: dict):
+    for method in ("Walk", "Scandir"):
+        d = data[lang][method][bs][path]
+        for key in tuple(d):
+            d[key] = newData[key]
+
+
+py_nt_linux = json.loads(
+    open("tools/benchmark_results_nt_linux-5.9_python.json").read()
+)
+py_nt_windows = json.loads(
+    open("tools/benchmark_results_nt_Windows_python.json").read()
+)
+py_linux_linux = json.loads(
+    open("tools/benchmark_results_posix_linux-5.9_python.json").read()
+)
+py_linux_usr = json.loads(open("tools/benchmark_results_posix_usr_python.json").read())
+
+UpdateData("Python", "Windows", "linux-5.9", py_nt_linux)
+UpdateData("Python", "Windows", "Windows", py_nt_windows)
+UpdateData("Python", "Linux", "linux-5.9", py_linux_linux)
+UpdateData("Python", "Linux", "usr", py_linux_usr)
+
 
 for lang, langData in data.items():
     baseDir = "pyscandir" if lang == "Python" else "scandir"

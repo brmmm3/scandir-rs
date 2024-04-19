@@ -1,0 +1,27 @@
+{
+    "stats": {
+        "dirs": 212836,
+        "files": 428834,
+        "slinks": 0,
+        "hlinks": 37428,
+        "devices": 0,
+        "pipes": 0,
+        "size": 45924271263,
+        "usage": 47145938944,
+        "errors": [],
+        "duration": 14.4608376
+    },
+    "Count.collect": 1.4410305777791008,
+    "Count.collect(Ext)": 4.6700401555556,
+    "os.walk": 36.25580859999658,
+    "os.walk(Ext)": 89.76988140000321,
+    "Walk.iter": 4.275886599997951,
+    "Walk.iter(Ext)": 4.457214966668592,
+    "Walk.collect": 5.365913033335043,
+    "Walk.collect(Ext)": 5.679970233332521,
+    "scantree (os.scandir)": 24.699874533330632,
+    "Scandir.iter": 4.2446447000014205,
+    "Scandir.iter(Ext)": 14.060320599999008,
+    "Scandir.collect": 4.712805566664126,
+    "Scandir.collect(Ext)": 14.565464133333686
+}

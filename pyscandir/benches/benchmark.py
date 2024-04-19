@@ -93,7 +93,7 @@ scandir.Count('{dirName}', return_type=scandir.ReturnType.Ext).collect()
     return {
         "stats": stats,
         "dtScandirCountCollect": dtScandirCountCollect / 3,
-        "dtScandirCountCollectExt": dtScandirCountCollectExt / 3}
+        "Count.collect(Ext)": dtScandirCountCollectExt / 3}
 
 
 def RunWalkBenchmarks(dirName: str) -> Dict[str, float]:
@@ -162,21 +162,19 @@ toc = scandir.Walk('{dirName}').collect()
 
     dtScandirWalkCollectExt = timeit.timeit(
         f"""
-instance = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext)
-toc = instance.collect()
-print(instance.duration)
+toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext).collect()
     """,
         setup="import scandir_rs as scandir",
         number=3,
     ) / 3
     print(f"scandir.Walk(Ext) (collect): {dtScandirWalkCollectExt}")
     return {
-        "dtOsWalk": dtOsWalk,
-        "dtOsWalkExt": dtOsWalkExt,
-        "dtScandirWalkIter": dtScandirWalkIter,
-        "dtScandirWalkIterExt": dtScandirWalkIterExt,
-        "dtScandirWalkCollect": dtScandirWalkCollect,
-        "dtScandirWalkCollectExt": dtScandirWalkCollectExt}
+        "os.walk": dtOsWalk,
+        "os.walk(Ext)": dtOsWalkExt,
+        "Walk.iter": dtScandirWalkIter,
+        "Walk.iter(Ext)": dtScandirWalkIterExt,
+        "Walk.collect": dtScandirWalkCollect,
+        "Walk.collect(Ext)": dtScandirWalkCollectExt}
 
 
 def RunScandirBenchmarks(dirName: str) -> Dict[str, float]:
@@ -254,11 +252,11 @@ entries = scandir.Scandir('{dirName}', return_type=scandir.ReturnType.Ext).colle
     ) / 3
     print(f"scandir.Scandir(Ext) (collect): {dtScandirScandirCollectExt}")
     return {
-        "dtOsScandir": dtOsScandir,
-        "dtScandirScandirIter": dtScandirScandirIter,
-        "dtScandirScandirIterExt": dtScandirScandirIterExt,
-        "dtScandirScandirCollect": dtScandirScandirCollect,
-        "dtScandirScandirCollectExt": dtScandirScandirCollectExt}
+        "scantree (os.scandir)": dtOsScandir,
+        "Scandir.iter": dtScandirScandirIter,
+        "Scandir.iter(Ext)": dtScandirScandirIterExt,
+        "Scandir.collect": dtScandirScandirCollect,
+        "Scandir.collect(Ext)": dtScandirScandirCollectExt}
 
 
 def BenchmarkDir(path: str, bCount: bool, bWalk: bool, bScandir: bool):
@@ -272,24 +270,24 @@ def BenchmarkDir(path: str, bCount: bool, bWalk: bool, bScandir: bool):
         stats.update(RunCountBenchmarks(path))
         tableCount = [
             [stats["dtScandirCountCollect"], "Count.collect"],
-            [stats["dtScandirCountCollectExt"], "Count(Ext).collect"]]
+            [stats["Count.collect(Ext)"], "Count(Ext).collect"]]
     if bWalk:
         stats.update(RunWalkBenchmarks(path))
         tableWalk = [
-            [stats["dtOsWalk"], f"os.walk (Python {pyVersion})"],
-            [stats["dtScandirWalkIter"], "Walk.iter"],
-            [stats["dtScandirWalkCollect"], "Walk.collect"],
-            [stats["dtOsWalkExt"], f"os.walk(Ext) (Python {pyVersion})"],
-            [stats["dtScandirWalkIterExt"], "Walk(Ext).iter"],
-            [stats["dtScandirWalkCollectExt"], "Walk(Ext).collect"]]
+            [stats["os.walk"], f"os.walk (Python {pyVersion})"],
+            [stats["Walk.iter"], "Walk.iter"],
+            [stats["Walk.collect"], "Walk.collect"],
+            [stats["os.walk(Ext)"], f"os.walk(Ext) (Python {pyVersion})"],
+            [stats["Walk.iter(Ext)"], "Walk(Ext).iter"],
+            [stats["Walk.collect(Ext)"], "Walk(Ext).collect"]]
     if bScandir:
         stats.update(RunScandirBenchmarks(path))
         tableScandir = [
-            [stats["dtOsScandir"], f"scantree (os.scandir, Python {pyVersion})"],
-            [stats["dtScandirScandirIter"], "Scandir.iter"],
-            [stats["dtScandirScandirCollect"], "Scandir.collect"],
-            [stats["dtScandirScandirIterExt"], "Scandir(Ext).iter"],
-            [stats["dtScandirScandirCollectExt"], "Scandir(Ext).collect"]]
+            [stats["scantree (os.scandir)"], f"scantree (os.scandir, Python {pyVersion})"],
+            [stats["Scandir.iter"], "Scandir.iter"],
+            [stats["Scandir.collect"], "Scandir.collect"],
+            [stats["Scandir.iter(Ext)"], "Scandir(Ext).iter"],
+            [stats["Scandir.collect(Ext)"], "Scandir(Ext).collect"]]
     uname = platform.uname()
     print(f"\n{uname.system} {uname.machine} (kernel={uname.release})")
     print("Physical cores:", psutil.cpu_count(logical=False))
@@ -316,17 +314,17 @@ def BenchmarkDir(path: str, bCount: bool, bWalk: bool, bScandir: bool):
     if tableWalk:
         print(tabulate(tableWalk, headers=["Time [s]", "Method"], tablefmt="github"))
         print()
-        print(f"Walk.iter **~{stats["dtOsWalk"] / stats["dtScandirWalkIter"]:.1f} times faster** than os.walk.")
-        print(f"Walk(Ext).iter **~{stats["dtOsWalkExt"] / stats["dtScandirWalkIterExt"]:.1f} times faster** than os.walk(Ext).")
+        print(f"Walk.iter **~{stats["os.walk"] / stats["Walk.iter"]:.1f} times faster** than os.walk.")
+        print(f"Walk(Ext).iter **~{stats["os.walk(Ext)"] / stats["Walk.iter(Ext)"]:.1f} times faster** than os.walk(Ext).")
         print()
     if tableScandir:
         print(tabulate(tableScandir, headers=["Time [s]", "Method"], tablefmt="github"))
         print()
         print(
-            f"Scandir.iter **~{stats["dtOsScandir"] / stats["dtScandirScandirIter"]:.1f} times faster** than scantree(os.scandir)."
+            f"Scandir.iter **~{stats["scantree (os.scandir)"] / stats["Scandir.iter"]:.1f} times faster** than scantree(os.scandir)."
         )
         print(
-            f"Scandir(Ext).iter **~{stats["dtOsScandir"] / stats["dtScandirScandirIterExt"]:.1f} times faster** than scantree(os.scandir)."
+            f"Scandir(Ext).iter **~{stats["scantree (os.scandir)"] / stats["Scandir.iter(Ext)"]:.1f} times faster** than scantree(os.scandir)."
         )
     with open(f"benchmark_results_{os.name}_{os.path.basename(path)}.json", "w") as F:
         F.write(json.dumps(stats))

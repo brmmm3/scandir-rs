@@ -18,19 +18,19 @@ results to os.walk.
 
 |   Time [s] | Method                        |
 |------------|-------------------------------|
-|   0.145235 | Count.collect                 |
-|   0.246698 | Count(Ext).collect |
+|   0.016    | Count.collect                 |
+|   0.026    | Count(Ext).collect |
 
 #### Walk
 
 |   Time [s] | Method                         |
 |------------|--------------------------------|
-|   0.440817 | os.walk (Python 3.12.3)        |
-|   0.133679 | Walk.iter                      |
-|   0.197038 | Walk.collect                   |
-|   1.61088  | os.walk(Ext) (Python 3.12.3)   |
-|   0.133556 | Walk(Ext).iter                 |
-|   0.191944 | Walk(Ext).collect              |
+|   0.149    | os.walk (Python 3.12.3)        |
+|   0.044    | Walk.iter                      |
+|   0.066    | Walk.collect                   |
+|   0.531    | os.walk(Ext) (Python 3.12.3)   |
+|   0.047    | Walk(Ext).iter                 |
+|   0.065    | Walk(Ext).collect              |
 
 Walk.iter **~3.3 times faster** than os.walk.  
 Walk(Ext).iter **~12.1 times faster** than os.walk(Ext).
@@ -41,11 +41,11 @@ Walk(Ext).iter **~12.1 times faster** than os.walk(Ext).
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
-|   1.31862  | scantree (os.scandir, Python 3.12.3) |
-|   0.237867 | Scandir.iter                         |
-|   0.271947 | Scandir.collect                      |
-|   0.320545 | Scandir(Ext).iter                    |
-|   0.380465 | Scandir(Ext).collect                 |
+|   0.442    | scantree (os.scandir, Python 3.12.3) |
+|   0.067    | Scandir.iter                         |
+|   0.084    | Scandir.collect                      |
+|   0.101    | Scandir(Ext).iter                    |
+|   0.122    | Scandir(Ext).collect                 |
 
 Scandir.iter **~5.5 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **~4.1 times faster** than scantree(os.scandir).
@@ -66,19 +66,19 @@ Scandir(Ext).iter **~4.1 times faster** than scantree(os.scandir).
 
 |   Time [s] | Method                        |
 |------------|-------------------------------|
-|   0.880686 | Count.collect                 |
-|   1.39832  | Count(Ext).collect            |
+|   0.104    | Count.collect                 |
+|   0.165    | Count(Ext).collect            |
 
 #### Walk
 
 |   Time [s] | Method                         |
 |------------|--------------------------------|
-|   3.94502  | os.walk (Python 3.12.3)        |
-|   0.80265  | Walk.iter                      |
-|   1.34461  | Walk.collect                   |
-|  10.7779   | os.walk(Ext) (Python 3.12.3)   |
-|   0.827304 | Walk(Ext).iter                 |
-|   1.33137  | Walk(Ext).collect              |
+|   1.340    | os.walk (Python 3.12.3)        |
+|   0.271    | Walk.iter                      |
+|   0.444    | Walk.collect                   |
+|   3.773    | os.walk(Ext) (Python 3.12.3)   |
+|   0.278    | Walk(Ext).iter                 |
+|   0.439    | Walk(Ext).collect              |
 
 Walk.iter **~4.9 times faster** than os.walk.  
 Walk(Ext).iter **~13.0 times faster** than os.walk(Ext).
@@ -89,11 +89,11 @@ Walk(Ext).iter **~13.0 times faster** than os.walk(Ext).
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
-|    8.25362 | scantree (os.scandir, Python 3.12.3) |
-|    1.27802 | Scandir.iter                         |
-|    2.01097 | Scandir.collect                      |
-|    1.75471 | Scandir(Ext).iter                    |
-|    2.58515 | Scandir(Ext).collect                 |
+|   2.785    | scantree (os.scandir, Python 3.12.3) |
+|   0.430    | Scandir.iter                         |
+|   0.668    | Scandir.collect                      |
+|   0.596    | Scandir(Ext).iter                    |
+|   0.874    | Scandir(Ext).collect                 |
 
 Scandir.iter **~6.5 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **~4.7 times faster** than scantree(os.scandir).
@@ -112,39 +112,39 @@ Scandir(Ext).iter **~4.7 times faster** than scantree(os.scandir).
 
 |   Time [s] | Method             |
 |------------|--------------------|
-|  0.0270922 | Count.collect      |
-|  0.275738  | Count(Ext).collect |
+|  0.027     | Count.collect      |
+|  0.276     | Count(Ext).collect |
 
 #### Walk
 
 |   Time [s] | Method                       |
 |------------|------------------------------|
-|  0.771403  | os.walk (Python 3.12.3)      |
-|  0.0919733 | Walk.iter                    |
-|  0.12844   | Walk.collect                 |
-|  6.28923   | os.walk(Ext) (Python 3.12.3) |
-|  0.0901381 | Walk(Ext).iter               |
-|  0.123835  | Walk(Ext).collect            |
+|  0.771     | os.walk (Python 3.12.3)      |
+|  0.092     | Walk.iter                    |
+|  0.128     | Walk.collect                 |
+|  6.289     | os.walk(Ext) (Python 3.12.3) |
+|  0.090     | Walk(Ext).iter               |
+|  0.124     | Walk(Ext).collect            |
 
 Walk.iter **~8.4 times faster** than os.walk.  
 Walk(Ext).iter **~69.8 times faster** than os.walk(Ext).
 
-![](images/linux_walk_linux-5.9.png)
+![](images/windows_walk_linux-5.9.png)
 
 #### Scandir
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
-|  0.611043  | scantree (os.scandir, Python 3.12.3) |
-|  0.0935449 | Scandir.iter                         |
-|  0.132047  | Scandir.collect                      |
-|  0.859825  | Scandir(Ext).iter                    |
-|  0.892622  | Scandir(Ext).collect                 |
+|  0.611     | scantree (os.scandir, Python 3.12.3) |
+|  0.094     | Scandir.iter                         |
+|  0.132     | Scandir.collect                      |
+|  0.860     | Scandir(Ext).iter                    |
+|  0.892     | Scandir(Ext).collect                 |
 
 Scandir.iter **~6.5 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **slower** than scantree(os.scandir). **TODO:** Needs investigation why.
 
-![](images/linux_scandir_linux-5.9.png)
+![](images/windows_scandir_linux-5.9.png)
 
 ### Directory C:\Windows with
 
@@ -157,19 +157,19 @@ Scandir(Ext).iter **slower** than scantree(os.scandir). **TODO:** Needs investig
 
 |   Time [s] | Method             |
 |------------|--------------------|
-|    1.44103 | Count.collect      |
-|    4.67004 | Count(Ext).collect |
+|    1.441   | Count.collect      |
+|    4.670   | Count(Ext).collect |
 
 #### Walk
 
 |   Time [s] | Method                       |
 |------------|------------------------------|
-|   36.2558  | os.walk (Python 3.12.3)      |
-|    4.27589 | Walk.iter                    |
-|    5.36591 | Walk.collect                 |
-|   89.7699  | os.walk(Ext) (Python 3.12.3) |
-|    4.45721 | Walk(Ext).iter               |
-|    5.67997 | Walk(Ext).collect            |
+|   36.255   | os.walk (Python 3.12.3)      |
+|    4.276   | Walk.iter                    |
+|    5.366   | Walk.collect                 |
+|   89.770   | os.walk(Ext) (Python 3.12.3) |
+|    4.457   | Walk(Ext).iter               |
+|    5.680   | Walk(Ext).collect            |
 
 Walk.iter **~8.5 times faster** than os.walk.  
 Walk(Ext).iter **~20.1 times faster** than os.walk(Ext).
@@ -180,11 +180,11 @@ Walk(Ext).iter **~20.1 times faster** than os.walk(Ext).
 
 |   Time [s] | Method                               |
 |------------|--------------------------------------|
-|   24.6999  | scantree (os.scandir, Python 3.12.3) |
-|    4.24464 | Scandir.iter                         |
-|    4.71281 | Scandir.collect                      |
-|   14.0603  | Scandir(Ext).iter                    |
-|   14.5655  | Scandir(Ext).collect                 |
+|   24.700   | scantree (os.scandir, Python 3.12.3) |
+|    4.245   | Scandir.iter                         |
+|    4.713   | Scandir.collect                      |
+|   14.060   | Scandir(Ext).iter                    |
+|   14.566   | Scandir(Ext).collect                 |
 
 Scandir.iter **~5.8 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **~1.8 times faster** than scantree(os.scandir).

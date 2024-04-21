@@ -193,6 +193,6 @@ for lang, langData in data.items():
                     xaxis_title="Method",
                     yaxis_title="Time [s]",
                 )
-                fig.write_image(
-                    f"{dirName}/{osName.lower()}_{methodGroup.lower()}_{path.lower()}.png"
-                )
+                pathName = f"{dirName}/{osName.lower()}_{methodGroup.lower()}_{path.lower()}.png"
+                print(pathName)
+                fig.write_image(pathName)

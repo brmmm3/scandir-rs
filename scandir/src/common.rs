@@ -1,13 +1,13 @@
-use std::fs::{ self, Metadata };
-use std::io::{ Error, ErrorKind };
-use std::path::{ Path, PathBuf };
+use std::fs::{self, Metadata};
+use std::io::{Error, ErrorKind};
+use std::path::{Path, PathBuf};
 
 #[cfg(unix)]
 use expanduser::expanduser;
 
-use glob_sl::{ MatchOptions, Pattern };
+use glob_sl::{MatchOptions, Pattern};
 
-use crate::def::{ Filter, Options };
+use crate::def::{Filter, Options};
 
 pub fn check_and_expand_path<P: AsRef<Path>>(path_str: P) -> Result<PathBuf, Error> {
     #[cfg(unix)]
@@ -17,9 +17,10 @@ pub fn check_and_expand_path<P: AsRef<Path>>(path_str: P) -> Result<PathBuf, Err
     let path = match path_result {
         Ok(p) => {
             if !p.exists() {
-                return Err(
-                    Error::new(ErrorKind::NotFound, path_str.as_ref().to_str().unwrap().to_string())
-                );
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    path_str.as_ref().to_str().unwrap().to_string(),
+                ));
             }
             p
         }
@@ -52,11 +53,10 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         file_exclude: Vec::new(),
         options: match options.case_sensitive {
             true => None,
-            false =>
-                Some(MatchOptions {
-                    case_sensitive: false,
-                    ..MatchOptions::new()
-                }),
+            false => Some(MatchOptions {
+                case_sensitive: false,
+                ..MatchOptions::new()
+            }),
         },
     };
     if let Some(ref f) = options.dir_include {
@@ -67,7 +67,10 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = match f {
             Ok(f) => f,
             Err(e) => {
-                return Err(Error::new(ErrorKind::InvalidInput, format!("dir_include: {}", e)));
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("dir_include: {}", e),
+                ));
             }
         };
         filter.dir_include.append(f);
@@ -80,7 +83,10 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = match f {
             Ok(f) => f,
             Err(e) => {
-                return Err(Error::new(ErrorKind::InvalidInput, format!("dir_exclude: {}", e)));
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("dir_exclude: {}", e),
+                ));
             }
         };
         filter.dir_exclude.append(f);
@@ -93,7 +99,10 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = match f {
             Ok(f) => f,
             Err(e) => {
-                return Err(Error::new(ErrorKind::InvalidInput, format!("file_include: {}", e)));
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("file_include: {}", e),
+                ));
             }
         };
         filter.file_include.append(f);
@@ -106,16 +115,18 @@ pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
         let f = match f {
             Ok(f) => f,
             Err(e) => {
-                return Err(Error::new(ErrorKind::InvalidInput, format!("file_exclude: {}", e)));
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("file_exclude: {}", e),
+                ));
             }
         };
         filter.file_exclude.append(f);
     }
-    if
-        filter.dir_include.is_empty() &&
-        filter.dir_exclude.is_empty() &&
-        filter.file_include.is_empty() &&
-        filter.file_exclude.is_empty()
+    if filter.dir_include.is_empty()
+        && filter.dir_exclude.is_empty()
+        && filter.file_include.is_empty()
+        && filter.file_exclude.is_empty()
     {
         return Ok(None);
     }
@@ -127,7 +138,7 @@ pub fn filter_direntry(
     key: &str,
     filter: &Vec<Pattern>,
     options: Option<MatchOptions>,
-    empty: bool
+    empty: bool,
 ) -> bool {
     if filter.is_empty() || key.is_empty() {
         return empty;
@@ -171,7 +182,7 @@ pub fn filter_direntry(
 pub fn filter_dir(
     root_path_len: usize,
     dir_entry: &jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>,
-    filter_ref: &Filter
+    filter_ref: &Filter,
 ) -> bool {
     let mut key = dir_entry.parent_path.to_path_buf();
     key.push(dir_entry.file_name.clone().into_string().unwrap());
@@ -181,9 +192,8 @@ pub fn filter_dir(
         .get(root_path_len..)
         .unwrap_or("")
         .to_string();
-    if
-        filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false) ||
-        !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true)
+    if filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false)
+        || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true)
     {
         return false;
     }
@@ -193,10 +203,10 @@ pub fn filter_dir(
 #[inline]
 pub fn filter_children(
     children: &mut Vec<
-        Result<jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>, jwalk_meta::Error>
+        Result<jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>, jwalk_meta::Error>,
     >,
     filter: &Option<Filter>,
-    root_path_len: usize
+    root_path_len: usize,
 ) {
     if let Some(filter_ref) = &filter {
         children.retain(|dir_entry_result| {
@@ -213,9 +223,8 @@ pub fn filter_children(
                                 return false;
                             }
                         };
-                        if
-                            filter_direntry(key, &filter_ref.file_exclude, options, false) ||
-                            !filter_direntry(key, &filter_ref.file_include, options, true)
+                        if filter_direntry(key, &filter_ref.file_exclude, options, false)
+                            || !filter_direntry(key, &filter_ref.file_include, options, true)
                         {
                             return false;
                         }

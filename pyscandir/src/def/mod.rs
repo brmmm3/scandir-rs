@@ -2,14 +2,14 @@ use pyo3::prelude::*;
 
 pub mod count;
 pub use count::Statistics;
-pub mod walk;
 pub mod direntry;
-pub use direntry::{ DirEntry, DirEntryExt };
+pub mod walk;
+pub use direntry::{DirEntry, DirEntryExt};
 pub mod scandir;
 pub mod toc;
 pub use toc::Toc;
 
-#[pyclass]
+#[pyclass(eq, eq_int)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReturnType {
     Base,

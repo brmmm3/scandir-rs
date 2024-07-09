@@ -1,9 +1,9 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-#[cfg(any(feature = "speedy", feature = "bincode"))]
-use pyo3::types::PyBytes;
 #[cfg(any(feature = "speedy", feature = "bincode", feature = "json"))]
 use pyo3::exceptions::PyException;
+use pyo3::prelude::*;
+#[cfg(any(feature = "speedy", feature = "bincode"))]
+use pyo3::types::PyBytes;
+use pyo3::types::PyDict;
 
 #[cfg(feature = "speedy")]
 use speedy::Writable;
@@ -70,6 +70,7 @@ impl Statistics {
         self.0.duration
     }
 
+    #[pyo3(signature = (duration=None))]
     pub fn as_dict(&self, duration: Option<bool>, py: Python) -> PyResult<PyObject> {
         let pyresult = PyDict::new_bound(py);
         if self.0.dirs > 0 {
@@ -108,14 +109,11 @@ impl Statistics {
     #[cfg(feature = "speedy")]
     fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.write_to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
@@ -123,21 +121,20 @@ impl Statistics {
     #[cfg(feature = "bincode")]
     fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
 
     #[cfg(feature = "json")]
     fn to_json(&self) -> PyResult<String> {
-        self.0.to_json().map_err(|e| PyException::new_err(e.to_string()))
+        self.0
+            .to_json()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     fn __repr__(&self) -> String {

@@ -1,6 +1,6 @@
 use std::io::ErrorKind;
 
-use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
@@ -10,7 +10,7 @@ use pyo3::types::PyBytes;
 #[cfg(feature = "speedy")]
 use speedy::Writable;
 
-use crate::def::{ ReturnType, Statistics };
+use crate::def::{ReturnType, Statistics};
 
 #[pyclass]
 #[derive(Debug)]
@@ -23,6 +23,7 @@ pub struct Count {
 impl Count {
     #[allow(clippy::too_many_arguments)]
     #[new]
+    #[pyo3(signature = (root_path, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, return_type=None))]
     fn new(
         root_path: &str,
         skip_hidden: Option<bool>,
@@ -33,33 +34,31 @@ impl Count {
         file_include: Option<Vec<String>>,
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
-        return_type: Option<ReturnType>
+        return_type: Option<ReturnType>,
     ) -> PyResult<Self> {
         Ok(Count {
             instance: match scandir::Count::new(root_path) {
-                Ok(c) =>
-                    c
-                        .skip_hidden(skip_hidden.unwrap_or(false))
-                        .max_depth(max_depth.unwrap_or(0))
-                        .max_file_cnt(max_file_cnt.unwrap_or(0))
-                        .dir_include(dir_include)
-                        .dir_exclude(dir_exclude)
-                        .file_include(file_include)
-                        .file_exclude(file_exclude)
-                        .case_sensitive(case_sensitive.unwrap_or(false))
-                        .extended(return_type.unwrap_or(ReturnType::Base) == ReturnType::Ext),
-                Err(e) =>
-                    match e.kind() {
-                        ErrorKind::InvalidInput => {
-                            return Err(PyValueError::new_err(e.to_string()));
-                        }
-                        ErrorKind::NotFound => {
-                            return Err(PyFileNotFoundError::new_err(e.to_string()));
-                        }
-                        _ => {
-                            return Err(PyException::new_err(e.to_string()));
-                        }
+                Ok(c) => c
+                    .skip_hidden(skip_hidden.unwrap_or(false))
+                    .max_depth(max_depth.unwrap_or(0))
+                    .max_file_cnt(max_file_cnt.unwrap_or(0))
+                    .dir_include(dir_include)
+                    .dir_exclude(dir_exclude)
+                    .file_include(file_include)
+                    .file_exclude(file_exclude)
+                    .case_sensitive(case_sensitive.unwrap_or(false))
+                    .extended(return_type.unwrap_or(ReturnType::Base) == ReturnType::Ext),
+                Err(e) => match e.kind() {
+                    ErrorKind::InvalidInput => {
+                        return Err(PyValueError::new_err(e.to_string()));
                     }
+                    ErrorKind::NotFound => {
+                        return Err(PyFileNotFoundError::new_err(e.to_string()));
+                    }
+                    _ => {
+                        return Err(PyException::new_err(e.to_string()));
+                    }
+                },
             },
             busy: false,
         })
@@ -74,7 +73,9 @@ impl Count {
     }
 
     pub fn start(&mut self) -> PyResult<()> {
-        self.instance.start().map_err(|e| PyException::new_err(e.to_string()))
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -94,7 +95,9 @@ impl Count {
 
     pub fn collect(&mut self, py: Python) -> PyResult<PyObject> {
         let results = py.allow_threads(|| self.instance.collect())?;
-        Ok(Py::new(py, Statistics::from(&results)).unwrap().to_object(py))
+        Ok(Py::new(py, Statistics::from(&results))
+            .unwrap()
+            .to_object(py))
     }
 
     pub fn has_results(&mut self) -> bool {
@@ -102,7 +105,9 @@ impl Count {
     }
 
     pub fn results(&mut self, py: Python) -> PyObject {
-        Py::new(py, Statistics::from(&self.instance.results())).unwrap().to_object(py)
+        Py::new(py, Statistics::from(&self.instance.results()))
+            .unwrap()
+            .to_object(py)
     }
 
     pub fn has_errors(&mut self) -> bool {
@@ -124,6 +129,7 @@ impl Count {
         self.instance.busy()
     }
 
+    #[pyo3(signature = (duration=None))]
     fn as_dict(&mut self, duration: Option<bool>, py: Python) -> PyResult<PyObject> {
         Statistics::from(&self.instance.results()).as_dict(duration, py)
     }
@@ -131,14 +137,11 @@ impl Count {
     #[cfg(feature = "speedy")]
     fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.instance.statistics.write_to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
@@ -146,33 +149,36 @@ impl Count {
     #[cfg(feature = "bincode")]
     fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.instance.statistics.to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
 
     #[cfg(feature = "json")]
     fn to_json(&self) -> PyResult<String> {
-        self.instance.statistics.to_json().map_err(|e| PyException::new_err(e.to_string()))
+        self.instance
+            .statistics
+            .to_json()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     fn __enter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.instance.start().map_err(|e| PyException::new_err(e.to_string()))?;
+        slf.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))?;
         Ok(slf)
     }
 
+    #[pyo3(signature = (ty=None, _value=None, _traceback=None))]
     fn __exit__(
         &mut self,
-        ty: Option<Bound<PyType>>,
-        _value: Option<Bound<PyAny>>,
-        _traceback: Option<Bound<PyAny>>
+        ty: Option<&Bound<PyType>>,
+        _value: Option<&Bound<PyAny>>,
+        _traceback: Option<&Bound<PyAny>>,
     ) -> PyResult<bool> {
         if !self.instance.stop() {
             return Ok(false);
@@ -200,7 +206,11 @@ impl Count {
         if !self.instance.busy() {
             self.busy = false;
         }
-        Ok(Some(Py::new(py, Statistics::from(&self.instance.results())).unwrap().to_object(py)))
+        Ok(Some(
+            Py::new(py, Statistics::from(&self.instance.results()))
+                .unwrap()
+                .to_object(py),
+        ))
     }
 
     fn __repr__(&self) -> String {

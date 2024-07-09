@@ -3,12 +3,12 @@ use std::io::ErrorKind;
 use std::thread;
 use std::time::Duration;
 
-use pyo3::exceptions::{ PyException, PyFileNotFoundError, PyRuntimeError, PyValueError };
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{ PyBytes, PyType };
+use pyo3::types::{PyBytes, PyType};
 use scandir::ErrorsType;
 
-use crate::def::{ ReturnType, Toc, Statistics };
+use crate::def::{ReturnType, Statistics, Toc};
 
 #[pyclass]
 #[derive(Debug)]
@@ -24,6 +24,7 @@ pub struct Walk {
 impl Walk {
     #[allow(clippy::too_many_arguments)]
     #[new]
+    #[pyo3(signature = (root_path, sorted=None, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, return_type=None, store=None))]
     fn new(
         root_path: &str,
         sorted: Option<bool>,
@@ -36,32 +37,30 @@ impl Walk {
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
         return_type: Option<ReturnType>,
-        store: Option<bool>
+        store: Option<bool>,
     ) -> PyResult<Self> {
         let return_type = return_type.unwrap_or(ReturnType::Base);
         Ok(Walk {
             instance: match scandir::Walk::new(root_path, store) {
-                Ok(s) =>
-                    s
-                        .sorted(sorted.unwrap_or(false))
-                        .skip_hidden(skip_hidden.unwrap_or(false))
-                        .max_depth(max_depth.unwrap_or(0))
-                        .max_file_cnt(max_file_cnt.unwrap_or(0))
-                        .dir_include(dir_include)
-                        .dir_exclude(dir_exclude)
-                        .file_include(file_include)
-                        .file_exclude(file_exclude)
-                        .case_sensitive(case_sensitive.unwrap_or(false))
-                        .return_type(return_type.from_object()),
-                Err(e) =>
-                    match e.kind() {
-                        ErrorKind::NotFound => {
-                            return Err(PyFileNotFoundError::new_err(e.to_string()));
-                        }
-                        _ => {
-                            return Err(PyException::new_err(e.to_string()));
-                        }
+                Ok(s) => s
+                    .sorted(sorted.unwrap_or(false))
+                    .skip_hidden(skip_hidden.unwrap_or(false))
+                    .max_depth(max_depth.unwrap_or(0))
+                    .max_file_cnt(max_file_cnt.unwrap_or(0))
+                    .dir_include(dir_include)
+                    .dir_exclude(dir_exclude)
+                    .file_include(file_include)
+                    .file_exclude(file_exclude)
+                    .case_sensitive(case_sensitive.unwrap_or(false))
+                    .return_type(return_type.from_object()),
+                Err(e) => match e.kind() {
+                    ErrorKind::NotFound => {
+                        return Err(PyFileNotFoundError::new_err(e.to_string()));
                     }
+                    _ => {
+                        return Err(PyException::new_err(e.to_string()));
+                    }
+                },
             },
             return_type,
             entries: Vec::new(),
@@ -80,7 +79,9 @@ impl Walk {
     }
 
     pub fn start(&mut self) -> PyResult<()> {
-        self.instance.start().map_err(|e| PyException::new_err(e.to_string()))
+        self.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
@@ -102,18 +103,24 @@ impl Walk {
         Ok(Toc::from(&py.allow_threads(|| self.instance.collect())?))
     }
 
+    #[pyo3(signature = (only_new=None))]
     pub fn has_results(&mut self, only_new: Option<bool>) -> bool {
         self.instance.has_results(only_new.unwrap_or(true))
     }
 
+    #[pyo3(signature = (only_new=None))]
     pub fn results_cnt(&mut self, only_new: Option<bool>) -> usize {
         self.instance.results_cnt(only_new.unwrap_or(true))
     }
 
-    pub fn results(&mut self, return_all: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
+    #[pyo3(signature = (only_new=None))]
+    pub fn results(&mut self, only_new: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
         let mut results = Vec::new();
-        for result in self.instance.results(return_all.unwrap_or(false)) {
-            results.push((result.0, Py::new(py, Toc::from(&result.1)).unwrap().to_object(py)));
+        for result in self.instance.results(only_new.unwrap_or(false)) {
+            results.push((
+                result.0,
+                Py::new(py, Toc::from(&result.1)).unwrap().to_object(py),
+            ));
         }
         results
     }
@@ -131,6 +138,7 @@ impl Walk {
         self.instance.errors_cnt()
     }
 
+    #[pyo3(signature = (only_new=None))]
     pub fn errors(&mut self, only_new: Option<bool>) -> ErrorsType {
         self.instance.errors(only_new.unwrap_or(true))
     }
@@ -144,8 +152,8 @@ impl Walk {
                     b.copy_from_slice(&v);
                     Ok(())
                 })
-                    .unwrap()
-                    .into()
+                .unwrap()
+                .into()
             })
             .map_err(|e| PyException::new_err(e.to_string()))
     }
@@ -159,15 +167,17 @@ impl Walk {
                     b.copy_from_slice(&v);
                     Ok(())
                 })
-                    .unwrap()
-                    .into()
+                .unwrap()
+                .into()
             })
             .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     #[cfg(feature = "json")]
     pub fn to_json(&self) -> PyResult<String> {
-        self.instance.to_json().map_err(|e| PyException::new_err(e.to_string()))
+        self.instance
+            .to_json()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     #[getter]
@@ -186,21 +196,24 @@ impl Walk {
     }
 
     fn __enter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.instance.start().map_err(|e| PyException::new_err(e.to_string()))?;
+        slf.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))?;
         Ok(slf)
     }
 
+    #[pyo3(signature = (ty=None, _value=None, _traceback=None))]
     fn __exit__(
         &mut self,
-        exc_ty: Option<Bound<PyType>>,
-        _exc_value: Option<Bound<PyAny>>,
-        _traceback: Option<Bound<PyAny>>
+        ty: Option<&Bound<PyType>>,
+        _value: Option<&Bound<PyAny>>,
+        _traceback: Option<&Bound<PyAny>>,
     ) -> PyResult<bool> {
         if !self.instance.stop() {
             return Ok(false);
         }
         self.instance.join();
-        match exc_ty {
+        match ty {
             Some(ty) => Python::with_gil(|py| ty.eq(py.get_type_bound::<PyValueError>())),
             None => Ok(false),
         }
@@ -221,24 +234,26 @@ impl Walk {
             if let Some((root_dir, toc)) = self.entries.get(self.idx) {
                 self.idx += 1;
                 if self.return_type == ReturnType::Base {
-                    return Ok(Some((root_dir, toc.dirs.clone(), toc.files.clone()).to_object(py)));
+                    return Ok(Some(
+                        (root_dir, toc.dirs.clone(), toc.files.clone()).to_object(py),
+                    ));
                 } else {
-                    return Ok(
-                        Some(
-                            (
-                                root_dir,
-                                toc.dirs.clone(),
-                                toc.files.clone(),
-                                toc.symlinks.clone(),
-                                toc.other.clone(),
-                                toc.errors.clone(),
-                            ).to_object(py)
+                    return Ok(Some(
+                        (
+                            root_dir,
+                            toc.dirs.clone(),
+                            toc.files.clone(),
+                            toc.symlinks.clone(),
+                            toc.other.clone(),
+                            toc.errors.clone(),
                         )
-                    );
+                            .to_object(py),
+                    ));
                 }
             } else {
                 self.entries.clear();
-                self.entries.extend_from_slice(&self.instance.results(true)[..]);
+                self.entries
+                    .extend_from_slice(&self.instance.results(true)[..]);
                 if self.entries.is_empty() {
                     if !self.instance.busy() {
                         break;

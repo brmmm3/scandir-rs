@@ -55,7 +55,7 @@ jobs:
       CIBW_TEST_COMMAND: pytest {package}/tests
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -73,7 +73,7 @@ jobs:
       - if: runner.os != 'Linux'
         name: Setup env when not using docker
         run: |
-          python -m pip install --upgrade wheel setuptools
+          python -m pip install --upgrade wheel setuptools setuptools-rust
 
       - uses: PyO3/maturin-action@v1
         with:
@@ -82,7 +82,7 @@ jobs:
           args: --release
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.x"
           cache: pip

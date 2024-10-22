@@ -38,16 +38,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-14]
 
     env:
       CIBW_BUILD_VERBOSITY: 1
       CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y && yum install -y openssl-devel"
-      CIBW_SKIP: "cp27-* cp34-* cp35-* cp36-* pp* *-win32 *-pypy* *-musllinux*"
+      CIBW_SKIP: "cp27-* cp34-* cp35-* cp36-* cp37-* pp* *-win32 *-pypy* *-musllinux*"
       # Build separate wheels for macOS's different architectures.
-      CIBW_ARCHS_MACOS: "x86_64"
+      CIBW_ARCHS_MACOS: "x86_64 arm64"
       # Build only on Linux architectures that don't need qemu emulation.
-      CIBW_ARCHS_LINUX: "x86_64"
+      CIBW_ARCHS_LINUX: "x86_64 aarch64"
       # Run the test suite after each build.
       CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
       CIBW_TEST_REQUIRES: "pytest"

@@ -8,7 +8,7 @@ fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     let default_dir = "/usr".to_string();
     let root_dir = &args.get(1).unwrap_or(&default_dir);
-    let mut instance = Scandir::new(&root_dir, Some(true))?;
+    let mut instance = Scandir::new(root_dir, Some(true))?;
     //instance = instance.max_file_cnt(100);
     if args.contains(&"--ext".to_string()) {
         instance = instance.return_type(ReturnType::Ext);

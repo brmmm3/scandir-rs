@@ -136,14 +136,14 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     group.bench_function("scandir.Scandir (collect)", |b| {
         b.iter(|| {
             let mut instance = scandir::Scandir::new(path, Some(true))
-                .expect(&format!("Failed to create Scandir instance for {path}"));
+                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path}"));
             instance.collect().unwrap();
         })
     });
     group.bench_function("scandir.Scandir(Ext) (collect)", |b| {
         b.iter(|| {
             let mut instance = scandir::Scandir::new(path, Some(true))
-                .expect(&format!("Failed to create Scandir instance for {path}"))
+                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path}"))
                 .return_type(scandir::ReturnType::Ext);
             instance.collect().unwrap();
         })

@@ -1,15 +1,15 @@
-use std::{ env, time::Instant };
 use std::io::Error;
 use std::thread;
 use std::time::Duration;
+use std::{env, time::Instant};
 
-use scandir::{ ReturnType, Walk };
+use scandir::{ReturnType, Walk};
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     let default_dir = "/usr".to_string();
     let root_dir = &args.get(1).unwrap_or(&default_dir);
-    let mut instance = Walk::new(&root_dir, Some(true))?.max_file_cnt(100);
+    let mut instance = Walk::new(root_dir, Some(true))?.max_file_cnt(100);
     if args.contains(&"--ext".to_string()) {
         instance = instance.return_type(ReturnType::Ext);
     }
@@ -25,7 +25,10 @@ fn main() -> Result<(), Error> {
     let result = format!("{:#?}", instance.collect()?);
     println!("dt={}", now.elapsed().as_secs_f64());
     let result_str = format!("{result:#?}");
-    println!("result {}", &result_str[..std::cmp::min(result_str.len(), 500)]);
+    println!(
+        "result {}",
+        &result_str[..std::cmp::min(result_str.len(), 500)]
+    );
     let results = instance.results(false);
     println!("result_cnt {}", results.len());
     println!("result_cnt {}", instance.results_cnt(false));

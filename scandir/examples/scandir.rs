@@ -1,8 +1,8 @@
-use std::time::Duration;
-use std::{ env, time::Instant };
 use std::io::Error;
+use std::time::Duration;
+use std::{env, time::Instant};
 
-use scandir::{ ReturnType, Scandir };
+use scandir::{ReturnType, Scandir};
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
@@ -23,11 +23,18 @@ fn main() -> Result<(), Error> {
     for (path, error) in entries.errors.iter() {
         println!("ERROR {path:?}: {error}");
     }
-    let first_result = entries.results.iter().next().unwrap();
-    println!("First file {:?} has size {}", first_result.path(), first_result.size());
+    let first_result = entries.results.first().unwrap();
+    println!(
+        "First file {:?} has size {}",
+        first_result.path(),
+        first_result.size()
+    );
     let result = format!("{:#?}", instance.results(false));
     let result_str = format!("{result:#?}");
-    println!("result {}", &result_str[..std::cmp::min(result_str.len(), 500)]);
+    println!(
+        "result {}",
+        &result_str[..std::cmp::min(result_str.len(), 500)]
+    );
     println!("finished {:?}", instance.finished());
     println!("has more entries {:?}", instance.has_entries(true));
     println!("has_errors {:?}", instance.has_errors());

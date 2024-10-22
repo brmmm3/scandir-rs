@@ -1,6 +1,6 @@
 use std::io::Error;
 
-use scandir::{ ReturnType, Scandir, ScandirResult };
+use scandir::{ReturnType, Scandir, ScandirResult};
 
 mod common;
 
@@ -10,10 +10,10 @@ fn test_scandir() -> Result<(), Error> {
     let entries = Scandir::new(temp_dir.path(), Some(true))?.collect()?;
     assert_eq!(192, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    match entries.results.get(0).unwrap() {
+    match entries.results.first().unwrap() {
         ScandirResult::DirEntry(d) => {
             assert_eq!("dir1", &d.path);
-            assert_eq!(true, d.is_dir);
+            assert!(d.is_dir);
             assert_eq!(4096, d.st_size);
         }
         _ => panic!("Wrong type"),
@@ -29,10 +29,10 @@ fn test_scandir_extended() -> Result<(), Error> {
         .collect()?;
     assert_eq!(192, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    match entries.results.get(0).unwrap() {
+    match entries.results.first().unwrap() {
         ScandirResult::DirEntryExt(d) => {
             assert_eq!("dir1", &d.path);
-            assert_eq!(true, d.is_dir);
+            assert!(d.is_dir);
             assert_eq!(4096, d.st_size);
         }
         _ => panic!("Wrong type"),

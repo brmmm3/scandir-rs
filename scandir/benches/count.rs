@@ -1,9 +1,9 @@
-use std::{ path::Path, time::Duration };
+use std::{path::Path, time::Duration};
 
 #[cfg(windows)]
 use std::path::PathBuf;
 
-use criterion::{ criterion_group, criterion_main, Criterion };
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn create_test_data() -> String {
     let temp_dir;
@@ -27,9 +27,9 @@ fn create_test_data() -> String {
     if !kernel_path.exists() {
         // Download kernel
         println!("Downloading linux-5.9.tar.gz...");
-        let resp = reqwest::blocking
-            ::get("https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz")
-            .expect("request failed");
+        let resp =
+            reqwest::blocking::get("https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz")
+                .expect("request failed");
         let body = resp.text().expect("body invalid");
         let mut out = std::fs::File::create(&kernel_path).expect("failed to create file");
         std::io::copy(&mut body.as_bytes(), &mut out).expect("failed to copy content");
@@ -50,23 +50,21 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     let mut group = c.benchmark_group(format!("Count {dir}"));
     group.measurement_time(Duration::from_secs(10));
     group.sample_size(20);
-    group.bench_function("scandir.Count (collect)", |b|
+    group.bench_function("scandir.Count (collect)", |b| {
         b.iter(|| {
-            let mut instance = scandir::Count
-                ::new(&path)
-                .expect(&format!("Failed to create Count instance for {path}"));
+            let mut instance = scandir::Count::new(path)
+                .unwrap_or_else(|_| panic!("Failed to create Count instance for {path}"));
             instance.collect().unwrap();
         })
-    );
-    group.bench_function("scandir.Count(Ext) (collect)", |b|
+    });
+    group.bench_function("scandir.Count(Ext) (collect)", |b| {
         b.iter(|| {
-            let mut instance = scandir::Count
-                ::new(&path)
-                .expect(&format!("Failed to create Count instance for {path}"))
+            let mut instance = scandir::Count::new(path)
+                .unwrap_or_else(|_| panic!("Failed to create Count instance for {path}"))
                 .extended(true);
             instance.collect().unwrap();
         })
-    );
+    });
     group.finish();
 }
 
@@ -76,7 +74,7 @@ fn benchmarks(c: &mut Criterion) {
     let path = "/usr";
     #[cfg(windows)]
     let path = "C:/Windows";
-    benchmark_dir(c, &path);
+    benchmark_dir(c, path);
 }
 
 criterion_group!(benches, benchmarks);

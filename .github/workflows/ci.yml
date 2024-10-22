@@ -43,7 +43,7 @@ jobs:
     env:
       CIBW_BUILD_VERBOSITY: 1
       CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y && yum install -y openssl-devel"
-      CIBW_SKIP: "cp27-* cp34-* cp35-* cp36-* cp37-* pp* *-win32 *-pypy* *-musllinux*"
+      CIBW_SKIP: "cp36-* cp37-* pp* *-win32 *-pypy* *-musllinux*"
       CIBW_TEST_SKIP: "cp38-macosx_*:arm64"
       # Build separate wheels for macOS's different architectures.
       CIBW_ARCHS_MACOS: "arm64"

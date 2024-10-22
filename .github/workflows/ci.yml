@@ -48,7 +48,7 @@ jobs:
       # Build separate wheels for macOS's different architectures.
       CIBW_ARCHS_MACOS: "arm64"
       # Build only on Linux architectures that don't need qemu emulation.
-      CIBW_ARCHS_LINUX: "x86_64 aarch64"
+      CIBW_ARCHS_LINUX: "x86_64"
       # Run the test suite after each build.
       CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
       CIBW_TEST_REQUIRES: "pytest"

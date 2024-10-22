@@ -1,23 +1,23 @@
 use std::fmt::Debug;
-use std::fs::{ self, Metadata };
-use std::io::{ Error, ErrorKind };
+use std::fs::{self, Metadata};
+use std::io::{Error, ErrorKind};
 use std::path::Path;
-use std::sync::atomic::{ AtomicBool, Ordering };
-use std::sync::{ Arc, Mutex };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
-use flume::{ unbounded, Receiver, Sender };
+use flume::{unbounded, Receiver, Sender};
 use jwalk_meta::WalkDirGeneric;
 use speedy::Writable;
 
-use crate::common::{ check_and_expand_path, create_filter, filter_children, get_root_path_len };
+use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::*;
 
 #[inline]
 fn update_toc(
     dir_entry: &jwalk_meta::DirEntry<((), Option<Result<fs::Metadata, Error>>)>,
-    toc: &mut Toc
+    toc: &mut Toc,
 ) {
     let file_type = dir_entry.file_type;
     let key = dir_entry.file_name.clone().into_string().unwrap();
@@ -36,14 +36,19 @@ pub fn toc_thread(
     options: Options,
     filter: Option<Filter>,
     tx: Sender<(String, Toc)>,
-    stop: Arc<AtomicBool>
+    stop: Arc<AtomicBool>,
 ) {
     let root_path_len = get_root_path_len(&options.root_path);
 
-    let dir_entry: jwalk_meta::DirEntry<
-        ((), Option<Result<Metadata, Error>>)
-    > = jwalk_meta::DirEntry
-        ::from_path(0, &options.root_path, true, true, false, Arc::new(Vec::new()))
+    let dir_entry: jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)> =
+        jwalk_meta::DirEntry::from_path(
+            0,
+            &options.root_path,
+            true,
+            true,
+            false,
+            Arc::new(Vec::new()),
+        )
         .unwrap();
 
     if !dir_entry.file_type.is_dir() {
@@ -86,7 +91,8 @@ pub fn toc_thread(
                     let _ = tx.send(("".to_owned(), toc));
                 }
             }
-        }) {
+        })
+    {
         if stop.load(Ordering::Relaxed) {
             break;
         }
@@ -109,6 +115,7 @@ pub struct Walk {
     // Results
     entries: Vec<(String, Toc)>,
     duration: Arc<Mutex<f64>>,
+    finished: Arc<AtomicBool>,
     has_errors: bool,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
@@ -135,6 +142,7 @@ impl Walk {
             store: store.unwrap_or(true),
             entries: Vec::new(),
             duration: Arc::new(Mutex::new(0.0)),
+            finished: Arc::new(AtomicBool::new(false)),
             has_errors: false,
             thr: None,
             stop: Arc::new(AtomicBool::new(false)),
@@ -251,13 +259,13 @@ impl Walk {
         self.stop.store(false, Ordering::Relaxed);
         let stop = self.stop.clone();
         let duration = self.duration.clone();
-        self.thr = Some(
-            thread::spawn(move || {
-                let start_time = Instant::now();
-                toc_thread(options, filter, tx, stop);
-                *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
-            })
-        );
+        let finished = self.finished.clone();
+        self.thr = Some(thread::spawn(move || {
+            let start_time = Instant::now();
+            toc_thread(options, filter, tx, stop);
+            *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
+            finished.store(true, Ordering::Relaxed);
+        }));
         Ok(())
     }
 
@@ -323,7 +331,11 @@ impl Walk {
 
     pub fn results_cnt(&mut self, only_new: bool) -> usize {
         if let Some(ref rx) = self.rx {
-            if only_new { rx.len() } else { self.entries.len() + rx.len() }
+            if only_new {
+                rx.len()
+            } else {
+                self.entries.len() + rx.len()
+            }
         } else {
             self.entries.len()
         }
@@ -345,21 +357,18 @@ impl Walk {
     }
 
     pub fn errors_cnt(&mut self) -> usize {
-        self.entries
-            .iter()
-            .map(|e| e.1.errors.len())
-            .sum()
+        self.entries.iter().map(|e| e.1.errors.len()).sum()
     }
 
     pub fn errors(&mut self, only_new: bool) -> ErrorsType {
         self.results(only_new)
             .iter()
-            .flat_map(|e|
+            .flat_map(|e| {
                 e.1.errors
                     .iter()
                     .map(|err| (e.0.clone(), err.to_string()))
                     .collect::<Vec<_>>()
-            )
+            })
             .collect::<Vec<_>>()
     }
 
@@ -395,11 +404,15 @@ impl Walk {
     }
 
     pub fn finished(&mut self) -> bool {
-        *self.duration.lock().unwrap() > 0.0
+        self.finished.load(Ordering::Relaxed)
     }
 
     pub fn busy(&self) -> bool {
-        if let Some(ref thr) = self.thr { !thr.is_finished() } else { false }
+        if let Some(ref thr) = self.thr {
+            !thr.is_finished()
+        } else {
+            false
+        }
     }
 
     // For debugging

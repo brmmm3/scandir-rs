@@ -1,17 +1,17 @@
 #![cfg_attr(windows, feature(windows_by_handle))]
 
-use std::path::Path;
-use std::time::Duration;
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
+use std::path::Path;
+use std::time::Duration;
 
 #[cfg(windows)]
 use std::path::PathBuf;
 
-use criterion::{ criterion_group, criterion_main, Criterion };
+use criterion::{criterion_group, criterion_main, Criterion};
 
 #[cfg(unix)]
 #[derive(Debug, Clone)]
@@ -85,9 +85,9 @@ fn create_test_data() -> String {
     if !kernel_path.exists() {
         // Download kernel
         println!("Downloading linux-5.9.tar.gz...");
-        let resp = reqwest::blocking
-            ::get("https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz")
-            .expect("request failed");
+        let resp =
+            reqwest::blocking::get("https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz")
+                .expect("request failed");
         let body = resp.text().expect("body invalid");
         let mut out = std::fs::File::create(&kernel_path).expect("failed to create file");
         std::io::copy(&mut body.as_bytes(), &mut out).expect("failed to copy content");
@@ -108,7 +108,7 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     let mut group = c.benchmark_group(format!("Scandir {dir}"));
     group.measurement_time(Duration::from_secs(60));
     group.sample_size(20);
-    group.bench_function("scan_dir.ScanDir", |b|
+    group.bench_function("scan_dir.ScanDir", |b| {
         b.iter(|| {
             let mut entries = Vec::new();
             let _ = scan_dir::ScanDir::all().walk(path, |iter| {
@@ -117,41 +117,37 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
                 }
             });
         })
-    );
-    group.bench_function("scan_dir.ScanDir(Ext)", |b|
+    });
+    group.bench_function("scan_dir.ScanDir(Ext)", |b| {
         b.iter(|| {
             let mut entries = Vec::new();
             let _ = scan_dir::ScanDir::all().walk(path, |iter| {
                 for (entry, _name) in iter {
                     if let Ok(metadata) = fs::metadata(entry.path()) {
-                        entries.push((
-                            entry.metadata().unwrap(),
-                            Some(get_metadata_ext(&metadata)),
-                        ));
+                        entries
+                            .push((entry.metadata().unwrap(), Some(get_metadata_ext(&metadata))));
                     } else {
                         entries.push((entry.metadata().unwrap(), None));
                     }
                 }
             });
         })
-    );
-    group.bench_function("scandir.Scandir (collect)", |b|
+    });
+    group.bench_function("scandir.Scandir (collect)", |b| {
         b.iter(|| {
-            let mut instance = scandir::Scandir
-                ::new(&path, Some(true))
-                .expect(&format!("Failed to create Scandir instance for {path}"));
+            let mut instance = scandir::Scandir::new(path, Some(true))
+                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path}"));
             instance.collect().unwrap();
         })
-    );
-    group.bench_function("scandir.Scandir(Ext) (collect)", |b|
+    });
+    group.bench_function("scandir.Scandir(Ext) (collect)", |b| {
         b.iter(|| {
-            let mut instance = scandir::Scandir
-                ::new(&path, Some(true))
-                .expect(&format!("Failed to create Scandir instance for {path}"))
+            let mut instance = scandir::Scandir::new(path, Some(true))
+                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path}"))
                 .return_type(scandir::ReturnType::Ext);
             instance.collect().unwrap();
         })
-    );
+    });
     group.finish();
 }
 

@@ -1,31 +1,36 @@
 use std::collections::HashSet;
 use std::fs::Metadata;
-use std::io::{ Error, ErrorKind };
+use std::io::{Error, ErrorKind};
 use std::path::Path;
-use std::sync::atomic::{ AtomicBool, Ordering };
-use std::sync::{ Arc, Mutex };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
-use flume::{ unbounded, Receiver, Sender };
+use flume::{unbounded, Receiver, Sender};
 use jwalk_meta::WalkDirGeneric;
 
-use crate::common::{ check_and_expand_path, create_filter, filter_children, get_root_path_len };
-use crate::def::{ Filter, Options, ReturnType };
+use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
+use crate::def::{Filter, Options, ReturnType};
 use crate::Statistics;
 
 fn count_thread(
     options: Options,
     filter: Option<Filter>,
     tx: Sender<Statistics>,
-    stop: Arc<AtomicBool>
+    stop: Arc<AtomicBool>,
 ) {
     let mut statistics = Statistics::new();
 
-    let dir_entry: jwalk_meta::DirEntry<
-        ((), Option<Result<Metadata, Error>>)
-    > = jwalk_meta::DirEntry
-        ::from_path(0, &options.root_path, true, true, false, Arc::new(Vec::new()))
+    let dir_entry: jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)> =
+        jwalk_meta::DirEntry::from_path(
+            0,
+            &options.root_path,
+            true,
+            true,
+            false,
+            Arc::new(Vec::new()),
+        )
         .unwrap();
 
     if !dir_entry.file_type.is_dir() {
@@ -79,8 +84,7 @@ fn count_thread(
     let mut file_indexes: HashSet<u64> = HashSet::new();
     let root_path_len = get_root_path_len(&options.root_path);
     let max_file_cnt = options.max_file_cnt as i32;
-    for result in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>
-        ::new(&options.root_path)
+    for result in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
         .sort(false)
         .max_depth(options.max_depth)
@@ -95,7 +99,8 @@ fn count_thread(
                 return;
             }
             filter_children(children, &filter, root_path_len);
-        }) {
+        })
+    {
         if stop.load(Ordering::Relaxed) {
             break;
         }
@@ -213,6 +218,7 @@ pub struct Count {
     // Results
     pub statistics: Statistics,
     duration: Arc<Mutex<f64>>,
+    finished: Arc<AtomicBool>,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     stop: Arc<AtomicBool>,
@@ -237,6 +243,7 @@ impl Count {
             },
             statistics: Statistics::new(),
             duration: Arc::new(Mutex::new(0.0)),
+            finished: Arc::new(AtomicBool::new(false)),
             thr: None,
             stop: Arc::new(AtomicBool::new(false)),
             rx: None,
@@ -339,13 +346,13 @@ impl Count {
         self.stop.store(false, Ordering::Relaxed);
         let stop = self.stop.clone();
         let duration = self.duration.clone();
-        self.thr = Some(
-            thread::spawn(move || {
-                let start_time = Instant::now();
-                count_thread(options, filter, tx, stop);
-                *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
-            })
-        );
+        let finished = self.finished.clone();
+        self.thr = Some(thread::spawn(move || {
+            let start_time = Instant::now();
+            count_thread(options, filter, tx, stop);
+            *duration.lock().unwrap() = start_time.elapsed().as_secs_f64();
+            finished.store(true, Ordering::Relaxed);
+        }));
         Ok(())
     }
 
@@ -411,11 +418,15 @@ impl Count {
     }
 
     pub fn finished(&self) -> bool {
-        self.statistics.duration > 0.0
+        self.finished.load(Ordering::Relaxed)
     }
 
     pub fn busy(&self) -> bool {
-        if let Some(ref thr) = self.thr { !thr.is_finished() } else { false }
+        if let Some(ref thr) = self.thr {
+            !thr.is_finished()
+        } else {
+            false
+        }
     }
 
     // For debugging

@@ -30,8 +30,8 @@ pub fn create_temp_file_tree(
     dircnt: u32,
     filecnt: u32,
     hlinkcnt: u32,
-    slinkcnt: u32,
-    pipecnt: u32,
+    #[cfg(unix)] slinkcnt: u32,
+    #[cfg(unix)] pipecnt: u32,
 ) -> Result<TempDir, Error> {
     let temp_dir = setup();
     for i in 1..=dircnt {

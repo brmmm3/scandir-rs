@@ -1,15 +1,15 @@
 #![cfg_attr(windows, feature(windows_by_handle))]
 
-use std::{ fs, path::Path, time::Duration };
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
+use std::{fs, path::Path, time::Duration};
 
 #[cfg(windows)]
 use std::path::PathBuf;
 
-use criterion::{ criterion_group, criterion_main, Criterion };
+use criterion::{criterion_group, criterion_main, Criterion};
 
 #[cfg(unix)]
 #[derive(Debug, Clone)]
@@ -83,9 +83,9 @@ fn create_test_data() -> String {
     if !kernel_path.exists() {
         // Download kernel
         println!("Downloading linux-5.9.tar.gz...");
-        let resp = reqwest::blocking
-            ::get("https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz")
-            .expect("request failed");
+        let resp =
+            reqwest::blocking::get("https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz")
+                .expect("request failed");
         let body = resp.text().expect("body invalid");
         let mut out = std::fs::File::create(&kernel_path).expect("failed to create file");
         std::io::copy(&mut body.as_bytes(), &mut out).expect("failed to copy content");
@@ -106,48 +106,43 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     let mut group = c.benchmark_group(format!("Walk {dir}"));
     group.measurement_time(Duration::from_secs(30));
     group.sample_size(20);
-    group.bench_function("walkdir.WalkDir", |b|
+    group.bench_function("walkdir.WalkDir", |b| {
         b.iter(|| {
-            let _ = walkdir::WalkDir::new(&path).into_iter().collect::<Vec<_>>();
+            let _ = walkdir::WalkDir::new(path).into_iter().collect::<Vec<_>>();
         })
-    );
-    group.bench_function("walkdir.WalkDir(Ext)", |b|
+    });
+    group.bench_function("walkdir.WalkDir(Ext)", |b| {
         b.iter(|| {
-            let _ = walkdir::WalkDir
-                ::new(&path)
+            let _ = walkdir::WalkDir::new(path)
                 .into_iter()
-                .map(|result| {
-                    match result {
-                        Ok(entry) => {
-                            if let Ok(metadata) = fs::metadata(entry.path()) {
-                                Ok((entry.metadata().unwrap(), Some(get_metadata_ext(&metadata))))
-                            } else {
-                                Ok((entry.metadata().unwrap(), None))
-                            }
+                .map(|result| match result {
+                    Ok(entry) => {
+                        if let Ok(metadata) = fs::metadata(entry.path()) {
+                            Ok((entry.metadata().unwrap(), Some(get_metadata_ext(&metadata))))
+                        } else {
+                            Ok((entry.metadata().unwrap(), None))
                         }
-                        Err(e) => Err(e),
                     }
+                    Err(e) => Err(e),
                 })
                 .collect::<Vec<_>>();
         })
-    );
-    group.bench_function("scandir.Walk (collect)", |b|
+    });
+    group.bench_function("scandir.Walk (collect)", |b| {
         b.iter(|| {
-            let mut instance = scandir::Walk
-                ::new(&path, Some(true))
-                .expect(&format!("Failed to create Walk instance for {path}"));
+            let mut instance = scandir::Walk::new(path, Some(true))
+                .unwrap_or_else(|_| panic!("Failed to create Walk instance for {path}"));
             instance.collect().unwrap();
         })
-    );
-    group.bench_function("scandir.Walk(Ext) (collect)", |b|
+    });
+    group.bench_function("scandir.Walk(Ext) (collect)", |b| {
         b.iter(|| {
-            let mut instance = scandir::Walk
-                ::new(&path, Some(true))
-                .expect(&format!("Failed to create Walk instance for {path}"))
+            let mut instance = scandir::Walk::new(path, Some(true))
+                .unwrap_or_else(|_| panic!("Failed to create Walk instance for {path}"))
                 .return_type(scandir::ReturnType::Ext);
             instance.collect().unwrap();
         })
-    );
+    });
     group.finish();
 }
 
@@ -157,7 +152,7 @@ fn benchmarks(c: &mut Criterion) {
     let path = "/usr";
     #[cfg(windows)]
     let path = "C:/Windows";
-    benchmark_dir(c, &path);
+    benchmark_dir(c, path);
 }
 
 criterion_group!(benches, benchmarks);

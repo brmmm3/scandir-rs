@@ -21,6 +21,12 @@ def test_walk_toc(tempDir):
     assert not toc.errors
     assert not toc.other
     assert not toc.symlinks
+    if len(toc.dirs) != 6:
+        import os
+
+        print(f"tempDir.name={tempDir.name}")
+        print(f"toc.dirs={toc.dirs}")
+        print(f"entries={os.listdir(tempDir.name)}")
     assert len(toc.dirs) == 6
     assert len(toc.files) == 180
 

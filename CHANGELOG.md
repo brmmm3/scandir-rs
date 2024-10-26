@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.7.3] - 2024-10-22
 
+### Changed
+
+- Important: `skip_hidden` is now `false` by default!
+
 ### Improved
 
 - Update dependencies.

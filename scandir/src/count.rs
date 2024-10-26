@@ -231,7 +231,7 @@ impl Count {
             options: Options {
                 root_path: check_and_expand_path(root_path)?,
                 sorted: false,
-                skip_hidden: true,
+                skip_hidden: false,
                 max_depth: usize::MAX,
                 max_file_cnt: usize::MAX,
                 dir_include: None,

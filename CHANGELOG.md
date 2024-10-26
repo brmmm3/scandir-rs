@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added optional serialization methods `to_json`, `to_speedy` and `to_bincode` to `Walk`. The corresponding features `json`, `speedy` and `bincode` need to be enabled.
+- Added optional serialization methods `to_json`, `to_speedy` and `to_bincode` to `Walk`.
+  The corresponding features `json`, `speedy` and `bincode` need to be enabled.
 - Add `statistics` getter to `Walk`.
 
 ### Improved
@@ -42,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added optional serialization methods `to_json`, `to_speedy` and `to_bincode`. The corresponding features `json`, `speedy` and `bincode` need to be enabled.
+- Added optional serialization methods `to_json`, `to_speedy` and `to_bincode`.
+  The corresponding features `json`, `speedy` and `bincode` need to be enabled.
 - Add `statistics` getter to `Scandir`.
 
 ### Improved
@@ -195,13 +197,11 @@ Fix CVE-2007-4559 in benchmark.py
 
 - Update dependencies.
 
-
 ## [0.9.6] - 2022-02-19
 
 ### Fixed
 
 - Fix a crash when file system doesn't support file creation time.
-
 
 ## [0.9.5] - 2022-01-31
 
@@ -215,7 +215,6 @@ Fix CVE-2007-4559 in benchmark.py
 - Update dependencies.
 - Add support for Python 3.10.
 - Improve example ex_scandir for showing usage of thread safe ts_busy and ts_count methods.
-
 
 ## [0.9.4] - 2021-02-16
 
@@ -282,8 +281,8 @@ Fix CVE-2007-4559 in benchmark.py
 ### Fixed
 
 - Correctly count hardlinks.
-- Update jwalk to get correct extended metadata (size and hardlinks).
-  https://github.com/brmmm3/jwalk/tree/jwalk-0.4.1-alpha.1
+- Update [jwalk](https://github.com/brmmm3/jwalk/tree/jwalk-0.4.1-alpha.1) to get correct extended
+  metadata (size and hardlinks).
 
 ## [0.7.2] - 2020-01-10
 

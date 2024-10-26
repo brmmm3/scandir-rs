@@ -14,7 +14,7 @@ fn test_scandir() -> Result<(), Error> {
     #[cfg(unix)]
     assert_eq!(210, entries.results.len());
     #[cfg(windows)]
-    assert_eq!(75, entries.results.len());
+    assert_eq!(93, entries.results.len());
     assert_eq!(0, entries.errors.len());
     #[cfg(target_os = "linux")]
     match entries.results.first().unwrap() {
@@ -45,7 +45,7 @@ fn test_scandir_skip_hidden() -> Result<(), Error> {
     #[cfg(unix)]
     assert_eq!(192, entries.results.len());
     #[cfg(windows)]
-    assert_eq!(93, entries.results.len());
+    assert_eq!(75, entries.results.len());
     assert_eq!(0, entries.errors.len());
     match entries.results.first().unwrap() {
         ScandirResult::DirEntry(d) => {
@@ -75,7 +75,7 @@ fn test_scandir_extended() -> Result<(), Error> {
     #[cfg(unix)]
     assert_eq!(210, entries.results.len());
     #[cfg(windows)]
-    assert_eq!(75, entries.results.len());
+    assert_eq!(93, entries.results.len());
     assert_eq!(0, entries.errors.len());
     match entries.results.first().unwrap() {
         ScandirResult::DirEntryExt(d) => {

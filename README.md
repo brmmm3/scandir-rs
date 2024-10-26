@@ -1,10 +1,22 @@
 # `scandir-rs`
 
-`scandir-rs` is a Rust project which provides a [Rust](https://github.com/brmmm3/scandir-rs/blob/master/scandir/README.md) and a [Python](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/README.md) module for directory iteration, like `os.walk()` or `os.scandir()`, but with more features and higher speed. Depending on the function call it yields a list of paths, tuple of lists grouped by their entry type or `DirEntry` objects that include file type and stat information along with the file name. Directory iteration is **many** times faster than `os.walk()`, `os.scandir()`, `walkdir` or `scan_dir` (see **benchmarks** for [Rust](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md) and [Python](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/doc/benchmarks.md)).
+`scandir-rs` is a Rust project which provides a [Rust](https://github.com/brmmm3/scandir-rs/blob/master/scandir/README.md)
+ and a [Python](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/README.md) module for
+ directory iteration, like `os.walk()` or `os.scandir()`, but with more features and higher speed.
+ Depending on the function call it yields a list of paths, tuple of lists grouped by their entry
+ type or `DirEntry` objects that include file type and stat information along with the file name.
+ Directory iteration is **many** times faster than `os.walk()`, `os.scandir()`, `walkdir` or
+ `scan_dir` (see **benchmarks** for [Rust](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)
+ and [Python](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/doc/benchmarks.md)).
 
-The higher performance is achieved through parallelizing the file system access for reducing the access delay because of the overhead each file access has.
+The higher performance is achieved through parallelizing the file system access for reducing the
+ access delay because of the overhead each file access has.
 
-**Note:** `scandir_rs` uses libc 2.34, which is currently not supported by the manylinux releases. So it is not possible to upload prebuilt Linux wheels to PyPI. As a workaround you can download the Linux wheels from [here](https://github.com/brmmm3/scandir-rs/releases/tag/2.7.0).
+**Note:** `scandir_rs` uses libc 2.34, which is currently not supported by the manylinux releases.
+ So it is not possible to upload prebuilt Linux wheels to PyPI. As a workaround you can download
+ the Linux wheels from [here](https://github.com/brmmm3/scandir-rs/releases/tag/2.7.0).
+
+**Note:** Since 2.8.0 `skip_hidden` is now `false` by default!
 
 ## Python examples
 

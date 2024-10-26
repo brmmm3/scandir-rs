@@ -16,18 +16,33 @@ def tempDir():
 
 
 def test_walk_toc(tempDir):
+    sd = Walk(tempDir.name)
+    toc = sd.collect()
+    assert not toc.errors
+    assert not toc.other
+    assert not toc.symlinks
+    import os
+
+    print(f"tempDir.name={tempDir.name}")
+    print(f"toc.dirs={toc.dirs}")
+    print(f"toc.files={toc.files}")
+    print(f"entries={os.listdir(tempDir.name)}")
+    assert len(toc.dirs) == 6
+    assert len(toc.files) == 180
+
+
+def test_walk_toc_extended(tempDir):
     sd = Walk(tempDir.name, return_type=ReturnType.Ext)
     toc = sd.collect()
     assert not toc.errors
     assert not toc.other
     assert not toc.symlinks
-    if len(toc.dirs) != 6:
-        import os
+    import os
 
-        print(f"tempDir.name={tempDir.name}")
-        print(f"toc.dirs={toc.dirs}")
-        print(f"toc.files={toc.files}")
-        print(f"entries={os.listdir(tempDir.name)}")
+    print(f"tempDir.name={tempDir.name}")
+    print(f"toc.dirs={toc.dirs}")
+    print(f"toc.files={toc.files}")
+    print(f"entries={os.listdir(tempDir.name)}")
     assert len(toc.dirs) == 6
     assert len(toc.files) == 180
 

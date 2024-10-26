@@ -1,6 +1,6 @@
 [project]
 name = "scandir-rs"
-version = "2.7.3"
+version = "2.8.0"
 authors = [{ name = "Martin Bammer", email = "mrbm74@gmail.com" }]
 description = "A fast file tree scanner written in Rust"
 license = "MIT"

@@ -40,8 +40,9 @@ pub fn create_temp_file_tree(
 ) -> Result<TempDir, Error> {
     let temp_dir = setup();
     #[cfg(windows)]
+    let junc_dir = temp_dir.path().join("junc_dir");
+    #[cfg(windows)]
     {
-        let junc_dir = temp_dir.path().join("junc_dir");
         if jcnt > 0 {
             create_dir_all(&junc_dir)?;
             for i in 1..=filecnt {

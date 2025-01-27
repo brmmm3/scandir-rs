@@ -1,8 +1,12 @@
+#![cfg_attr(windows, feature(junction_point))]
+
 use std::cmp::min;
 use std::fs::{create_dir_all, hard_link, File};
 use std::io::{Error, Write};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::junction_point;
 
 use tempfile::TempDir;
 
@@ -30,10 +34,22 @@ pub fn create_temp_file_tree(
     dircnt: u32,
     filecnt: u32,
     hlinkcnt: u32,
+    #[cfg(windows)] jcnt: u32, // Number of junctions to create
     #[cfg(unix)] slinkcnt: u32,
     #[cfg(unix)] pipecnt: u32,
 ) -> Result<TempDir, Error> {
     let temp_dir = setup();
+    #[cfg(windows)]
+    {
+        let junc_dir = temp_dir.path().join("junc_dir");
+        if jcnt > 0 {
+            create_dir_all(&junc_dir)?;
+            for i in 1..=filecnt {
+                let mut file = File::create(junc_dir.join("junc_".to_string() + &get_filename(i)))?;
+                file.write_all(format!("HELLO{i}").as_bytes())?;
+            }
+        }
+    }
     for i in 1..=dircnt {
         let mut dir = temp_dir.path().join(format!("dir{i}"));
         for d in 1..=depth {
@@ -49,6 +65,10 @@ pub fn create_temp_file_tree(
                     dir.join(get_filename(filenum)),
                     dir.join(format!("hardlink{i}")),
                 )?;
+            }
+            #[cfg(windows)]
+            for i in 1..=jcnt {
+                junction_point(&junc_dir, &dir.join(format!("junction{i}")))?;
             }
             #[cfg(unix)]
             for i in 1..=slinkcnt {

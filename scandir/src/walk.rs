@@ -46,7 +46,7 @@ pub fn toc_thread(
             &options.root_path,
             true,
             true,
-            false,
+            options.follow_links,
             Arc::new(Vec::new()),
         )
         .unwrap();
@@ -63,6 +63,7 @@ pub fn toc_thread(
     let mut file_cnt = 0;
     for result in WalkDirGeneric::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
+        .follow_links(options.follow_links)
         .sort(options.sorted)
         .max_depth(options.max_depth)
         .process_read_dir(move |_, root_dir, _, children| {

@@ -56,6 +56,7 @@ The returned results are tuples with absolute path and `DirEntry`, `DirEntryExt`
 - `file_include` list of patterns for files to include.
 - `file_exclude` list of patterns for files to exclude.
 - `case_sensitive` if `True` then do case sensitive pattern matching.
+- `follow_links` if `True` then follow symlinks and junctions.
 - `return_type` defines type of data returned.
 - `store` store results in local structure.
 

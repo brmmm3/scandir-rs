@@ -1,6 +1,6 @@
 [package]
 name = "scandir"
-version = "2.9.0"
+version = "2.9.1"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast file tree scanner written in Rust"
 edition = "2021"

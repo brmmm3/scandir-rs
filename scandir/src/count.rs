@@ -28,7 +28,7 @@ fn count_thread(
             &options.root_path,
             true,
             true,
-            false,
+            options.follow_links,
             Arc::new(Vec::new()),
         )
         .unwrap();

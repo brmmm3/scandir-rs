@@ -235,6 +235,7 @@ impl Scandir {
                 file_include: None,
                 file_exclude: None,
                 case_sensitive: false,
+                follow_links: false,
                 return_type: ReturnType::Base,
             },
             store: store.unwrap_or(true),
@@ -312,6 +313,12 @@ impl Scandir {
     /// Set case sensitive filename filtering
     pub fn case_sensitive(mut self, case_sensitive: bool) -> Self {
         self.options.case_sensitive = case_sensitive;
+        self
+    }
+
+    /// Set follow symlinks
+    pub fn follow_links(mut self, follow_links: bool) -> Self {
+        self.options.follow_links = follow_links;
         self
     }
 

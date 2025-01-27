@@ -1,11 +1,11 @@
 use std::time::SystemTime;
 
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-#[cfg(any(feature = "speedy", feature = "bincode"))]
-use pyo3::types::PyBytes;
 #[cfg(any(feature = "speedy", feature = "bincode", feature = "json"))]
 use pyo3::exceptions::PyException;
+use pyo3::prelude::*;
+#[cfg(any(feature = "speedy", feature = "bincode"))]
+use pyo3::types::PyBytes;
+use pyo3::types::PyDict;
 
 #[cfg(feature = "speedy")]
 use speedy::Writable;
@@ -78,29 +78,26 @@ impl DirEntry {
     }
 
     fn as_dict(&self, py: Python) -> PyResult<PyObject> {
-        let pydict = PyDict::new_bound(py);
-        pydict.set_item("path".to_object(py), self.0.path.clone())?;
-        pydict.set_item("is_symlink".to_object(py), self.0.is_symlink)?;
-        pydict.set_item("is_dir".to_object(py), self.0.is_dir)?;
-        pydict.set_item("is_file".to_object(py), self.0.is_file)?;
-        pydict.set_item("st_ctime".to_object(py), self.0.st_ctime)?;
-        pydict.set_item("st_mtime".to_object(py), self.0.st_mtime)?;
-        pydict.set_item("st_atime".to_object(py), self.0.st_atime)?;
-        pydict.set_item("st_size".to_object(py), self.0.st_size)?;
-        Ok(pydict.to_object(py))
+        let pydict = PyDict::new(py);
+        pydict.set_item("path", self.0.path.clone())?;
+        pydict.set_item("is_symlink", self.0.is_symlink)?;
+        pydict.set_item("is_dir", self.0.is_dir)?;
+        pydict.set_item("is_file", self.0.is_file)?;
+        pydict.set_item("st_ctime", self.0.st_ctime)?;
+        pydict.set_item("st_mtime", self.0.st_mtime)?;
+        pydict.set_item("st_atime", self.0.st_atime)?;
+        pydict.set_item("st_size", self.0.st_size)?;
+        Ok(pydict.into_any().unbind())
     }
 
     #[cfg(feature = "speedy")]
     fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.write_to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
@@ -108,21 +105,20 @@ impl DirEntry {
     #[cfg(feature = "bincode")]
     fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
 
     #[cfg(feature = "json")]
     fn to_json(&self) -> PyResult<String> {
-        self.0.to_json().map_err(|e| PyException::new_err(e.to_string()))
+        self.0
+            .to_json()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     fn __repr__(&self) -> String {
@@ -247,38 +243,35 @@ impl DirEntryExt {
     }
 
     fn as_dict(&self, py: Python) -> PyResult<PyObject> {
-        let pydict = PyDict::new_bound(py);
-        pydict.set_item("path".to_object(py), self.0.path.clone())?;
-        pydict.set_item("is_symlink".to_object(py), self.0.is_symlink)?;
-        pydict.set_item("is_dir".to_object(py), self.0.is_dir)?;
-        pydict.set_item("is_file".to_object(py), self.0.is_file)?;
-        pydict.set_item("st_ctime".to_object(py), self.0.st_ctime)?;
-        pydict.set_item("st_mtime".to_object(py), self.0.st_mtime)?;
-        pydict.set_item("st_atime".to_object(py), self.0.st_atime)?;
-        pydict.set_item("st_size".to_object(py), self.0.st_size)?;
-        pydict.set_item("st_blksize".to_object(py), self.0.st_blksize)?;
-        pydict.set_item("st_blocks".to_object(py), self.0.st_blocks)?;
-        pydict.set_item("st_mode".to_object(py), self.0.st_mode)?;
-        pydict.set_item("st_nlink".to_object(py), self.0.st_nlink)?;
-        pydict.set_item("st_uid".to_object(py), self.0.st_uid)?;
-        pydict.set_item("st_gid".to_object(py), self.0.st_gid)?;
-        pydict.set_item("st_ino".to_object(py), self.0.st_ino)?;
-        pydict.set_item("st_dev".to_object(py), self.0.st_dev)?;
-        pydict.set_item("st_rdev".to_object(py), self.0.st_rdev)?;
-        Ok(pydict.to_object(py))
+        let pydict = PyDict::new(py);
+        pydict.set_item("path", self.0.path.clone())?;
+        pydict.set_item("is_symlink", self.0.is_symlink)?;
+        pydict.set_item("is_dir", self.0.is_dir)?;
+        pydict.set_item("is_file", self.0.is_file)?;
+        pydict.set_item("st_ctime", self.0.st_ctime)?;
+        pydict.set_item("st_mtime", self.0.st_mtime)?;
+        pydict.set_item("st_atime", self.0.st_atime)?;
+        pydict.set_item("st_size", self.0.st_size)?;
+        pydict.set_item("st_blksize", self.0.st_blksize)?;
+        pydict.set_item("st_blocks", self.0.st_blocks)?;
+        pydict.set_item("st_mode", self.0.st_mode)?;
+        pydict.set_item("st_nlink", self.0.st_nlink)?;
+        pydict.set_item("st_uid", self.0.st_uid)?;
+        pydict.set_item("st_gid", self.0.st_gid)?;
+        pydict.set_item("st_ino", self.0.st_ino)?;
+        pydict.set_item("st_dev", self.0.st_dev)?;
+        pydict.set_item("st_rdev", self.0.st_rdev)?;
+        Ok(pydict.into_any().unbind())
     }
 
     #[cfg(feature = "speedy")]
     fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.write_to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
@@ -286,21 +279,20 @@ impl DirEntryExt {
     #[cfg(feature = "bincode")]
     fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.to_vec() {
-            Ok(v) => {
-                Ok(
-                    PyBytes::new_bound_with(py, v.len(), |b| {
-                        b.copy_from_slice(&v);
-                        Ok(())
-                    })?.into()
-                )
-            }
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
+                b.copy_from_slice(&v);
+                Ok(())
+            })?
+            .into()),
             Err(e) => Err(PyException::new_err(e.to_string())),
         }
     }
 
     #[cfg(feature = "json")]
     fn to_json(&self) -> PyResult<String> {
-        self.0.to_json().map_err(|e| PyException::new_err(e.to_string()))
+        self.0
+            .to_json()
+            .map_err(|e| PyException::new_err(e.to_string()))
     }
 
     fn __repr__(&self) -> String {

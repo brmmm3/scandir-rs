@@ -3,8 +3,8 @@ use std::thread;
 use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
-use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyType};
+use pyo3::{prelude::*, IntoPyObjectExt};
 use scandir::def::scandir::ScandirResults;
 
 use crate::def::{DirEntry, DirEntryExt, ReturnType, Statistics};
@@ -12,9 +12,9 @@ use scandir::{ErrorsType, ScandirResult};
 
 fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
     match result {
-        ScandirResult::DirEntry(e) => Some(Py::new(py, DirEntry::from(e)).unwrap().to_object(py)),
+        ScandirResult::DirEntry(e) => Some(Py::new(py, DirEntry::from(e)).unwrap().into_any()),
         ScandirResult::DirEntryExt(e) => {
-            Some(Py::new(py, DirEntryExt::from(e)).unwrap().to_object(py))
+            Some(Py::new(py, DirEntryExt::from(e)).unwrap().into_any())
         }
         ScandirResult::Error((_path, _e)) => None,
     }
@@ -31,7 +31,7 @@ pub struct Scandir {
 impl Scandir {
     #[allow(clippy::too_many_arguments)]
     #[new]
-    #[pyo3(signature = (root_path, sorted=None, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, return_type=None, store=None))]
+    #[pyo3(signature = (root_path, sorted=None, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, follow_links=None, return_type=None, store=None))]
     pub fn new(
         root_path: &str,
         sorted: Option<bool>,
@@ -43,6 +43,7 @@ impl Scandir {
         file_include: Option<Vec<String>>,
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
+        follow_links: Option<bool>,
         return_type: Option<ReturnType>,
         store: Option<bool>,
     ) -> PyResult<Self> {
@@ -59,6 +60,7 @@ impl Scandir {
                     .file_include(file_include)
                     .file_exclude(file_exclude)
                     .case_sensitive(case_sensitive.unwrap_or(false))
+                    .follow_links(follow_links.unwrap_or(false))
                     .return_type(return_type),
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
@@ -167,28 +169,26 @@ impl Scandir {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyObject {
-        let pyresults = PyDict::new_bound(py);
+    pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyResult<PyObject> {
+        let pyresults = PyDict::new(py);
         let entries = self.instance.results(only_new.unwrap_or(true));
         for entry in entries.results {
             let _ = match entry {
                 ScandirResult::DirEntry(e) => pyresults.set_item(
-                    e.path.clone().into_py(py),
-                    Py::new(py, DirEntry::from(&e)).unwrap().to_object(py),
+                    e.path.clone().into_py_any(py)?,
+                    Py::new(py, DirEntry::from(&e)).unwrap().into_any(),
                 ),
                 ScandirResult::DirEntryExt(e) => pyresults.set_item(
-                    e.path.clone().into_py(py),
-                    Py::new(py, DirEntryExt::from(&e)).unwrap().to_object(py),
+                    e.path.clone().into_py_any(py)?,
+                    Py::new(py, DirEntryExt::from(&e)).unwrap().into_any(),
                 ),
-                ScandirResult::Error((path, e)) => {
-                    pyresults.set_item(path.into_py(py), e.to_object(py))
-                }
+                ScandirResult::Error((path, e)) => pyresults.set_item(path.into_py_any(py)?, e),
             };
         }
         for error in entries.errors {
-            let _ = pyresults.set_item(error.0.into_py(py), error.1.to_object(py));
+            let _ = pyresults.set_item(error.0.into_py_any(py)?, error.1.into_py_any(py)?);
         }
-        pyresults.to_object(py)
+        Ok(pyresults.into_any().unbind())
     }
 
     #[cfg(feature = "speedy")]
@@ -196,7 +196,7 @@ impl Scandir {
         self.instance
             .to_speedy()
             .map(|v| {
-                PyBytes::new_bound_with(py, v.len(), |b| {
+                PyBytes::new_with(py, v.len(), |b| {
                     b.copy_from_slice(&v);
                     Ok(())
                 })
@@ -211,7 +211,7 @@ impl Scandir {
         self.instance
             .to_bincode()
             .map(|v| {
-                PyBytes::new_bound_with(py, v.len(), |b| {
+                PyBytes::new_with(py, v.len(), |b| {
                     b.copy_from_slice(&v);
                     Ok(())
                 })
@@ -267,7 +267,7 @@ impl Scandir {
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type_bound::<PyValueError>())),
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -286,20 +286,18 @@ impl Scandir {
             if let Some(entry) = self.entries.results.pop() {
                 match entry {
                     ScandirResult::DirEntry(e) => {
-                        return Ok(Some(Py::new(py, DirEntry::from(&e)).unwrap().to_object(py)));
+                        return Ok(Some(Py::new(py, DirEntry::from(&e)).unwrap().into_any()));
                     }
                     ScandirResult::DirEntryExt(e) => {
-                        return Ok(Some(
-                            Py::new(py, DirEntryExt::from(&e)).unwrap().to_object(py),
-                        ));
+                        return Ok(Some(Py::new(py, DirEntryExt::from(&e)).unwrap().into_any()));
                     }
                     ScandirResult::Error(error) => {
-                        return Ok(Some(error.to_object(py)));
+                        return Ok(Some(error.into_py_any(py)?));
                     }
                 }
             }
             if let Some(error) = self.entries.errors.pop() {
-                return Ok(Some(error.to_object(py)));
+                return Ok(Some(error.into_py_any(py)?));
             }
             let entries = self.instance.results(true);
             if entries.is_empty() {

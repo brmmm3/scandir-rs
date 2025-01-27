@@ -72,7 +72,7 @@ impl Statistics {
 
     #[pyo3(signature = (duration=None))]
     pub fn as_dict(&self, duration: Option<bool>, py: Python) -> PyResult<PyObject> {
-        let pyresult = PyDict::new_bound(py);
+        let pyresult = PyDict::new(py);
         if self.0.dirs > 0 {
             pyresult.set_item("dirs", self.0.dirs).unwrap();
         }
@@ -103,13 +103,13 @@ impl Statistics {
         if duration.unwrap_or(false) {
             pyresult.set_item("duration", self.0.duration).unwrap();
         }
-        Ok(pyresult.to_object(py))
+        Ok(pyresult.into_any().unbind())
     }
 
     #[cfg(feature = "speedy")]
     fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.write_to_vec() {
-            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
                 b.copy_from_slice(&v);
                 Ok(())
             })?
@@ -121,7 +121,7 @@ impl Statistics {
     #[cfg(feature = "bincode")]
     fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.0.to_vec() {
-            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
                 b.copy_from_slice(&v);
                 Ok(())
             })?

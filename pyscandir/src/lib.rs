@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
-mod def;
 mod count;
+mod def;
 mod scandir;
 mod walk;
 

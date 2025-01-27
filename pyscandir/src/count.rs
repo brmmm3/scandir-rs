@@ -23,7 +23,7 @@ pub struct Count {
 impl Count {
     #[allow(clippy::too_many_arguments)]
     #[new]
-    #[pyo3(signature = (root_path, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, return_type=None))]
+    #[pyo3(signature = (root_path, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, follow_links=None, return_type=None))]
     fn new(
         root_path: &str,
         skip_hidden: Option<bool>,
@@ -34,6 +34,7 @@ impl Count {
         file_include: Option<Vec<String>>,
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
+        follow_links: Option<bool>,
         return_type: Option<ReturnType>,
     ) -> PyResult<Self> {
         Ok(Count {
@@ -47,6 +48,7 @@ impl Count {
                     .file_include(file_include)
                     .file_exclude(file_exclude)
                     .case_sensitive(case_sensitive.unwrap_or(false))
+                    .follow_links(follow_links.unwrap_or(false))
                     .extended(return_type.unwrap_or(ReturnType::Base) == ReturnType::Ext),
                 Err(e) => match e.kind() {
                     ErrorKind::InvalidInput => {
@@ -95,9 +97,7 @@ impl Count {
 
     pub fn collect(&mut self, py: Python) -> PyResult<PyObject> {
         let results = py.allow_threads(|| self.instance.collect())?;
-        Ok(Py::new(py, Statistics::from(&results))
-            .unwrap()
-            .to_object(py))
+        Ok(Py::new(py, Statistics::from(&results)).unwrap().into_any())
     }
 
     pub fn has_results(&mut self) -> bool {
@@ -107,7 +107,7 @@ impl Count {
     pub fn results(&mut self, py: Python) -> PyObject {
         Py::new(py, Statistics::from(&self.instance.results()))
             .unwrap()
-            .to_object(py)
+            .into_any()
     }
 
     pub fn has_errors(&mut self) -> bool {
@@ -137,7 +137,7 @@ impl Count {
     #[cfg(feature = "speedy")]
     fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.instance.statistics.write_to_vec() {
-            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
                 b.copy_from_slice(&v);
                 Ok(())
             })?
@@ -149,7 +149,7 @@ impl Count {
     #[cfg(feature = "bincode")]
     fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
         match self.instance.statistics.to_vec() {
-            Ok(v) => Ok(PyBytes::new_bound_with(py, v.len(), |b| {
+            Ok(v) => Ok(PyBytes::new_with(py, v.len(), |b| {
                 b.copy_from_slice(&v);
                 Ok(())
             })?
@@ -185,7 +185,7 @@ impl Count {
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type_bound::<PyValueError>())),
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -209,7 +209,7 @@ impl Count {
         Ok(Some(
             Py::new(py, Statistics::from(&self.instance.results()))
                 .unwrap()
-                .to_object(py),
+                .into_any(),
         ))
     }
 

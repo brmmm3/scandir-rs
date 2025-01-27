@@ -4,8 +4,8 @@ use std::thread;
 use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
-use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyType};
+use pyo3::{prelude::*, IntoPyObjectExt};
 use scandir::ErrorsType;
 
 use crate::def::{ReturnType, Statistics, Toc};
@@ -24,7 +24,7 @@ pub struct Walk {
 impl Walk {
     #[allow(clippy::too_many_arguments)]
     #[new]
-    #[pyo3(signature = (root_path, sorted=None, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, return_type=None, store=None))]
+    #[pyo3(signature = (root_path, sorted=None, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, follow_links=None, return_type=None, store=None))]
     fn new(
         root_path: &str,
         sorted: Option<bool>,
@@ -36,6 +36,7 @@ impl Walk {
         file_include: Option<Vec<String>>,
         file_exclude: Option<Vec<String>>,
         case_sensitive: Option<bool>,
+        follow_links: Option<bool>,
         return_type: Option<ReturnType>,
         store: Option<bool>,
     ) -> PyResult<Self> {
@@ -52,6 +53,7 @@ impl Walk {
                     .file_include(file_include)
                     .file_exclude(file_exclude)
                     .case_sensitive(case_sensitive.unwrap_or(false))
+                    .follow_links(follow_links.unwrap_or(false))
                     .return_type(return_type.from_object()),
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
@@ -114,15 +116,19 @@ impl Walk {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn results(&mut self, only_new: Option<bool>, py: Python) -> Vec<(String, PyObject)> {
+    pub fn results(
+        &mut self,
+        only_new: Option<bool>,
+        py: Python,
+    ) -> PyResult<Vec<(String, PyObject)>> {
         let mut results = Vec::new();
         for result in self.instance.results(only_new.unwrap_or(false)) {
             results.push((
                 result.0,
-                Py::new(py, Toc::from(&result.1)).unwrap().to_object(py),
+                Py::new(py, Toc::from(&result.1)).unwrap().into_py_any(py)?,
             ));
         }
-        results
+        Ok(results)
     }
 
     pub fn has_errors(&mut self) -> bool {
@@ -148,7 +154,7 @@ impl Walk {
         self.instance
             .to_speedy()
             .map(|v| {
-                PyBytes::new_bound_with(py, v.len(), |b| {
+                PyBytes::new_with(py, v.len(), |b| {
                     b.copy_from_slice(&v);
                     Ok(())
                 })
@@ -163,7 +169,7 @@ impl Walk {
         self.instance
             .to_bincode()
             .map(|v| {
-                PyBytes::new_bound_with(py, v.len(), |b| {
+                PyBytes::new_with(py, v.len(), |b| {
                     b.copy_from_slice(&v);
                     Ok(())
                 })
@@ -214,7 +220,7 @@ impl Walk {
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type_bound::<PyValueError>())),
+            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -235,7 +241,7 @@ impl Walk {
                 self.idx += 1;
                 if self.return_type == ReturnType::Base {
                     return Ok(Some(
-                        (root_dir, toc.dirs.clone(), toc.files.clone()).to_object(py),
+                        (root_dir, toc.dirs.clone(), toc.files.clone()).into_py_any(py)?,
                     ));
                 } else {
                     return Ok(Some(
@@ -247,7 +253,7 @@ impl Walk {
                             toc.other.clone(),
                             toc.errors.clone(),
                         )
-                            .to_object(py),
+                            .into_py_any(py)?,
                     ));
                 }
             } else {

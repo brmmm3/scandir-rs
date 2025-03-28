@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use std::fs::{self, Metadata};
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -257,7 +257,7 @@ impl Walk {
 
     pub fn start(&mut self) -> Result<(), Error> {
         if self.busy() {
-            return Err(Error::new(ErrorKind::Other, "Busy"));
+            return Err(Error::other("Busy"));
         }
         self.clear();
         let options = self.options.clone();

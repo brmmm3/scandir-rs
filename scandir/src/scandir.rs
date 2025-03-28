@@ -353,7 +353,7 @@ impl Scandir {
 
     pub fn start(&mut self) -> Result<(), Error> {
         if self.busy() {
-            return Err(Error::new(ErrorKind::Other, "Busy"));
+            return Err(Error::other("Busy"));
         }
         if self.options.return_type > ReturnType::Ext {
             return Err(Error::new(

@@ -25,7 +25,7 @@ pub fn check_and_expand_path<P: AsRef<Path>>(path_str: P) -> Result<PathBuf, Err
             p
         }
         Err(e) => {
-            return Err(Error::new(ErrorKind::Other, e.to_string()));
+            return Err(Error::other(e.to_string()));
         }
     };
     Ok(path)

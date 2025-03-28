@@ -22,16 +22,28 @@ pip install -U pytest
 pip install --force-reinstall ../target/wheels/$name-$version-cp39-cp39-linux_x86_64.whl
 python3.9 -m pytest
 
-pyenv shell 3.10.8
+pyenv shell 3.10.14
 pip install --upgrade pip
 pip install -U pytest
 pip install --force-reinstall ../target/wheels/$name-$version-cp310-cp310-linux_x86_64.whl
 python3.10 -m pytest
 
-pyenv shell 3.11.0
+pyenv shell 3.11.11
 pip install --upgrade pip
 pip install -U pytest
 pip install --force-reinstall ../target/wheels/$name-$version-cp311-cp311-linux_x86_64.whl
 python3.11 -m pytest
+
+pyenv shell 3.12.8
+pip install --upgrade pip
+pip install -U pytest
+pip install --force-reinstall ../target/wheels/$name-$version-cp312-cp312-linux_x86_64.whl
+python3.12 -m pytest
+
+pyenv shell 3.13.2
+pip install --upgrade pip
+pip install -U pytest
+pip install --force-reinstall ../target/wheels/$name-$version-cp313-cp313-linux_x86_64.whl
+python3.13 -m pytest
 
 pyenv shell --unset

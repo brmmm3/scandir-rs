@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::fs::Metadata;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -343,7 +343,7 @@ impl Count {
 
     pub fn start(&mut self) -> Result<(), Error> {
         if self.busy() {
-            return Err(Error::new(ErrorKind::Other, "Busy"));
+            return Err(Error::other("Busy"));
         }
         self.clear();
         let options = self.options.clone();

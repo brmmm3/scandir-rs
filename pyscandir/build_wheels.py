@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import fnmatch
 import concurrent.futures
 from typing import List
 
@@ -71,20 +72,27 @@ def BuildWheel(
     return 0
 
 
-if __name__ == "__main__":
-    versions = [sys.version.split()[0]]
+def GetPyEnvVersions() -> List[str] | None:
+    tmpVersions = [sys.version.split()[0]]
     if "--versions" in sys.argv:
-        versions = sys.argv[sys.argv.index("--versions") + 1].split(",")
-    if versions == ["*"]:
-        pyenv_versions = Run(["pyenv", "versions"])
-        stdout, returncode = ShowResult("pyenv versions", pyenv_versions)
-        if pyenv_versions.returncode != 0:
-            sys.exit(1)
-        versions = [
-            version.lstrip("*").strip().split()[0]
-            for version in stdout.splitlines()
-            if "system" not in version and " 2.7." not in version
-        ]
+        tmpVersions = sys.argv[sys.argv.index("--versions") + 1].split(",")
+    pyEnvVersionsPrc = Run(["pyenv", "versions"])
+    stdOut, returnCode = ShowResult("pyenv versions", pyEnvVersionsPrc)
+    if returnCode != 0:
+        sys.exit(1)
+    pyEnvVersions = [
+        version.lstrip("*").strip().split()[0]
+        for version in stdOut.splitlines()
+        if "system" not in version and " 2.7." not in version
+    ]
+    versions = []
+    for version in tmpVersions:
+        versions.extend(fnmatch.filter(pyEnvVersions, version))
+    return sorted(set(versions))
+
+
+if __name__ == "__main__":
+    versions = GetPyEnvVersions()
     if not versions:
         print("No versions to build Python wheel!")
         sys.exit(1)
@@ -94,7 +102,7 @@ if __name__ == "__main__":
     bDebug = "--debug" in sys.argv
 
     print(f"Building wheel for Python versions {bDebug=}:")
-    print("\n".join(versions))
+    print(", ".join(versions))
 
     python_path = Run(["pyenv", "which", "python"])
     if python_path.returncode != 0:

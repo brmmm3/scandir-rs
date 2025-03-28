@@ -37,3 +37,10 @@ build-backend = "maturin"
 [tool.maturin]
 manylinux = "2_34"
 strip = true
+
+[tool.poetry.dependencies]
+python = '>=3.7'
+maturin = ">=1.5.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.4.4"

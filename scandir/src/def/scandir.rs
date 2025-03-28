@@ -1,10 +1,13 @@
-use speedy::{ Readable, Writable };
+use speedy::{Readable, Writable};
 
 use crate::ErrorsType;
-use crate::direntry::{ DirEntry, DirEntryExt };
+use crate::direntry::{DirEntry, DirEntryExt};
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ScandirResult {
     DirEntry(DirEntry),
@@ -25,7 +28,7 @@ impl ScandirResult {
     #[inline]
     pub fn error(&self) -> Option<&(String, String)> {
         match self {
-            Self::Error(ref e) => Some(e),
+            Self::Error(e) => Some(e),
             _ => None,
         }
     }
@@ -96,7 +99,7 @@ impl ScandirResult {
     #[inline]
     pub fn ext(&self) -> Option<&DirEntryExt> {
         match self {
-            Self::DirEntryExt(ref e) => Some(e),
+            Self::DirEntryExt(e) => Some(e),
             _ => None,
         }
     }
@@ -118,7 +121,10 @@ impl ScandirResult {
 }
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScandirResults {
     pub results: Vec<ScandirResult>,

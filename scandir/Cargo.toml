@@ -3,7 +3,7 @@ name = "scandir"
 version = "2.9.3"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast file tree scanner written in Rust"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/brmmm3/scandir-rs"
 homepage = "https://github.com/brmmm3/scandir-rs"
@@ -61,15 +61,3 @@ harness = false
 name = "scandir"
 path = "benches/scandir.rs"
 harness = false
-
-[[example]]
-name = "count"
-path = "examples/count.rs"
-
-[[example]]
-name = "walk"
-path = "examples/walk.rs"
-
-[[example]]
-name = "scandir"
-path = "examples/scandir.rs"

@@ -61,3 +61,15 @@ harness = false
 name = "scandir"
 path = "benches/scandir.rs"
 harness = false
+
+[[example]]
+name = "count"
+path = "examples/count.rs"
+
+[[example]]
+name = "walk"
+path = "examples/walk.rs"
+
+[[example]]
+name = "scandir"
+path = "examples/scandir.rs"

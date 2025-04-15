@@ -1,9 +1,15 @@
-use std::time::{ Duration, SystemTime, UNIX_EPOCH };
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use speedy::{ Readable, Writable };
+#[cfg(feature = "bincode")]
+use bincode::error::EncodeError;
+#[cfg(feature = "speedy")]
+use speedy::{Readable, Writable};
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DirEntry {
     pub path: String,
@@ -19,7 +25,8 @@ pub struct DirEntry {
 impl DirEntry {
     #[inline]
     pub fn ctime(&self) -> f64 {
-        let duration = self.st_ctime
+        let duration = self
+            .st_ctime
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_err| Duration::new(0, 0));
@@ -28,7 +35,8 @@ impl DirEntry {
 
     #[inline]
     pub fn mtime(&self) -> f64 {
-        let duration = self.st_mtime
+        let duration = self
+            .st_mtime
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_err| Duration::new(0, 0));
@@ -37,7 +45,8 @@ impl DirEntry {
 
     #[inline]
     pub fn atime(&self) -> f64 {
-        let duration = self.st_atime
+        let duration = self
+            .st_atime
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_err| Duration::new(0, 0));
@@ -50,8 +59,8 @@ impl DirEntry {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_vec(&self) -> bincode::Result<Vec<u8>> {
-        bincode::serialize(&self)
+    pub fn to_vec(&self) -> Result<Vec<u8>, EncodeError> {
+        bincode::serde::encode_to_vec(self, bincode::config::legacy())
     }
 
     #[cfg(feature = "json")]
@@ -61,7 +70,10 @@ impl DirEntry {
 }
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DirEntryExt {
     pub path: String,
@@ -99,7 +111,8 @@ pub struct DirEntryExt {
 impl DirEntryExt {
     #[inline]
     pub fn ctime(&self) -> f64 {
-        let duration = self.st_ctime
+        let duration = self
+            .st_ctime
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_err| Duration::new(0, 0));
@@ -108,7 +121,8 @@ impl DirEntryExt {
 
     #[inline]
     pub fn mtime(&self) -> f64 {
-        let duration = self.st_mtime
+        let duration = self
+            .st_mtime
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_err| Duration::new(0, 0));
@@ -117,7 +131,8 @@ impl DirEntryExt {
 
     #[inline]
     pub fn atime(&self) -> f64 {
-        let duration = self.st_atime
+        let duration = self
+            .st_atime
             .unwrap_or(UNIX_EPOCH)
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_err| Duration::new(0, 0));
@@ -130,8 +145,8 @@ impl DirEntryExt {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_vec(&self) -> bincode::Result<Vec<u8>> {
-        bincode::serialize(&self)
+    pub fn to_vec(&self) -> Result<Vec<u8>, EncodeError> {
+        bincode::serde::encode_to_vec(self, bincode::config::legacy())
     }
 
     #[cfg(feature = "json")]

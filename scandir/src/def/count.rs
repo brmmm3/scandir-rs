@@ -1,8 +1,13 @@
+#[cfg(feature = "bincode")]
+use bincode::error::EncodeError;
 #[cfg(feature = "speedy")]
-use speedy::{ Readable, Writable };
+use speedy::{Readable, Writable};
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Statistics {
     pub dirs: i32,
@@ -52,8 +57,8 @@ impl Statistics {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_vec(&self) -> bincode::Result<Vec<u8>> {
-        bincode::serialize(&self)
+    pub fn to_vec(&self) -> Result<Vec<u8>, EncodeError> {
+        bincode::serde::encode_to_vec(self, bincode::config::legacy())
     }
 }
 

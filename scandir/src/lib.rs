@@ -12,7 +12,8 @@
 #![cfg_attr(windows, feature(windows_by_handle))]
 
 extern crate glob_sl;
-#[macro_use]
+#[cfg_attr(any(feature = "bincode", feature = "json"), macro_use)]
+#[cfg(any(feature = "bincode", feature = "json"))]
 extern crate serde_derive;
 
 pub mod def;

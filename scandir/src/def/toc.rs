@@ -1,9 +1,15 @@
 use std::path::PathBuf;
 
-use speedy::{ Readable, Writable };
+#[cfg(feature = "bincode")]
+use bincode::error::EncodeError;
+#[cfg(feature = "speedy")]
+use speedy::{Readable, Writable};
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Toc {
     pub dirs: Vec<String>,
@@ -53,43 +59,48 @@ impl Toc {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.dirs.is_empty() &&
-            self.files.is_empty() &&
-            self.symlinks.is_empty() &&
-            self.other.is_empty() &&
-            self.errors.is_empty()
+        self.dirs.is_empty()
+            && self.files.is_empty()
+            && self.symlinks.is_empty()
+            && self.other.is_empty()
+            && self.errors.is_empty()
     }
 
     pub fn extend(&mut self, root_dir: &str, other: &Toc) {
         self.dirs.extend_from_slice(
-            &other.dirs
+            &other
+                .dirs
                 .iter()
                 .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
-                .collect::<Vec<String>>()
+                .collect::<Vec<String>>(),
         );
         self.files.extend_from_slice(
-            &other.files
+            &other
+                .files
                 .iter()
                 .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
-                .collect::<Vec<String>>()
+                .collect::<Vec<String>>(),
         );
         self.symlinks.extend_from_slice(
-            &other.symlinks
+            &other
+                .symlinks
                 .iter()
                 .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
-                .collect::<Vec<String>>()
+                .collect::<Vec<String>>(),
         );
         self.other.extend_from_slice(
-            &other.other
+            &other
+                .other
                 .iter()
                 .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
-                .collect::<Vec<String>>()
+                .collect::<Vec<String>>(),
         );
         self.errors.extend_from_slice(
-            &other.errors
+            &other
+                .errors
                 .iter()
                 .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
-                .collect::<Vec<String>>()
+                .collect::<Vec<String>>(),
         );
     }
 
@@ -99,8 +110,8 @@ impl Toc {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_bincode(&self) -> bincode::Result<Vec<u8>> {
-        bincode::serialize(&self)
+    pub fn to_bincode(&self) -> Result<Vec<u8>, EncodeError> {
+        bincode::serde::encode_to_vec(self, bincode::config::legacy())
     }
 
     #[cfg(feature = "json")]

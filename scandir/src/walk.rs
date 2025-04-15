@@ -7,8 +7,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
-use flume::{unbounded, Receiver, Sender};
+#[cfg(feature = "bincode")]
+use bincode::error::EncodeError;
+use flume::{Receiver, Sender, unbounded};
 use jwalk_meta::WalkDirGeneric;
+#[cfg(feature = "speedy")]
 use speedy::Writable;
 
 use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
@@ -386,8 +389,8 @@ impl Walk {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_bincode(&self) -> bincode::Result<Vec<u8>> {
-        bincode::serialize(&self.entries)
+    pub fn to_bincode(&self) -> Result<Vec<u8>, EncodeError> {
+        bincode::serde::encode_to_vec(&self.entries, bincode::config::legacy())
     }
 
     #[cfg(feature = "json")]

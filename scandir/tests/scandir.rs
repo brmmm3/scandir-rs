@@ -24,7 +24,7 @@ fn test_scandir() -> Result<(), Error> {
             assert_eq!("dir1", &d.path);
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
-            assert_eq!(4096, d.st_size);
+            assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
             #[cfg(target_os = "macos")]
             assert_eq!(96, d.st_size);
             #[cfg(windows)]
@@ -54,7 +54,7 @@ fn test_scandir_skip_hidden() -> Result<(), Error> {
             assert!(vec!["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
-            assert_eq!(4096, d.st_size);
+            assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
             #[cfg(target_os = "macos")]
             assert_eq!(96, d.st_size);
             #[cfg(windows)]
@@ -84,7 +84,7 @@ fn test_scandir_extended() -> Result<(), Error> {
             assert!(vec!["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
-            assert_eq!(4096, d.st_size);
+            assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
             #[cfg(target_os = "macos")]
             assert_eq!(96, d.st_size);
             #[cfg(windows)]
@@ -115,7 +115,7 @@ fn test_scandir_follow_links() -> Result<(), Error> {
             assert_eq!("dir1", &d.path);
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
-            assert_eq!(4096, d.st_size);
+            assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
             #[cfg(target_os = "macos")]
             assert_eq!(96, d.st_size);
             #[cfg(windows)]

@@ -1,9 +1,13 @@
-use speedy::{ Readable, Writable };
+#[cfg(feature = "speedy")]
+use speedy::{Readable, Writable};
 
 use crate::Toc;
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct WalkEntry {
     pub path: String,
@@ -11,7 +15,10 @@ pub struct WalkEntry {
 }
 
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
-#[cfg_attr(any(feature = "bincode", feature = "json"), derive(Deserialize, Serialize))]
+#[cfg_attr(
+    any(feature = "bincode", feature = "json"),
+    derive(Deserialize, Serialize)
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct WalkEntryExt {
     pub path: String,

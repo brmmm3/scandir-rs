@@ -7,14 +7,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Instant, SystemTime};
 
-use flume::{unbounded, Receiver, Sender};
+#[cfg(feature = "bincode")]
+use bincode::error::EncodeError;
+use flume::{Receiver, Sender, unbounded};
 
 use jwalk_meta::WalkDirGeneric;
 
+use crate::Statistics;
 use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::scandir::ScandirResults;
 use crate::def::{DirEntry, DirEntryExt, ErrorsType, Filter, Options, ReturnType, ScandirResult};
-use crate::Statistics;
 
 #[derive(Debug, Clone)]
 pub enum Stats {
@@ -501,7 +503,7 @@ impl Scandir {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_bincode(&self) -> bincode::Result<Vec<u8>> {
+    pub fn to_bincode(&self) -> Result<Vec<u8>, EncodeError> {
         self.entries.to_bincode()
     }
 

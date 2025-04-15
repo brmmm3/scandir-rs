@@ -1,3 +1,6 @@
+#[cfg(feature = "bincode")]
+use bincode::error::EncodeError;
+#[cfg(feature = "speedy")]
 use speedy::{Readable, Writable};
 
 use crate::ErrorsType;
@@ -110,8 +113,8 @@ impl ScandirResult {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_bincode(&self) -> bincode::Result<Vec<u8>> {
-        bincode::serialize(&self)
+    pub fn to_bincode(&self) -> Result<Vec<u8>, EncodeError> {
+        bincode::serde::encode_to_vec(self, bincode::config::legacy())
     }
 
     #[cfg(feature = "json")]
@@ -165,8 +168,8 @@ impl ScandirResults {
     }
 
     #[cfg(feature = "bincode")]
-    pub fn to_bincode(&self) -> bincode::Result<Vec<u8>> {
-        bincode::serialize(&self)
+    pub fn to_bincode(&self) -> Result<Vec<u8>, EncodeError> {
+        bincode::serde::encode_to_vec(self, bincode::config::legacy())
     }
 
     #[cfg(feature = "json")]

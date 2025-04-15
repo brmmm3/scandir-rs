@@ -9,6 +9,8 @@ Cargo.lock
 
 *.pyc
 
+*.lock
+
 dist/
 
 .idea/

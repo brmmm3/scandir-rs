@@ -41,4 +41,4 @@ python = '>=3.10'
 maturin = ">=1.10.1"
 
 [tool.poetry.group.dev.dependencies]
-pytest = ">=9.0.1
+pytest = ">=9.0.1"

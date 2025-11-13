@@ -71,7 +71,7 @@ impl Statistics {
     }
 
     #[pyo3(signature = (duration=None))]
-    pub fn as_dict(&self, duration: Option<bool>, py: Python) -> PyResult<PyObject> {
+    pub fn as_dict(&self, duration: Option<bool>, py: Python) -> PyResult<Py<PyAny>> {
         let pyresult = PyDict::new(py);
         if self.0.dirs > 0 {
             pyresult.set_item("dirs", self.0.dirs).unwrap();

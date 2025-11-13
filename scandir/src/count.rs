@@ -7,12 +7,12 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
-use flume::{unbounded, Receiver, Sender};
+use flume::{Receiver, Sender, unbounded};
 use jwalk_meta::WalkDirGeneric;
 
+use crate::Statistics;
 use crate::common::{check_and_expand_path, create_filter, filter_children, get_root_path_len};
 use crate::def::{Filter, Options, ReturnType};
-use crate::Statistics;
 
 fn count_thread(
     options: Options,
@@ -404,10 +404,10 @@ impl Count {
     }
 
     pub fn has_results(&self) -> bool {
-        if let Some(ref rx) = self.rx {
-            if !rx.is_empty() {
-                return true;
-            }
+        if let Some(ref rx) = self.rx
+            && !rx.is_empty()
+        {
+            return true;
         }
         false
     }

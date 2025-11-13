@@ -42,7 +42,7 @@ impl Toc {
         self.0.errors()
     }
 
-    fn as_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
         pydict.set_item("dirs", self.0.dirs.clone())?;
         pydict.set_item("files", self.0.files.clone())?;

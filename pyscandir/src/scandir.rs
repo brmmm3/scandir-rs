@@ -4,13 +4,13 @@ use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::types::{PyBytes, PyDict, PyType};
-use pyo3::{prelude::*, IntoPyObjectExt};
+use pyo3::{IntoPyObjectExt, prelude::*};
 use scandir::def::scandir::ScandirResults;
 
 use crate::def::{DirEntry, DirEntryExt, ReturnType, Statistics};
 use scandir::{ErrorsType, ScandirResult};
 
-fn result2py(result: &ScandirResult, py: Python) -> Option<PyObject> {
+fn result2py(result: &ScandirResult, py: Python) -> Option<Py<PyAny>> {
     match result {
         ScandirResult::DirEntry(e) => Some(Py::new(py, DirEntry::from(e)).unwrap().into_any()),
         ScandirResult::DirEntryExt(e) => {
@@ -91,7 +91,7 @@ impl Scandir {
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
-        let result = py.allow_threads(|| self.instance.join());
+        let result = py.detach(|| self.instance.join());
         if !result {
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
@@ -105,8 +105,8 @@ impl Scandir {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<PyObject>, ErrorsType)> {
-        let entries = py.allow_threads(|| self.instance.collect())?;
+    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<Py<PyAny>>, ErrorsType)> {
+        let entries = py.detach(|| self.instance.collect())?;
         let results = entries
             .results
             .iter()
@@ -126,7 +126,7 @@ impl Scandir {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn results(&mut self, only_new: Option<bool>, py: Python) -> (Vec<PyObject>, ErrorsType) {
+    pub fn results(&mut self, only_new: Option<bool>, py: Python) -> (Vec<Py<PyAny>>, ErrorsType) {
         let entries = self.instance.results(only_new.unwrap_or(true));
         let results = entries
             .results
@@ -147,7 +147,7 @@ impl Scandir {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn entries(&mut self, only_new: Option<bool>, py: Python) -> Vec<PyObject> {
+    pub fn entries(&mut self, only_new: Option<bool>, py: Python) -> Vec<Py<PyAny>> {
         self.instance
             .entries(only_new.unwrap_or(true))
             .iter()
@@ -169,7 +169,7 @@ impl Scandir {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyResult<PyObject> {
+    pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyResult<Py<PyAny>> {
         let pyresults = PyDict::new(py);
         let entries = self.instance.results(only_new.unwrap_or(true));
         for entry in entries.results {
@@ -267,7 +267,7 @@ impl Scandir {
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
+            Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -281,7 +281,7 @@ impl Scandir {
         Ok(slf)
     }
 
-    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+    fn __next__(&mut self, py: Python) -> PyResult<Option<Py<PyAny>>> {
         loop {
             if let Some(entry) = self.entries.results.pop() {
                 match entry {

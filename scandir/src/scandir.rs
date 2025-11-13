@@ -183,13 +183,12 @@ fn entries_thread(
             }
             filter_children(children, &filter, root_path_len);
             children.iter_mut().for_each(|dir_entry_result| {
-                if let Ok(dir_entry) = dir_entry_result {
-                    if tx
+                if let Ok(dir_entry) = dir_entry_result
+                    && tx
                         .send(create_entry(root_path_len, &return_type, dir_entry))
                         .is_err()
-                    {
-                        return;
-                    }
+                {
+                    return;
                 }
             });
         })
@@ -197,12 +196,12 @@ fn entries_thread(
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        if let Ok(dir_entry) = result {
-            if !dir_entry.file_type.is_dir() {
-                file_cnt += 1;
-                if max_file_cnt > 0 && file_cnt > max_file_cnt {
-                    break;
-                }
+        if let Ok(dir_entry) = result
+            && !dir_entry.file_type.is_dir()
+        {
+            file_cnt += 1;
+            if max_file_cnt > 0 && file_cnt > max_file_cnt {
+                break;
             }
         }
     }
@@ -413,10 +412,10 @@ impl Scandir {
     }
 
     pub fn has_results(&mut self, only_new: bool) -> bool {
-        if let Some(ref rx) = self.rx {
-            if !rx.is_empty() {
-                return true;
-            }
+        if let Some(ref rx) = self.rx
+            && !rx.is_empty()
+        {
+            return true;
         }
         if only_new {
             return false;
@@ -459,10 +458,10 @@ impl Scandir {
     }
 
     pub fn has_entries(&mut self, only_new: bool) -> bool {
-        if let Some(ref rx) = self.rx {
-            if !rx.is_empty() {
-                return true;
-            }
+        if let Some(ref rx) = self.rx
+            && !rx.is_empty()
+        {
+            return true;
         }
         if only_new {
             return false;

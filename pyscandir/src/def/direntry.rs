@@ -77,7 +77,7 @@ impl DirEntry {
         self.0.atime()
     }
 
-    fn as_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
         pydict.set_item("path", self.0.path.clone())?;
         pydict.set_item("is_symlink", self.0.is_symlink)?;
@@ -242,7 +242,7 @@ impl DirEntryExt {
         self.0.atime()
     }
 
-    fn as_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
         pydict.set_item("path", self.0.path.clone())?;
         pydict.set_item("is_symlink", self.0.is_symlink)?;

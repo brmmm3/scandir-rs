@@ -21,7 +21,7 @@ fn test_scandir() -> Result<(), Error> {
     #[cfg(target_os = "linux")]
     match entries.results.first().unwrap() {
         ScandirResult::DirEntry(d) => {
-            assert_eq!("dir1", &d.path);
+            assert_eq!("dir3", &d.path);
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
@@ -112,7 +112,7 @@ fn test_scandir_follow_links() -> Result<(), Error> {
     #[cfg(target_os = "linux")]
     match entries.results.first().unwrap() {
         ScandirResult::DirEntry(d) => {
-            assert_eq!("dir1", &d.path);
+            assert_eq!("dir3", &d.path);
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096

@@ -81,7 +81,7 @@ impl Count {
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
-        let result = py.allow_threads(|| self.instance.join());
+        let result = py.detach(|| self.instance.join());
         if !result {
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
@@ -95,8 +95,8 @@ impl Count {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<PyObject> {
-        let results = py.allow_threads(|| self.instance.collect())?;
+    pub fn collect(&mut self, py: Python) -> PyResult<Py<PyAny>> {
+        let results = py.detach(|| self.instance.collect())?;
         Ok(Py::new(py, Statistics::from(&results)).unwrap().into_any())
     }
 
@@ -104,7 +104,7 @@ impl Count {
         self.instance.has_results()
     }
 
-    pub fn results(&mut self, py: Python) -> PyObject {
+    pub fn results(&mut self, py: Python) -> Py<PyAny> {
         Py::new(py, Statistics::from(&self.instance.results()))
             .unwrap()
             .into_any()
@@ -130,7 +130,7 @@ impl Count {
     }
 
     #[pyo3(signature = (duration=None))]
-    fn as_dict(&mut self, duration: Option<bool>, py: Python) -> PyResult<PyObject> {
+    fn as_dict(&mut self, duration: Option<bool>, py: Python) -> PyResult<Py<PyAny>> {
         Statistics::from(&self.instance.results()).as_dict(duration, py)
     }
 
@@ -185,7 +185,7 @@ impl Count {
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
+            Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -199,7 +199,7 @@ impl Count {
         Ok(slf)
     }
 
-    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+    fn __next__(&mut self, py: Python) -> PyResult<Option<Py<PyAny>>> {
         if !self.busy {
             return Ok(None);
         }

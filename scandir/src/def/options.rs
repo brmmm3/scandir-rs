@@ -19,6 +19,7 @@ pub struct Options {
 }
 
 impl Options {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         root_path: PathBuf,
         sorted: bool,

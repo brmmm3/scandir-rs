@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::types::{PyBytes, PyType};
-use pyo3::{prelude::*, IntoPyObjectExt};
+use pyo3::{IntoPyObjectExt, prelude::*};
 use scandir::ErrorsType;
 
 use crate::def::{ReturnType, Statistics, Toc};
@@ -87,7 +87,7 @@ impl Walk {
     }
 
     pub fn join(&mut self, py: Python) -> PyResult<bool> {
-        let result = py.allow_threads(|| self.instance.join());
+        let result = py.detach(|| self.instance.join());
         if !result {
             return Err(PyRuntimeError::new_err("Thread not running"));
         }
@@ -102,7 +102,7 @@ impl Walk {
     }
 
     pub fn collect(&mut self, py: Python) -> PyResult<Toc> {
-        Ok(Toc::from(&py.allow_threads(|| self.instance.collect())?))
+        Ok(Toc::from(&py.detach(|| self.instance.collect())?))
     }
 
     #[pyo3(signature = (only_new=None))]
@@ -120,7 +120,7 @@ impl Walk {
         &mut self,
         only_new: Option<bool>,
         py: Python,
-    ) -> PyResult<Vec<(String, PyObject)>> {
+    ) -> PyResult<Vec<(String, Py<PyAny>)>> {
         let mut results = Vec::new();
         for result in self.instance.results(only_new.unwrap_or(false)) {
             results.push((
@@ -220,7 +220,7 @@ impl Walk {
         }
         self.instance.join();
         match ty {
-            Some(ty) => Python::with_gil(|py| ty.eq(py.get_type::<PyValueError>())),
+            Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
         }
     }
@@ -235,7 +235,7 @@ impl Walk {
         Ok(slf)
     }
 
-    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+    fn __next__(&mut self, py: Python) -> PyResult<Option<Py<PyAny>>> {
         loop {
             if let Some((root_dir, toc)) = self.entries.get(self.idx) {
                 self.idx += 1;

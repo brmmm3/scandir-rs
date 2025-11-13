@@ -201,6 +201,7 @@ pub fn filter_dir(
 }
 
 #[inline]
+#[allow(clippy::type_complexity)]
 pub fn filter_children(
     children: &mut Vec<
         Result<jwalk_meta::DirEntry<((), Option<Result<Metadata, Error>>)>, jwalk_meta::Error>,

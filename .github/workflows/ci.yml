@@ -1,134 +1,341 @@
-on: [push, pull_request]
+name: CI
 
-name: Continuous Integration
+permissions: { }
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+    paths-ignore:
+      - "README.md"
+  pull_request:
+    paths-ignore:
+      - "README.md"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 jobs:
-
-  check:
-    name: Check
+  cargo-fmt:
+    name: "cargo fmt"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-      - uses: actions-rs/cargo@v1
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master # zizmor: ignore[unpinned-uses]
         with:
-          command: check
+          toolchain: stable
+          components: rustfmt
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+        with:
+          lookup-only: true
+      - run: cargo fmt --all --check
 
-  clippy_check:
+  cargo-clippy:
+    name: "cargo clippy"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          toolchain: nightly
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master # zizmor: ignore[unpinned-uses]
+        with:
+          toolchain: stable
           components: clippy
-          override: true
-      - uses: actions-rs/clippy-check@v1
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features --all-targets -- -A clippy::unnecessary_wraps
+          lookup-only: true
+      - run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::style -D clippy::perf
 
-  test:
-    name: Run cargo test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  tests:
+    name: "tests (python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     strategy:
-      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-14]
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.13t"
+          - "3.14"
+          - "3.14t"
+          - "pypy3.11"
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
+        with:
+          enable-cache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+      - name: "Create and activate .venv"
+        shell: bash
+        run: |
+          uv venv .venv --python ${{ matrix.python-version }}
+          echo ".venv/bin" >> "$GITHUB_PATH"
+          echo "PYO3_PYTHON=.venv/bin/python3" >> "$GITHUB_ENV"
+      - name: "Install dependencies"
+        run: |
+          uv pip install --group dev
+      - name: "Run zizmor"
+        run: |
+          zizmor .github/
+      - name: "Run maturin (--release)"
+        run: |
+          rustc --version --verbose
+          maturin build --release
+          uv pip install target/wheels/*.whl
+      - name: "Run Ruff"
+        run: |
+          ruff check
+      - name: "Run typos"
+        run: |
+          typos --config _typos.toml
+      - name: "Run rumdl"
+        run: |
+          rumdl check .
+      - name: "Run pytest"
+        run: |
+          pytest tests/
+
+  linux:
+    name: "linux (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
+    needs: [ tests, cargo-fmt, cargo-clippy ]
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - {
+            runner: ubuntu-latest,
+            target: x86_64,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            maturin-args: "--release --out dist"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: x86,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            maturin-args: "--release --out dist"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: aarch64,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            maturin-args: "--release --out dist --zig"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: armv7,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            maturin-args: "--release --out dist --no-default-features"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: s390x,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            maturin-args: "--release --out dist --no-default-features"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: ppc64le,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            maturin-args: "--release --out dist --no-default-features"
+          }
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: 3.x
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        with:
+          target: ${{ matrix.platform.target }}
+          args: ${{ matrix.platform.maturin-args }} --interpreter ${{ matrix.platform.interpreter }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+          manylinux: auto
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: wheels-linux-${{ matrix.platform.target }}
+          path: dist
+
+  musllinux:
+    name: "musllinux (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
+    needs: [ tests, cargo-fmt, cargo-clippy ]
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - {
+            runner: ubuntu-latest,
+            target: x86_64,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: x86,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: aarch64,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+          }
+          - {
+            runner: ubuntu-latest,
+            target: armv7,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+          }
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-      - name: cargo-test
-        run: |
-          cd scandir
-          cargo test
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: 3.x
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --interpreter ${{ matrix.platform.interpreter }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+          manylinux: musllinux_1_2
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: wheels-musllinux-${{ matrix.platform.target }}
+          path: dist
 
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  windows:
+    name: "windows (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
+    needs: [ tests, cargo-fmt, cargo-clippy ]
+    runs-on: ${{ matrix.platform.runner }}
     strategy:
-      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-14]
-
-    env:
-      CIBW_BUILD_VERBOSITY: 1
-      CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y && yum install -y openssl-devel"
-      CIBW_SKIP: "cp36-* cp37-* pp* *-win32 *-pypy* *-musllinux*"
-      CIBW_TEST_SKIP: "cp38-macosx_*:arm64"
-      # Build separate wheels for macOS's different architectures.
-      CIBW_ARCHS_MACOS: "arm64"
-      # Build only on Linux architectures that don't need qemu emulation.
-      CIBW_ARCHS_LINUX: "x86_64"
-      # Run the test suite after each build.
-      CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
-      CIBW_TEST_REQUIRES: "pytest"
-      CIBW_TEST_COMMAND: pytest {package}/tests
-
+        platform:
+          - {
+            runner: windows-latest,
+            target: x64,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+          }
+          - {
+            runner: windows-latest,
+            target: x86,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t"
+          }
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-
-      - if: runner.os == 'Windows'
-        run: |
-            echo 'PATH=/c/Python38:/c/Python38/Scripts:$PATH' >> $GITHUB_ENV
-            echo 'RUSTFLAGS=-Ctarget-feature=+crt-static' >> $GITHUB_ENV
-            echo 'RUSTFLAGS=-Ctarget-feature=+crt-static' >> $GITHUB_ENV
-            echo 'CIBW_BEFORE_BUILD=python -m pip install --upgrade pip' >> $GITHUB_ENV
-
-      - if: runner.os != 'Linux'
-        name: Setup env when not using docker
-        run: |
-          python -m pip install --upgrade wheel setuptools setuptools-rust
-
-      - uses: PyO3/maturin-action@v1
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
-          working-directory: ./pyscandir
-          command: build
-          args: --release
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+          python-version: 3.x
+          architecture: ${{ matrix.platform.target }}
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          python-version: "3.x"
-          cache: pip
-          cache-dependency-path: ".github/workflows/wheels.yml"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install cibuildwheel
-          python -m pip install -U twine
-
-      - name: Build wheels
-        run: |
-          cd pyscandir
-          maturin build --sdist --interpreter
-          python -m cibuildwheel --output-dir wheelhouse
-
-      - name: Upload as build artifacts
-        uses: actions/upload-artifact@v3
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --interpreter ${{ matrix.platform.interpreter }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: wheels
-          path: target/wheels/*.whl
-          if-no-files-found: error
+          name: wheels-windows-${{ matrix.platform.target }}
+          path: dist
 
-      - name: Publish package to TestPyPI
+  macos:
+    name: "macos (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
+    needs: [ tests, cargo-fmt, cargo-clippy ]
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - {
+            runner: macos-latest,
+            target: x86_64,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+          }
+          - {
+            runner: macos-latest,
+            target: aarch64,
+            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+          }
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: 3.x
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --interpreter ${{ matrix.platform.interpreter }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: wheels-macos-${{ matrix.platform.target }}
+          path: dist
+
+  build-sdist:
+    name: "build sdist"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: "Build sdist"
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        with:
+          command: sdist
+          args: --out dist
+          rust-toolchain: stable
+      - name: "Upload sdist"
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: wheels-sdist
+          path: dist
+
+  release:
+    name: "Release"
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    needs: [ linux, musllinux, windows, macos, build-sdist, tests, cargo-clippy, cargo-fmt ]
+    permissions:
+      # Use to sign the release artifacts
+      id-token: write
+      # Used to upload release artifacts
+      contents: write
+      # Used to generate artifact attestation
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      - name: "Generate artifact attestation"
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-path: "wheels-*/*"
+      - name: "Publish to PyPI"
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
-        run: |
-          twine upload --repository-url https://test.pypi.org/legacy/ --skip-existing target/wheels/*
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        with:
+          command: upload
+          args: --non-interactive --skip-existing wheels-*/*

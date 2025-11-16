@@ -89,6 +89,8 @@ jobs:
       - name: "Install dependencies"
         run: |
           uv pip install --group dev
+        with:
+          working-directory: pyscandir
       - name: "Run zizmor"
         run: |
           zizmor .github/
@@ -97,6 +99,8 @@ jobs:
           rustc --version --verbose
           maturin build --release
           uv pip install target/wheels/*.whl
+        with:
+          working-directory: pyscandir
       - name: "Run Ruff"
         run: |
           ruff check
@@ -109,6 +113,8 @@ jobs:
       - name: "Run pytest"
         run: |
           pytest tests/
+        with:
+          working-directory: pyscandir
 
   linux:
     name: "linux (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"

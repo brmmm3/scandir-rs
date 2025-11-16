@@ -3,7 +3,7 @@ use std::{path::Path, time::Duration};
 #[cfg(windows)]
 use std::path::PathBuf;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 fn create_test_data() -> String {
     let temp_dir;

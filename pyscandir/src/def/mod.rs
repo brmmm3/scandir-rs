@@ -17,6 +17,7 @@ pub enum ReturnType {
 }
 
 impl ReturnType {
+    #[allow(clippy::wrong_self_convention)]
     pub fn from_object(&self) -> ::scandir::ReturnType {
         match &self {
             ReturnType::Base => ::scandir::ReturnType::Base,

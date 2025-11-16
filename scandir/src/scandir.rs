@@ -182,6 +182,7 @@ fn entries_thread(
                 return;
             }
             filter_children(children, &filter, root_path_len);
+            #[allow(clippy::needless_return)]
             children.iter_mut().for_each(|dir_entry_result| {
                 if let Ok(dir_entry) = dir_entry_result
                     && tx

@@ -11,7 +11,7 @@ use std::time::Duration;
 #[cfg(windows)]
 use std::path::PathBuf;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 #[cfg(unix)]
 #[derive(Debug, Clone)]

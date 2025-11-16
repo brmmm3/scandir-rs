@@ -88,19 +88,17 @@ jobs:
           echo "PYO3_PYTHON=.venv/bin/python3" >> "$GITHUB_ENV"
       - name: "Install dependencies"
         run: |
+          cd pyscandir
           uv pip install --group dev
-        with:
-          working-directory: pyscandir
       - name: "Run zizmor"
         run: |
           zizmor .github/
       - name: "Run maturin (--release)"
         run: |
+          cd pyscandir
           rustc --version --verbose
           maturin build --release
           uv pip install target/wheels/*.whl
-        with:
-          working-directory: pyscandir
       - name: "Run Ruff"
         run: |
           ruff check
@@ -112,9 +110,8 @@ jobs:
           rumdl check .
       - name: "Run pytest"
         run: |
+          cd pyscandir
           pytest tests/
-        with:
-          working-directory: pyscandir
 
   linux:
     name: "linux (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"

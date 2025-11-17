@@ -47,7 +47,7 @@ def CreateTestData():
         if userDnsDomain and userDnsDomain.endswith("SCH.COM"):
             proxies = {
                 "http": "http://127.0.0.1:3129",
-                "http": "https://127.0.0.1:3129",
+                "https": "http://127.0.0.1:3129",
             }
         r = requests.get(
             "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.9.tar.gz",

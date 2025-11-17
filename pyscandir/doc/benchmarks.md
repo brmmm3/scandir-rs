@@ -35,7 +35,7 @@ results to os.walk.
 Walk.iter **~3.3 times faster** than os.walk.  
 Walk(Ext).iter **~12.1 times faster** than os.walk(Ext).
 
-![](images/linux_walk_linux-5.9.png)
+![Linux Walk Linux 5 image](images/linux_walk_linux-5.9.png)
 
 #### Scandir
 
@@ -50,7 +50,7 @@ Walk(Ext).iter **~12.1 times faster** than os.walk(Ext).
 Scandir.iter **~5.5 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **~4.1 times faster** than scantree(os.scandir).
 
-![](images/linux_scandir_linux-5.9.png)
+![Linux Scandir Linux 5 image](images/linux_scandir_linux-5.9.png)
 
 ### Directory /usr with
 
@@ -83,7 +83,7 @@ Scandir(Ext).iter **~4.1 times faster** than scantree(os.scandir).
 Walk.iter **~4.9 times faster** than os.walk.  
 Walk(Ext).iter **~13.0 times faster** than os.walk(Ext).
 
-![](images/linux_walk_usr.png)
+![Linux Walk Usr image](images/linux_walk_usr.png)
 
 #### Scandir
 
@@ -98,9 +98,9 @@ Walk(Ext).iter **~13.0 times faster** than os.walk(Ext).
 Scandir.iter **~6.5 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **~4.7 times faster** than scantree(os.scandir).
 
-![](images/linux_scandir_usr.png)
+![Linux Scandir Usr image](images/linux_scandir_usr.png)
 
-## Windows 10 with Laptop Core i7-11850H @ 2.5GHz (8/16 cores) and Samsung MZVLB1T0HBLR-000H1 (NVME, NTFS)
+## Windows 10 with Laptop Core i7-11850H @ 2.5GHz (8/16 cores) and Samsung MZVLB1T0HBLR-000H1 (NTFS)
 
 ### Directory linux-5.9 with
 
@@ -129,7 +129,7 @@ Scandir(Ext).iter **~4.7 times faster** than scantree(os.scandir).
 Walk.iter **~8.4 times faster** than os.walk.  
 Walk(Ext).iter **~69.8 times faster** than os.walk(Ext).
 
-![](images/windows_walk_linux-5.9.png)
+![Windows Walk Linux 5 image](images/windows_walk_linux-5.9.png)
 
 #### Scandir
 
@@ -144,7 +144,7 @@ Walk(Ext).iter **~69.8 times faster** than os.walk(Ext).
 Scandir.iter **~6.5 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **slower** than scantree(os.scandir). **TODO:** Needs investigation why.
 
-![](images/windows_scandir_linux-5.9.png)
+![Windows Scandir Linux 5 image](images/windows_scandir_linux-5.9.png)
 
 ### Directory C:\Windows with
 
@@ -174,7 +174,7 @@ Scandir(Ext).iter **slower** than scantree(os.scandir). **TODO:** Needs investig
 Walk.iter **~8.5 times faster** than os.walk.  
 Walk(Ext).iter **~20.1 times faster** than os.walk(Ext).
 
-![](images/windows_walk_windows.png)
+![Windows Walk Windows image](images/windows_walk_windows.png)
 
 #### Scandir
 
@@ -189,4 +189,4 @@ Walk(Ext).iter **~20.1 times faster** than os.walk(Ext).
 Scandir.iter **~5.8 times faster** than scantree(os.scandir).  
 Scandir(Ext).iter **~1.8 times faster** than scantree(os.scandir).
 
-![](images/windows_scandir_windows.png)
+![Windows Scandir Windows image](images/windows_scandir_windows.png)

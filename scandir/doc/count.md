@@ -2,7 +2,8 @@
 
 ## Statistics
 
-The `Statistics` class is the return value of class methods `results` and `collect` of class `Count`.
+The `Statistics` class is the return value of class methods `results` and `collect`
+of class `Count`.
 
 ### `Statistics` has following class members
 
@@ -19,7 +20,8 @@ The `Statistics` class is the return value of class methods `results` and `colle
 
 ## `Count::new<P: AsRef<Path>>(root_path: P) -> Result<Self, Error>`
 
-Creates a class instance for calculating statistics. The class instance initially does nothing. To start the scan either the method `start` or the method `collect` has to be called.
+Creates a class instance for calculating statistics. The class instance initially does nothing.
+To start the scan either the method `start` or the method `collect` has to be called.
 
 ### Class members
 
@@ -39,7 +41,9 @@ For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct
 ### Return types
 
 - `ReturnType::Base` calculate statistics for `dirs`, `files`, `slinks`, `size` and `usage`.
-- `ReturnType::Ext` in addition to above calculate statistcs `hlinks` and on Unix platforms `devices` and `pipes`.
+- `ReturnType::Ext` in addition to above calculate statistcs `hlinks` and on Unix platforms
+
+ `devices` and `pipes`.
 
 ### `skip_hidden(mut self, skip_hidden: bool) -> Self`
 
@@ -107,11 +111,13 @@ Return a `Statistics` object with the current statistics.
 
 ### `has_errors(&mut self) -> bool`
 
-Returns `true` if errors occured while scanning the directory tree. The errors can be found in the statistics object.
+Returns `true` if errors occured while scanning the directory tree. The errors can be found
+ in the statistics object.
 
 ### `duration(&mut self) -> f64`
 
-Returns the duration of the task in seconds as float. As long as the task is running it will return 0.
+Returns the duration of the task in seconds as float. As long as the task is running it will
+return 0.
 
 ### `finished(&self) -> bool`
 

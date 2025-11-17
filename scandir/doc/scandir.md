@@ -39,7 +39,9 @@ Is an enum which can be:
 
 ## `Scandir::new<P: AsRef<Path>>(root_path: P, store: Option<bool>) -> Result<Self, Error>`
 
-Creates a class instance for getting the metadata of the entries of a file tree. The class instance initially does nothing. To start the scan either the method `start` or the method `collect` has to be called.
+Creates a class instance for getting the metadata of the entries of a file tree.
+The class instance initially does nothing. To start the scan either the method `start`
+or the method `collect` has to be called.
 
 ### Class members
 
@@ -187,7 +189,8 @@ Returns the statistics of the results.
 
 ### `duration(&mut self) -> f64`
 
-Returns the duration of the task in seconds as float. As long as the task is running it will return 0.
+Returns the duration of the task in seconds as float. As long as the task is running it will
+return 0.
 
 ### `finished(&self) -> bool`
 

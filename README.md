@@ -14,7 +14,7 @@ The higher performance is achieved through parallelizing the file system access 
 
 **Note:** `scandir_rs` uses libc 2.34, which is currently not supported by the manylinux releases.
  So it is not possible to upload prebuilt Linux wheels to PyPI. As a workaround you can download
- the Linux wheels from [here](https://github.com/brmmm3/scandir-rs/releases/tag/2.7.0).
+ the Linux wheels from [github](https://github.com/brmmm3/scandir-rs/releases/tag/2.7.0).
 
 **Note:** Since 2.8.0 `skip_hidden` is now `false` by default!
 

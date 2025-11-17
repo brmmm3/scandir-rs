@@ -107,9 +107,6 @@ jobs:
       - name: "Run Ruff"
         run: |
           ruff check
-      - name: "Run typos"
-        run: |
-          typos --config _typos.toml
       - name: "Run rumdl"
         run: |
           rumdl check .

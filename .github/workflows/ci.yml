@@ -99,13 +99,11 @@ jobs:
         run: |
           zizmor .github/
       - name: "Run maturin (--release)"
-        env:
-          MATURIN_PYPI_INTERPRETER: python
         run: |
           cd pyscandir
           rustc --version --verbose
-          uvx maturin==1.10.1 build --release
-          maturin build --release
+          uvx maturin==1.10.1 build --release --interpreter=python
+          maturin build --release --interpreter=python
           uv pip install target/wheels/*.whl
       - name: "Run Ruff"
         run: |

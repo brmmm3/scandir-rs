@@ -65,9 +65,7 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
-          - "3.13t"
           - "3.14"
-          - "3.14t"
           - "pypy3.11"
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -245,7 +243,7 @@ jobs:
           - {
             runner: windows-latest,
             target: x86,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t"
+            interpreter: "3.10 3.11 3.12 3.13 3.14"
           }
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0

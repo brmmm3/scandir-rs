@@ -3,8 +3,6 @@
 import os
 import tempfile
 
-import pytest
-
 
 def CreateTempFileTree(dircnt: int, depth: int, filecnt: int):
     print(

@@ -103,7 +103,6 @@ jobs:
           cd pyscandir
           rustc --version --verbose
           uvx maturin==1.10.1 build --release --interpreter=python
-          maturin build --release --interpreter=python
           uv pip install target/wheels/*.whl
       - name: "Run Ruff"
         run: |

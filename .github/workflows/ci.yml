@@ -113,8 +113,7 @@ jobs:
       - name: "Run pytest"
         run: |
           cd pyscandir
-          uv pip install pytest
-          pytest tests/
+          uv run pytest tests/
 
   linux:
     name: "linux (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"

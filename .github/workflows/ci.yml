@@ -81,7 +81,7 @@ jobs:
         with:
           enable-cache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
       - name: Install Rust toolchain (nightly)
-        uses: dtolnay/rust-toolchain@9b6bc4da7230e4243c1c9a98e0e2a5da81de7c92
+        uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331
         with:
           toolchain: nightly
           components: rustfmt, clippy

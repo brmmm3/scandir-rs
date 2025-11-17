@@ -46,8 +46,7 @@ pytest = ">=9.0.1"
 [dependency-groups]
 dev = [
     "pytest == 9.0.1",
-    "dirty-equals == 0.10.0",
-    "maturin == 1.10.1",
+    "dirty-equals == 0.11",
     "ruff == 0.14.4",
     "zizmor == 1.16.3",
     "typos == 1.39.0",

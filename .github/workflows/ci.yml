@@ -5,7 +5,7 @@ permissions: { }
 on:
   push:
     branches:
-      - main
+      - master
     tags:
       - "*"
     paths-ignore:
@@ -97,6 +97,7 @@ jobs:
         run: |
           cd pyscandir
           rustc --version --verbose
+          uv pip install maturin==1.10.1
           maturin build --release
           uv pip install target/wheels/*.whl
       - name: "Run Ruff"

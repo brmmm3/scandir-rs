@@ -99,6 +99,8 @@ jobs:
         run: |
           zizmor .github/
       - name: "Run maturin (--release)"
+        env:
+          MATURIN_PYPI_INTERPRETER: python
         run: |
           cd pyscandir
           rustc --version --verbose

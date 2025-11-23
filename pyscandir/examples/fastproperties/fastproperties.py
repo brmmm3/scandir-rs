@@ -206,7 +206,7 @@ class FastProperties(Tk):
     def _delete_window(self):
         try:
             self.destroy()
-        except:
+        except Exception:
             pass
 
     def _destroy(self, _):

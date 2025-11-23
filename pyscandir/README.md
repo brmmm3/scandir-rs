@@ -1,7 +1,11 @@
 # scandir-rs
 
-The Python module is called `scandir_rs` and installable via `pip`. It is an alternative to `os.walk()` and `os.scandir()` with more features and higher speed. On Linux it is **3 - 11 times faster** and on Windows **6 - 70 time faster** (see [benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/doc/benchmarks.md)).  
-It releases the GIL and the scanning is done in a background thread. With different methods intermediate results can be read.
+The Python module is called `scandir_rs` and installable via `pip`. It is an alternative to
+`os.walk()` and `os.scandir()` with more features and higher speed. On Linux it is
+**3 - 11 times faster** and on Windows **6 - 70 time faster**
+(see [benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/doc/benchmarks.md)).  
+It releases the GIL and the scanning is done in a background thread.
+With different methods intermediate results can be read.
 
 If you are just interested in directory statistics you can use the `Count`.
 
@@ -47,8 +51,10 @@ maturin build --release --strip --no-sdist
 
 ``maturin`` will build the wheels for all Python versions installed on your system.
 
-Alternatively you can use the build script `build_wheels.py`. The precondition to run this script is to have `pyenv` installed.
-The script can build the wheel for specific Python versions or for all Python versions installed by `pyenv`.
+Alternatively you can use the build script `build_wheels.py`.
+The precondition to run this script is to have `pyenv` installed.
+The script can build the wheel for specific Python versions or for all Python versions installed
+by `pyenv`.
 In addition it runs ``pytest`` after successfull creation of each wheel.
 
 ```sh
@@ -56,7 +62,8 @@ python build_wheels.py
 ```
 
 By default the script will build the wheel for the current Python interpreter.
-If you want to build the wheel for specific Python version(s) by providing the argument `--versions`.
+If you want to build the wheel for specific Python version(s) by providing the
+argument `--versions`.
 
 ```sh
 python build_wheels.py --versions 3.11.8,3.12.2
@@ -68,7 +75,7 @@ To build the wheel for all installed Python versions:
 python build_wheels.py --versions *
 ```
 
-Instruction how to install ``pyenv`` can be found [here](https://github.com/pyenv/pyenv).
+Instruction how to install ``pyenv`` can be found on [github](https://github.com/pyenv/pyenv).
 
 ## Examples
 

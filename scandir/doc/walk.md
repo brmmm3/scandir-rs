@@ -14,7 +14,8 @@ The `Toc` class is the return value of class method `results` and `collect` of c
 
 ## `Walk::new<P: AsRef<Path>>(root_path: P, store: Option<bool>) -> Result<Self, Error>`
 
-Creates a class instance for getting the file tree. The class instance initially does nothing. To start the scan either the method `start` or the method `collect` has to be called.
+Creates a class instance for getting the file tree. The class instance initially does nothing.
+To start the scan either the method `start` or the method `collect` has to be called.
 
 ### Class members
 
@@ -38,7 +39,8 @@ For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct
 - `ReturnType::Ext` return additional data: `symlinks`, `other` and `errors`.
 
 **Please note:**
-> Due to limitations of jwalk the returned errors just contain the error message without any information to which files the errors correspond to.
+> Due to limitations of jwalk the returned errors just contain the error message without
+ any information to which files the errors correspond to.
 
 ### `sorted(mut self, sorted: bool) -> Self`
 
@@ -117,7 +119,8 @@ If `only_new` is `false` this method returns total results,
 
 ### `has_errors(&mut self) -> bool`
 
-Returns `true` if errors occured while scanning the directory tree. The errors can be found in the statistics object.
+Returns `true` if errors occured while scanning the directory tree. The errors can be found
+ in the statistics object.
 
 ### `errors_cnt(&mut self) -> usize`
 
@@ -144,11 +147,13 @@ For this method the feature `json` needs to be enabled.
 
 ### `statistics(&self) -> Statistics`
 
-Returns the statistics of the results. Please note that file types `other` are counted in member `devices`.
+Returns the statistics of the results. Please note that file types `other` are
+counted in member `devices`.
 
 ### `duration(&mut self) -> f64`
 
-Returns the duration of the task in seconds as float. As long as the task is running it will return 0.
+Returns the duration of the task in seconds as float. As long as the task is running it will
+return 0.
 
 ### `finished(&self) -> bool`
 

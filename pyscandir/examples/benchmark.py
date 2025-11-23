@@ -20,7 +20,7 @@ def scantree(path):
                 yield from scantree(entry.path)
             else:
                 yield entry
-    except:
+    except Exception:
         return
 
 
@@ -106,7 +106,7 @@ size = 0
 for entry in scantree(os.path.expanduser(dirName)):
     try:
         st = entry.stat()
-    except:
+    except Exception:
         continue
     if entry.is_dir():
         dirs += 1

@@ -2,7 +2,8 @@
 
 Benchmarking code see [benches/benchmark.rs](../benches/benchmark.rs)
 
-**(Ext)** means reading extended metadata to be able to identify hardlinks and special file types, like pipes, devices.
+**(Ext)** means reading extended metadata to be able to identify hardlinks and special file types,
+like pipes, devices.
 
 ## Linux with Tower Ryzen 5 2400G @ 3.6GHz (4/8 cores) and Samsung SSD 960 EVO 250GB (NVME, EXT4)
 
@@ -93,7 +94,7 @@ Scandir.collect(Ext) **~3.1 times faster** than scan_dir.ScanDir(Ext).
 
 ![images/linux_scandir_usr.png](images/linux_scandir_usr.png)
 
-## Windows 10 with Laptop Core i7-11850H @ 2.5GHz (8/16 cores) and Samsung MZVLB1T0HBLR-000H1 (NVME, NTFS)
+## Windows 10, Laptop Core i7-11850H @ 2.5GHz (8/16 cores), Samsung MZVLB1T0HBLR-000H1 (NVME, NTFS)
 
 ### Directory linux-5.9 with
 

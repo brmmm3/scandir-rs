@@ -51,7 +51,7 @@ fn test_scandir_skip_hidden() -> Result<(), Error> {
     assert_eq!(0, entries.errors.len());
     match entries.results.first().unwrap() {
         ScandirResult::DirEntry(d) => {
-            assert!(vec!["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
+            assert!(["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
@@ -81,7 +81,7 @@ fn test_scandir_extended() -> Result<(), Error> {
     assert_eq!(0, entries.errors.len());
     match entries.results.first().unwrap() {
         ScandirResult::DirEntryExt(d) => {
-            assert!(vec!["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
+            assert!(["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096

@@ -157,7 +157,7 @@ fn benchmarks(c: &mut Criterion) {
     let path = "/usr";
     #[cfg(windows)]
     let path = "C:/Windows";
-    benchmark_dir(c, &path);
+    benchmark_dir(c, path);
 }
 
 criterion_group!(benches, benchmarks);

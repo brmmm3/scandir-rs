@@ -2,7 +2,8 @@
 
 ## `Statistics`
 
-The `Statistics` class is the return value of class methods `results` and `collect` of class `Count`.
+The `Statistics` class is the return value of class methods `results` and `collect`
+of class `Count`.
 
 ### `Statistics` has following class members
 
@@ -17,9 +18,25 @@ The `Statistics` class is the return value of class methods `results` and `colle
 - `errors` list of access errors (list of strings).
 - `duration` time taken for scanning (in seconds as a float).
 
-## `Count(root_path: str, skip_hidden: bool = False, max_depth: int = 0, max_file_cnt: int = 0, dir_include: List[str] = None, dir_exclude: List[str] = None, file_include: List[str] = None, file_exclude: List[str] = None, case_sensitive: bool = False, return_type: ReturnType = ReturnType.Base)`
+## `Count()`
 
-Creates a class instance for calculating statistics. The class instance initially does nothing. To start the scan either the method `start`  or the method `collect` has to be called or a context has to be created (`with Count(...) as instance:`). When the context is closed the background thread is stopped.
+    def Count(
+    root_path: str,
+    skip_hidden: bool = False,
+    max_depth: int = 0,
+    max_file_cnt: int = 0,
+    dir_include: List[str] | None = None,
+    dir_exclude: List[str] | None = None,
+    file_include: List[str] | None = None,
+    file_exclude: List[str] | None = None,
+    case_sensitive: bool = False,
+    return_type: ReturnType = ReturnType.Base,
+    )
+
+Creates a class instance for calculating statistics. The class instance initially does nothing.
+To start the scan either the method `start`  or the method `collect` has to be called or a
+context has to be created (`with Count(...) as instance:`). When the context is closed the
+background thread is stopped.
 
 ### Parameters
 
@@ -40,20 +57,23 @@ For valid file patterns see module [glob](https://docs.rs/glob/0.3.0/glob/struct
 ### Return types
 
 - `ReturnType.Base` calculate statistcs for `dirs`, `files`, `slinks`, `size` and `usage`.
-- `ReturnType.Ext` in addition to above calculate statistcs `hlinks` and on Unix platforms `devices` and `pipes`.
+- `ReturnType.Ext` in addition to above calculate statistcs `hlinks` and on Unix platforms
+`devices` and `pipes`.
 
 ### Example usage of the context manager
 
 ``python
 import scandir_rs as scandir
 
-with scandir.Count("~/workspace", extended=True)) as instance:
+with scandir.Count("~/workspace", extended=True) as instance:
     while instance.busy():
         statistics = instance.results()
-        # Do something
+
+## Do something
+
 ``
 
-### `clear()`
+## `clear()`
 
 Clear all results.
 
@@ -71,7 +91,8 @@ Stop parsing task.
 
 ### `collect() -> Statistics`
 
-Calculate statistics and return a `Statistics` object when the task has finished. This method is blocking and releases the GIL.
+Calculate statistics and return a `Statistics` object when the task has finished.
+This method is blocking and releases the GIL.
 
 ### `has_results() -> bool`
 
@@ -83,11 +104,13 @@ Return a `Statistics` object with the current statistics.
 
 ### `has_errors() -> bool`
 
-Returns `True` if errors occured while scanning the directory tree. The errors can be found in the statistics object.
+Returns `True` if errors occured while scanning the directory tree. The errors can be found
+in the statistics object.
 
 ### `duration -> float`
 
-Returns the duration of the task in seconds as float. As long as the task is running it will return 0.
+Returns the duration of the task in seconds as float. As long as the task is running it will
+return 0.
 
 ### `finished -> bool`
 

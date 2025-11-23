@@ -5,7 +5,7 @@ permissions: { }
 on:
   push:
     branches:
-      - main
+      - master
     tags:
       - "*"
     paths-ignore:
@@ -28,9 +28,9 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@master # zizmor: ignore[unpinned-uses]
+      - uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331 # zizmor: ignore[unpinned-uses]
         with:
-          toolchain: stable
+          toolchain: nightly
           components: rustfmt
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
@@ -45,9 +45,9 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@master # zizmor: ignore[unpinned-uses]
+      - uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331 # zizmor: ignore[unpinned-uses]
         with:
-          toolchain: stable
+          toolchain: nightly
           components: clippy
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
@@ -65,9 +65,7 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
-          - "3.13t"
           - "3.14"
-          - "3.14t"
           - "pypy3.11"
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -80,6 +78,11 @@ jobs:
         uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
         with:
           enable-cache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+      - name: Install Rust toolchain (nightly)
+        uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331
+        with:
+          toolchain: nightly
+          components: rustfmt, clippy
       - name: "Create and activate .venv"
         shell: bash
         run: |
@@ -88,27 +91,27 @@ jobs:
           echo "PYO3_PYTHON=.venv/bin/python3" >> "$GITHUB_ENV"
       - name: "Install dependencies"
         run: |
+          cd pyscandir
           uv pip install --group dev
       - name: "Run zizmor"
         run: |
           zizmor .github/
       - name: "Run maturin (--release)"
         run: |
+          cd pyscandir
           rustc --version --verbose
-          maturin build --release
+          uvx maturin==1.10.1 build --release --interpreter=python --out target/wheels
           uv pip install target/wheels/*.whl
       - name: "Run Ruff"
         run: |
           ruff check
-      - name: "Run typos"
-        run: |
-          typos --config _typos.toml
       - name: "Run rumdl"
         run: |
           rumdl check .
       - name: "Run pytest"
         run: |
-          pytest tests/
+          cd pyscandir
+          uv run pytest tests/
 
   linux:
     name: "linux (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
@@ -120,38 +123,38 @@ jobs:
           - {
             runner: ubuntu-latest,
             target: x86_64,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11",
             maturin-args: "--release --out dist"
           }
           - {
             runner: ubuntu-latest,
             target: x86,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11",
             maturin-args: "--release --out dist"
           }
           - {
             runner: ubuntu-latest,
             target: aarch64,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11",
             maturin-args: "--release --out dist --zig"
           }
           - {
             runner: ubuntu-latest,
             target: armv7,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
-            maturin-args: "--release --out dist --no-default-features"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11",
+            maturin-args: "--release --out dist"
           }
           - {
             runner: ubuntu-latest,
             target: s390x,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
-            maturin-args: "--release --out dist --no-default-features"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11",
+            maturin-args: "--release --out dist"
           }
           - {
             runner: ubuntu-latest,
             target: ppc64le,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11",
-            maturin-args: "--release --out dist --no-default-features"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11",
+            maturin-args: "--release --out dist"
           }
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -160,18 +163,29 @@ jobs:
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: 3.x
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331
+        with:
+          toolchain: nightly
+          components: rustc, cargo, rustfmt
+      - name: Enable sccache properly for nightly
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
+          rust-toolchain: nightly
           target: ${{ matrix.platform.target }}
           args: ${{ matrix.platform.maturin-args }} --interpreter ${{ matrix.platform.interpreter }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
           manylinux: auto
+          working-directory: pyscandir
       - name: "Upload wheels"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: wheels-linux-${{ matrix.platform.target }}
-          path: dist
+          path: pyscandir/dist/*.whl
 
   musllinux:
     name: "musllinux (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
@@ -183,22 +197,22 @@ jobs:
           - {
             runner: ubuntu-latest,
             target: x86_64,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
           }
           - {
             runner: ubuntu-latest,
             target: x86,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
           }
           - {
             runner: ubuntu-latest,
             target: aarch64,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
           }
           - {
             runner: ubuntu-latest,
             target: armv7,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
           }
 
     steps:
@@ -208,18 +222,29 @@ jobs:
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: 3.x
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331
+        with:
+          toolchain: nightly
+          components: rustc, cargo, rustfmt
+      - name: Enable sccache properly for nightly
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
+          rust-toolchain: nightly
           target: ${{ matrix.platform.target }}
           args: --release --out dist --interpreter ${{ matrix.platform.interpreter }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
           manylinux: musllinux_1_2
+          working-directory: pyscandir
       - name: "Upload wheels"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: wheels-musllinux-${{ matrix.platform.target }}
-          path: dist
+          path: pyscandir/dist/*.whl
 
   windows:
     name: "windows (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
@@ -231,12 +256,12 @@ jobs:
           - {
             runner: windows-latest,
             target: x64,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
           }
           - {
             runner: windows-latest,
             target: x86,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t"
+            interpreter: "3.10 3.11 3.12 3.13 3.14"
           }
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -246,17 +271,28 @@ jobs:
         with:
           python-version: 3.x
           architecture: ${{ matrix.platform.target }}
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331
+        with:
+          toolchain: nightly
+          components: rustc, cargo, rustfmt
+      - name: Enable sccache properly for nightly
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
+          rust-toolchain: nightly
           target: ${{ matrix.platform.target }}
           args: --release --out dist --interpreter ${{ matrix.platform.interpreter }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+          working-directory: pyscandir
       - name: "Upload wheels"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: wheels-windows-${{ matrix.platform.target }}
-          path: dist
+          path: pyscandir/dist/*.whl
 
   macos:
     name: "macos (${{ matrix.platform.runner }} / ${{ matrix.platform.target }})"
@@ -268,12 +304,12 @@ jobs:
           - {
             runner: macos-latest,
             target: x86_64,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
           }
           - {
             runner: macos-latest,
             target: aarch64,
-            interpreter: "3.10 3.11 3.12 3.13 3.13t 3.14 3.14t pypy3.11"
+            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
           }
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -282,17 +318,28 @@ jobs:
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: 3.x
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@0f44b27771c32bda9f458f75a1e241b09791b331
+        with:
+          toolchain: nightly
+          components: rustc, cargo, rustfmt
+      - name: Enable sccache properly for nightly
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
+          rust-toolchain: nightly
           target: ${{ matrix.platform.target }}
           args: --release --out dist --interpreter ${{ matrix.platform.interpreter }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
+          working-directory: pyscandir
       - name: "Upload wheels"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: wheels-macos-${{ matrix.platform.target }}
-          path: dist
+          path: pyscandir/dist/*.whl
 
   build-sdist:
     name: "build sdist"
@@ -306,12 +353,13 @@ jobs:
         with:
           command: sdist
           args: --out dist
-          rust-toolchain: stable
+          rust-toolchain: nightly
+          working-directory: pyscandir
       - name: "Upload sdist"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: wheels-sdist
-          path: dist
+          path: pyscandir/dist/*.tar.gz
 
   release:
     name: "Release"

@@ -1,6 +1,8 @@
 # scandir
 
-The Rust crate is called `scandir` and installable via `cargo`. On Linux it is **1.5 - 2.9 times faster** and on Windows **1.5 - 5.4 time faster** (see [benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)).
+The Rust crate is called `scandir` and installable via `cargo`. On Linux it is
+**1.5 - 2.9 times faster** and on Windows **1.5 - 5.4 time faster** (see
+[benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)).
 
 If you are just interested in directory statistics you can use the `Count`.
 
@@ -71,7 +73,8 @@ println!(Walk::new("/usr")?.collect()?);
 println!(Walk::new("/usr", return_type=ReturnType.Ext)?.collect()?);
 ```
 
-If you want to have intermediate results, e.g. you want to show the progress to the user, the use the example below.
+If you want to have intermediate results, e.g. you want to show the progress to the user,
+the use the example below.
 
 ```rust
 let mut instance = Walk::new(&path, None)?;
@@ -99,7 +102,8 @@ println!(Scandir::new("/usr")?.collect()?);
 println!(Scandir::new("/usr", return_type=ReturnType.Ext, None)?.collect()?);
 ```
 
-If you want to have intermediate results, e.g. you want to show the progress to the user, the use the example below.
+If you want to have intermediate results, e.g. you want to show the progress to the user,
+the use the example below.
 
 ```rust
 let mut instance = Scandir::new(&path, None)?;

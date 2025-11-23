@@ -37,11 +37,35 @@ Is an enum which can be:
 - `st_gid` groud id (only for Unix).
 - `st_rdev` device number (for character and block devices on Unix).
 
-## `Scandir(root_path: str, sorted: bool = False, skip_hidden: bool = False, metadata: bool = False, metadata_ext: bool = False, max_depth: int = 0, dir_include: list = None, dir_exclude: list = None, file_include: list = None, file_exclude: list = None, case_sensitive: bool = True, return_type: int = RETURN_TYPE_WALK, store: bool = true)`
+## `Scandir()`
 
-Creates a class object for more control when reading the directory contents. Useful when the iteration should be doine in background without blocking the application. The class instance initially does nothing. To start the scan either the method `start` has to be called or a context has to be created (`with ClassInstance:`). When the context is closed the background thread is stopped.
+```python
+def Scandir(
+    root_path: str,
+    sorted: bool = False,
+    skip_hidden: bool = False,
+    metadata: bool = False,
+    metadata_ext: bool = False,
+    max_depth: int = 0,
+    dir_include: list | None = None,
+    dir_exclude: list | None = None,
+    file_include: list | None = None,
+    file_exclude: list | None = None,
+    case_sensitive: bool = True,
+    return_type: int = RETURN_TYPE_WALK,
+    store: bool = True,
+)
+```
 
-The returned results are tuples with absolute path and `DirEntry`, `DirEntryExt` or `DirEntryFull` object, depending on the `return_type`. In case of an error an error string is returned.
+Creates a class object for more control when reading the directory contents.
+Useful when the iteration should be doine in background without blocking the application.
+The class instance initially does nothing. To start the scan either the method `start` has
+to be called or a context has to be created (`with ClassInstance:`).
+When the context is closed the background thread is stopped.
+
+The returned results are tuples with absolute path and `DirEntry`, `DirEntryExt` or
+`DirEntryFull` object, depending on the `return_type`. In case of an error an error string
+is returned.
 
 ### Parameters
 
@@ -85,50 +109,63 @@ Stop parsing task.
 
 ### `collect() -> Tuple[List[ScandirResult], List[Tuple[str, str]]]`
 
-Parse file tree and wait until parsing has finished. Method `start` will be called if not already done. This method returns the same as the `results` method. It is blocking and releases the GIL.
-`Error` contains a tuple with 2 strings. First string contains path to file. Second string is the error message.
+Parse file tree and wait until parsing has finished. Method `start` will be called if not
+already done. This method returns the same as the `results` method.
+It is blocking and releases the GIL.
+`Error` contains a tuple with 2 strings. First string contains path to file.
+Second string is the error message.
 
 ### `has_results(only_new: bool | None = True) -> bool`
 
-Returns `True` if new entries or errors are available and `only_new` is `True` (default) or in case `only_new` is `False` and any entries and errors have been collected since the start of the parse task.
+Returns `True` if new entries or errors are available and `only_new` is `True` (default) or
+in case `only_new` is `False` and any entries and errors have been collected since the start
+of the parse task.
 
 ### `results_cnt(only_new: bool | None = True) -> int`
 
-Returns the number of new entries and errors if `only_new` is `True` (default) or in case `only_new` is `False` the number of entries and errors since the start of the parse task.
+Returns the number of new entries and errors if `only_new` is `True` (default) or in case
+`only_new` is `False` the number of entries and errors since the start of the parse task.
 
 ### `results(only_new: bool | None = True) -> Tuple[List[ScandirResult], List[str, str]]`
 
 Returns entries and errors.
 
-If `only_new` is `True` (default) then return all results and errors collected so far else return only new results and errors.
+If `only_new` is `True` (default) then return all results and errors collected so far else return
+only new results and errors.
 
 ### `has_entries(only_new: bool | None = True) -> bool`
 
-Returns `True` if new entries are available and `only_new` is `True` (default) or in case `only_new` is `False` and any entries have been collected since the start of the parse task.
+Returns `True` if new entries are available and `only_new` is `True` (default) or in case
+`only_new` is `False` and any entries have been collected since the start of the parse task.
 
 ### `entries_cnt(only_new: bool | None = True) -> int`
 
-Returns the number of new entries if `only_new` is `True` (default) or in case `only_new` is `False` the number of entries since the start of the parse task.
+Returns the number of new entries if `only_new` is `True` (default) or in case `only_new`
+is `False` the number of entries since the start of the parse task.
 
 ### `entries(only_new: bool | None = True) -> List[Tuple[str, Toc]]`
 
 Returns entries.
 
-If `only_new` is `True` (default) then return all results and errors collected so far else return only new results and errors.
+If `only_new` is `True` (default) then return all results and errors collected so far else
+return only new results and errors.
 
 ### `has_errors() -> bool`
 
-Returns `True` if new errors are available and `only_new` is `True` (default) or in case `only_new` is `False` and any errors have been collected since the start of the parse task.
+Returns `True` if new errors are available and `only_new` is `True` (default) or in case
+`only_new` is `False` and any errors have been collected since the start of the parse task.
 
 ### `errors_cnt(only_new: bool | None = True) -> int`
 
-Returns the number of new errors if `only_new` is `True` (default) or in case `only_new` is `False` the number of errors since the start of the parse task.
+Returns the number of new errors if `only_new` is `True` (default) or in case `only_new`
+is `False` the number of errors since the start of the parse task.
 
 ### `errors(only_new: bool | None = True) -> List[Tuple[str, str]]`
 
 Returns errors.
 
-If `only_new` is `True` (default) then return all results and errors collected so far else return only new results and errors.
+If `only_new` is `True` (default) then return all results and errors collected so far else
+return only new results and errors.
 
 ### `duration -> float`
 
@@ -150,7 +187,8 @@ Returns the statistics for all currently collected results.
 
 Returns entries and errors as dictionary.
 
-If `only_new` is `True` then return all results collected so far else return only new results. Each result consists of root directory and `Toc`.
+If `only_new` is `True` then return all results collected so far else return only new results.
+Each result consists of root directory and `Toc`.
 
 ### `to_speedy() -> bytes`
 

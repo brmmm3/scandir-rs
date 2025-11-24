@@ -169,6 +169,7 @@ jobs:
           toolchain: nightly
           components: rustc, cargo, rustfmt
       - name: Enable sccache properly for nightly
+        if: "!startsWith(github.ref, 'refs/tags/')"
         run: |
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
           echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
@@ -228,6 +229,7 @@ jobs:
           toolchain: nightly
           components: rustc, cargo, rustfmt
       - name: Enable sccache properly for nightly
+        if: "!startsWith(github.ref, 'refs/tags/')"
         run: |
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
           echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
@@ -277,6 +279,7 @@ jobs:
           toolchain: nightly
           components: rustc, cargo, rustfmt
       - name: Enable sccache properly for nightly
+        if: "!startsWith(github.ref, 'refs/tags/')"
         run: |
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
           echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
@@ -324,6 +327,7 @@ jobs:
           toolchain: nightly
           components: rustc, cargo, rustfmt
       - name: Enable sccache properly for nightly
+        if: "!startsWith(github.ref, 'refs/tags/')"
         run: |
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
           echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV

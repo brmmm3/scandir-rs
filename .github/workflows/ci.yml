@@ -389,12 +389,12 @@ jobs:
       - name: "Generate artifact attestation"
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-path: "wheels-*/*"
+          subject-path: "artifacts/*"
       - name: Create/Release GitHub Release
         uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe # v2.4.2
         with:
           files: |
-            artifacts/**
+            artifacts/*
           draft: false
           prerelease: false
           generate_release_notes: true   # optional but nice

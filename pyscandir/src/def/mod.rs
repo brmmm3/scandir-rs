@@ -9,7 +9,7 @@ pub mod scandir;
 pub mod toc;
 pub use toc::Toc;
 
-#[pyclass(eq, eq_int)]
+#[pyclass(eq, eq_int, from_py_object)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReturnType {
     Base,

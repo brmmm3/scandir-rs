@@ -6,7 +6,7 @@ use pyo3::types::PyBytes;
 
 use super::DirEntryExt;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub struct ScandirResult(scandir::ScandirResult);
 

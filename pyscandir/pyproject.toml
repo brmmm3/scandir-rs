@@ -1,6 +1,6 @@
 [project]
 name = "scandir-rs"
-version = "2.9.5"
+version = "2.9.6"
 authors = [{ name = "Martin Bammer", email = "mrbm74@gmail.com" }]
 description = "A fast file tree scanner written in Rust"
 license = "MIT"
@@ -38,19 +38,19 @@ strip = true
 
 [tool.poetry.dependencies]
 python = '>=3.10'
-maturin = ">=1.10.1"
+maturin = ">=1.12.4"
 
 [tool.poetry.group.dev.dependencies]
-pytest = ">=9.0.1"
+pytest = ">=9.0.2"
 
 [dependency-groups]
 dev = [
-    "pytest == 9.0.1",
+    "pytest == 9.0.2",
     "dirty-equals == 0.11",
-    "ruff == 0.14.4",
-    "zizmor == 1.16.3",
-    "typos == 1.39.0",
-    "rumdl == 0.0.176",
+    "ruff == 0.15.2",
+    "zizmor == 1.22.0",
+    "typos == 1.43.5",
+    "rumdl == 0.1.29",
 ]
 bench = [
     "oyaml",
@@ -60,7 +60,7 @@ bench = [
     "polars == 1.35.2",
     "altair == 6.0.0",
     "py-cpuinfo == 9.0.0",
-    "vl-convert-python == 1.8.0",
+    "vl-convert-python == 1.9.0.post1",
 ]
 
 [project.urls]

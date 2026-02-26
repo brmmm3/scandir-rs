@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyDict;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub struct Toc(scandir::Toc);
 

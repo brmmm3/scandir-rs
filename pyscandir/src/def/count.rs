@@ -8,7 +8,7 @@ use pyo3::types::PyDict;
 #[cfg(feature = "speedy")]
 use speedy::Writable;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub struct Statistics(pub scandir::Statistics);
 

@@ -6,11 +6,11 @@ updates:
       interval: "weekly"
     target-branch: main
     cooldown:
-      default-days: 4
+      default-days: 7
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
     target-branch: main
     cooldown:
-      default-days: 4
+      default-days: 7

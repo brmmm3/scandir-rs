@@ -21,7 +21,7 @@ fn count_thread(
     filter: Option<Filter>,
     tx: Sender<Statistics>,
     stop: Arc<AtomicBool>,
-) {
+) -> Result<(), Error> {
     let mut statistics = Statistics::new();
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
@@ -56,7 +56,7 @@ fn count_thread(
         }
         statistics.duration = 0.01;
         let _ = tx.send(statistics);
-        return;
+        return Ok(());
     }
 
     let mut dirs: i32 = 0;
@@ -73,7 +73,7 @@ fn count_thread(
     let start_time = Instant::now();
     let mut update_time = start_time;
     let mut file_indexes: HashSet<u64> = HashSet::new();
-    let root_path_len = get_root_path_len(&options.root_path);
+    let root_path_len = get_root_path_len(&options.root_path)?;
     let max_file_cnt = options.max_file_cnt as i32;
     for result in WalkDirGeneric::<((), Option<Result<Metadata, Error>>)>::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
@@ -200,6 +200,7 @@ fn count_thread(
         statistics.pipes = pipes;
     }
     let _ = tx.send(statistics);
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -217,7 +218,7 @@ pub struct Count {
 }
 
 impl Count {
-    pub fn new<P: AsRef<Path>>(root_path: P) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path> + std::fmt::Debug>(root_path: P) -> Result<Self, Error> {
         Ok(Count {
             options: Options {
                 root_path: check_and_expand_path(root_path)?,

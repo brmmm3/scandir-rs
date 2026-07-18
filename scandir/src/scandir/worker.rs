@@ -7,7 +7,7 @@ use std::thread;
 use std::time::SystemTime;
 
 #[cfg(feature = "bincode")]
-use bincode::error::EncodeError;
+use bincode_next::error::EncodeError;
 use flume::{Receiver, Sender};
 
 use jwalk_meta::WalkDirGeneric;
@@ -93,16 +93,33 @@ fn create_entry(
         }
     }
     let is_file = file_type.is_file();
-    let path_str = dir_entry.parent_path.to_str().unwrap();
+    let path_str = match dir_entry.parent_path.to_str() {
+        Some(v) => v,
+        None => {
+            return ScandirResult::Error((
+                dir_entry.parent_path.to_string_lossy().to_string(),
+                "Invalid dirname".to_string(),
+            ));
+        }
+    };
     let mut path = if path_str.len() > root_path_len {
         PathBuf::from(&path_str[root_path_len..])
     } else {
         PathBuf::new()
     };
     path.push(&dir_entry.file_name);
+    let path = match path.to_str() {
+        Some(v) => v.to_string(),
+        None => {
+            return ScandirResult::Error((
+                path.to_string_lossy().to_string(),
+                "Invalid path".to_string(),
+            ));
+        }
+    };
     let entry: ScandirResult = match return_type {
         ReturnType::Base => ScandirResult::DirEntry(DirEntry {
-            path: path.to_str().unwrap().to_string(),
+            path,
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
             is_file,
@@ -112,7 +129,7 @@ fn create_entry(
             st_size,
         }),
         ReturnType::Ext => ScandirResult::DirEntryExt(DirEntryExt {
-            path: path.to_str().unwrap().to_string(),
+            path,
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
             is_file,
@@ -140,13 +157,13 @@ fn worker_thread(
     filter: Option<Filter>,
     tx: Sender<ScandirResult>,
     stop: Arc<AtomicBool>,
-) {
-    let root_path_len = get_root_path_len(&options.root_path);
+) -> Result<(), Error> {
+    let root_path_len = get_root_path_len(&options.root_path)?;
     let return_type = options.return_type.clone();
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
         let _ = tx.send(create_entry(root_path_len, &return_type, &dir_entry));
-        return;
+        return Ok(());
     }
 
     let max_file_cnt = options.max_file_cnt;
@@ -192,6 +209,7 @@ fn worker_thread(
             }
         }
     }
+    Ok(())
 }
 
 /// Class for iterating a file tree and returning `Entry` objects
@@ -211,7 +229,10 @@ pub struct Scandir {
 }
 
 impl Scandir {
-    pub fn new<P: AsRef<Path>>(root_path: P, store: Option<bool>) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path> + std::fmt::Debug>(
+        root_path: P,
+        store: Option<bool>,
+    ) -> Result<Self, Error> {
         Ok(Scandir {
             options: Options {
                 root_path: check_and_expand_path(root_path)?,

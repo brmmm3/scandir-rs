@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[cfg(feature = "bincode")]
-use bincode::error::EncodeError;
+use bincode_next::error::EncodeError;
 #[cfg(feature = "speedy")]
 use speedy::{Readable, Writable};
 
@@ -60,7 +60,7 @@ impl DirEntry {
 
     #[cfg(feature = "bincode")]
     pub fn to_vec(&self) -> Result<Vec<u8>, EncodeError> {
-        bincode::serde::encode_to_vec(self, bincode::config::legacy())
+        bincode_next::serde::encode_to_vec(self, bincode_next::config::legacy())
     }
 
     #[cfg(feature = "json")]
@@ -146,7 +146,7 @@ impl DirEntryExt {
 
     #[cfg(feature = "bincode")]
     pub fn to_vec(&self) -> Result<Vec<u8>, EncodeError> {
-        bincode::serde::encode_to_vec(self, bincode::config::legacy())
+        bincode_next::serde::encode_to_vec(self, bincode_next::config::legacy())
     }
 
     #[cfg(feature = "json")]

@@ -135,7 +135,7 @@ Returns the errors.
 Returns the results serialized with `speedy`.
 For this method the feature `speedy` needs to be enabled.
 
-### `to_bincode(&self) -> bincode::Result<Vec<u8>>`
+### `to_bincode(&self) -> bincode_next::Result<Vec<u8>>`
 
 Returns the results serialized with `bincode`.
 For this method the feature `bincode` needs to be enabled.

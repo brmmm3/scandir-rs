@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 #[cfg(feature = "bincode")]
-use bincode::error::EncodeError;
+use bincode_next::error::EncodeError;
 use flume::{Receiver, Sender};
 use jwalk_meta::WalkDirGeneric;
 use parking_lot::Mutex;
@@ -22,7 +22,13 @@ use crate::{
 #[inline]
 fn update_toc(dir_entry: &DirEntryType, toc: &mut Toc) {
     let file_type = dir_entry.file_type;
-    let key = dir_entry.file_name.clone().into_string().unwrap();
+    let key = match dir_entry.file_name.clone().into_string() {
+        Ok(v) => v,
+        Err(e) => {
+            toc.errors.push(format!("Invalid filename: {e:?}"));
+            return;
+        }
+    };
     if file_type.is_symlink() {
         toc.symlinks.push(key);
     } else if file_type.is_dir() {
@@ -40,15 +46,15 @@ fn worker_thread(
     filter: Option<Filter>,
     tx: Sender<(String, Toc)>,
     stop: Arc<AtomicBool>,
-) {
-    let root_path_len = get_root_path_len(&options.root_path);
+) -> Result<(), Error> {
+    let root_path_len = get_root_path_len(&options.root_path)?;
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
         let mut toc = Toc::new();
 
         update_toc(&dir_entry, &mut toc);
         let _ = tx.send(("".to_owned(), toc));
-        return;
+        return Ok(());
     }
 
     let max_file_cnt = options.max_file_cnt;
@@ -98,6 +104,7 @@ fn worker_thread(
             }
         }
     }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -117,7 +124,10 @@ pub struct Walk {
 }
 
 impl Walk {
-    pub fn new<P: AsRef<Path>>(root_path: P, store: Option<bool>) -> Result<Self, Error> {
+    pub fn new<P: AsRef<Path> + std::fmt::Debug>(
+        root_path: P,
+        store: Option<bool>,
+    ) -> Result<Self, Error> {
         Ok(Walk {
             options: Options {
                 root_path: check_and_expand_path(root_path)?,
@@ -372,7 +382,7 @@ impl Walk {
 
     #[cfg(feature = "bincode")]
     pub fn to_bincode(&self) -> Result<Vec<u8>, EncodeError> {
-        bincode::serde::encode_to_vec(&self.entries, bincode::config::legacy())
+        bincode_next::serde::encode_to_vec(&self.entries, bincode_next::config::legacy())
     }
 
     #[cfg(feature = "json")]

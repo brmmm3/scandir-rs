@@ -14,18 +14,27 @@ use parking_lot::Mutex;
 
 use crate::{DirEntryType, Filter, Options};
 
-pub fn check_and_expand_path<P: AsRef<Path>>(path_str: P) -> Result<PathBuf, Error> {
+pub fn check_and_expand_path<P>(path_str: P) -> Result<PathBuf, Error>
+where
+    P: AsRef<Path> + std::fmt::Debug,
+{
+    let path_str = match path_str.as_ref().to_str() {
+        Some(v) => v,
+        None => return Err(Error::other(format!("Invalid path: {path_str:?}"))),
+    };
     #[cfg(unix)]
-    let path_result = fs::canonicalize(expanduser(path_str.as_ref().to_str().unwrap()).unwrap());
+    let path = match expanduser(path_str) {
+        Ok(v) => v,
+        Err(e) => return Err(Error::other(format!("Invalid path {path_str:?}: {e:?}"))),
+    };
+    #[cfg(unix)]
+    let path_result = fs::canonicalize(path);
     #[cfg(not(unix))]
     let path_result = fs::canonicalize(&path_str);
     let path = match path_result {
         Ok(p) => {
             if !p.exists() {
-                return Err(Error::new(
-                    ErrorKind::NotFound,
-                    path_str.as_ref().to_str().unwrap().to_string(),
-                ));
+                return Err(Error::new(ErrorKind::NotFound, path_str.to_string()));
             }
             p
         }
@@ -36,8 +45,11 @@ pub fn check_and_expand_path<P: AsRef<Path>>(path_str: P) -> Result<PathBuf, Err
     Ok(path)
 }
 
-pub fn get_root_path_len(root_path: &Path) -> usize {
-    let root_path = root_path.to_str().unwrap();
+pub fn get_root_path_len(root_path: &Path) -> Result<usize, Error> {
+    let root_path = match root_path.to_str() {
+        Some(v) => v,
+        None => return Err(Error::other(format!("Invalid path: {root_path:?}"))),
+    };
     let mut root_path_len = root_path.len();
     #[cfg(unix)]
     if !root_path.ends_with('/') {
@@ -47,7 +59,7 @@ pub fn get_root_path_len(root_path: &Path) -> usize {
     if !root_path.ends_with('\\') {
         root_path_len += 1;
     }
-    root_path_len
+    Ok(root_path_len)
 }
 
 pub fn create_filter(options: &Options) -> Result<Option<Filter>, Error> {
@@ -186,13 +198,11 @@ pub fn filter_direntry(
 #[inline]
 pub fn filter_dir(root_path_len: usize, dir_entry: &DirEntryType, filter_ref: &Filter) -> bool {
     let mut key = dir_entry.parent_path.to_path_buf();
-    key.push(dir_entry.file_name.clone().into_string().unwrap());
-    let key = key
-        .to_str()
-        .unwrap()
-        .get(root_path_len..)
-        .unwrap_or("")
-        .to_string();
+    key.push(&dir_entry.file_name);
+    let key = match key.to_str() {
+        Some(v) => v.get(root_path_len..).unwrap_or("").to_string(),
+        None => return false,
+    };
     if filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false)
         || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true)
     {
@@ -241,7 +251,13 @@ pub fn start<T: Send + 'static + std::fmt::Debug>(
     duration: Arc<Mutex<f64>>,
     finished: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
-    worker_thread: fn(DirEntryType, Options, Option<Filter>, Sender<T>, Arc<AtomicBool>),
+    worker_thread: fn(
+        DirEntryType,
+        Options,
+        Option<Filter>,
+        Sender<T>,
+        Arc<AtomicBool>,
+    ) -> Result<(), Error>,
 ) -> Result<(Option<thread::JoinHandle<()>>, Option<Receiver<T>>), Error> {
     let filter = create_filter(&options)?;
     let (tx, rx) = unbounded();
@@ -258,7 +274,7 @@ pub fn start<T: Send + 'static + std::fmt::Debug>(
     Ok((
         Some(thread::spawn(move || {
             let start_time = Instant::now();
-            worker_thread(dir_entry, options, filter, tx, stop);
+            let _ = worker_thread(dir_entry, options, filter, tx, stop);
             *duration.lock() = start_time.elapsed().as_secs_f64();
             finished.store(true, Ordering::Relaxed);
         })),

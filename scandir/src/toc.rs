@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 #[cfg(feature = "bincode")]
-use bincode::error::EncodeError;
+use bincode_next::error::EncodeError;
 #[cfg(feature = "speedy")]
 use speedy::{Readable, Writable};
 
@@ -67,39 +67,40 @@ impl Toc {
     }
 
     pub fn extend(&mut self, root_dir: &str, other: &Toc) {
+        let root_dir_path = PathBuf::from(root_dir);
         self.dirs.extend_from_slice(
             &other
                 .dirs
                 .iter()
-                .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
+                .filter_map(|v| root_dir_path.join(v).to_str().map(|v| v.to_owned()))
                 .collect::<Vec<String>>(),
         );
         self.files.extend_from_slice(
             &other
                 .files
                 .iter()
-                .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
+                .filter_map(|v| root_dir_path.join(v).to_str().map(|v| v.to_owned()))
                 .collect::<Vec<String>>(),
         );
         self.symlinks.extend_from_slice(
             &other
                 .symlinks
                 .iter()
-                .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
+                .filter_map(|v| root_dir_path.join(v).to_str().map(|v| v.to_owned()))
                 .collect::<Vec<String>>(),
         );
         self.other.extend_from_slice(
             &other
                 .other
                 .iter()
-                .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
+                .filter_map(|v| root_dir_path.join(v).to_str().map(|v| v.to_owned()))
                 .collect::<Vec<String>>(),
         );
         self.errors.extend_from_slice(
             &other
                 .errors
                 .iter()
-                .map(|x| PathBuf::from(root_dir).join(x).to_str().unwrap().to_owned())
+                .filter_map(|v| root_dir_path.join(v).to_str().map(|v| v.to_owned()))
                 .collect::<Vec<String>>(),
         );
     }
@@ -111,7 +112,7 @@ impl Toc {
 
     #[cfg(feature = "bincode")]
     pub fn to_bincode(&self) -> Result<Vec<u8>, EncodeError> {
-        bincode::serde::encode_to_vec(self, bincode::config::legacy())
+        bincode_next::serde::encode_to_vec(self, bincode_next::config::legacy())
     }
 
     #[cfg(feature = "json")]

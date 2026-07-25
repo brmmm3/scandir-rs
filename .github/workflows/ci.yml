@@ -547,11 +547,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Temporary modify workspace Cargo.toml
-        run: |
-          sed -i '/members = \["scandir", "pyscandir"\]/c\members = ["scandir"]\nexclude = ["pyscandir"]' Cargo.toml
-          cat Cargo.toml
-
       - name: "Build sdist"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:

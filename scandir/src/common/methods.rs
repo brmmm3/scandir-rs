@@ -203,12 +203,8 @@ pub fn filter_dir(root_path_len: usize, dir_entry: &DirEntryType, filter_ref: &F
         Some(v) => v.get(root_path_len..).unwrap_or("").to_string(),
         None => return false,
     };
-    if filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false)
-        || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true)
-    {
-        return false;
-    }
-    true
+    !(filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false)
+        || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true))
 }
 
 #[inline]

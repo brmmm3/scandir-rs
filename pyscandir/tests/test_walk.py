@@ -26,8 +26,8 @@ def test_walk_toc(tempDir):
     print(f"toc.dirs={toc.dirs}")
     print(f"toc.files={toc.files}")
     print(f"entries={os.listdir(tempDir.name)}")
-    assert len(toc.dirs) == 6
-    assert len(toc.files) == 180
+    assert len(toc.dirs) == 30
+    assert len(toc.files) == 900
 
 
 def test_walk_toc_extended(tempDir):
@@ -42,8 +42,8 @@ def test_walk_toc_extended(tempDir):
     print(f"toc.dirs={toc.dirs}")
     print(f"toc.files={toc.files}")
     print(f"entries={os.listdir(tempDir.name)}")
-    assert len(toc.dirs) == 6
-    assert len(toc.files) == 180
+    assert len(toc.dirs) == 30
+    assert len(toc.files) == 900
 
 
 def test_walk_toc_iter(tempDir):
@@ -55,8 +55,8 @@ def test_walk_toc_iter(tempDir):
     assert not toc.errors
     assert not toc.other
     assert not toc.symlinks
-    assert len(toc.dirs) == 6
-    assert len(toc.files) == 180
+    assert len(toc.dirs) == 30
+    assert len(toc.files) == 900
 
 
 def test_walk_walk(tempDir):
@@ -66,8 +66,8 @@ def test_walk_walk(tempDir):
     for root, dirs, files in sd:
         allDirs.extend(dirs)
         allFiles.extend(files)
-    assert len(allDirs) == 6
-    assert len(allFiles) == 180
+    assert len(allDirs) == 30
+    assert len(allFiles) == 900
 
 
 def test_walk_walk_ext(tempDir):
@@ -86,5 +86,5 @@ def test_walk_walk_ext(tempDir):
     assert not allErrors
     assert not allOther
     assert not allSymlinks
-    assert len(allDirs) == 6
-    assert len(allFiles) == 180
+    assert len(allDirs) == 30
+    assert len(allFiles) == 900

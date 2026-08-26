@@ -16,28 +16,28 @@ def test_count(tempDir):
     count = Count(tempDir.name)
     count.start()
     count.join()
-    assert count.as_dict() == {'dirs': 6, 'files': 180,
-                               'size': 24576, 'usage': 24576}
+    assert count.as_dict() == {'dirs': 30, 'files': 900,
+                               'size': 122880, 'usage': 122880}
 
 
 def test_count_extended(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext).collect()
-    assert count.as_dict() == {'dirs': 6, 'files': 180,
-                               'size': 24576, 'usage': 24576}
+    assert count.as_dict() == {'dirs': 30, 'files': 900,
+                               'size': 122880, 'usage': 122880}
 
 
 def test_count_extended_file_exclude(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   file_exclude=["*.bin"]).collect()
-    assert count.as_dict() == {'dirs': 6, 'files': 120,
-                               'size': 24576, 'usage': 24576}
+    assert count.as_dict() == {'dirs': 30, 'files': 600,
+                               'size': 122880, 'usage': 122880}
 
 
 def test_count_extended_file_include(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   file_include=["*.bin"]).collect()
-    assert count.as_dict() == {'dirs': 6, 'files': 60,
-                               'size': 24576, 'usage': 24576}
+    assert count.as_dict() == {'dirs': 30, 'files': 300,
+                               'size': 122880, 'usage': 122880}
 
 
 def test_count_extended_dir_include(tempDir):
@@ -50,5 +50,5 @@ def test_count_extended_dir_include(tempDir):
 def test_count_extended_dir_exclude(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
                   dir_exclude=["dir0", "dir1"]).collect()
-    assert count.as_dict() == {'dirs': 1, 'files': 30,
-                               'size': 4096, 'usage': 4096}
+    assert count.as_dict() == {'dirs': 24, 'files': 720,
+                               'size': 98304, 'usage': 98304}

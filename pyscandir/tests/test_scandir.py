@@ -21,7 +21,7 @@ def test_scandir_fast(tempDir):
         assert dirEntry.mtime > 0.0
         assert not hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
-    assert len(contents) == 186
+    assert len(contents) == 930
 
 
 def test_scandir_ext(tempDir):
@@ -33,4 +33,4 @@ def test_scandir_ext(tempDir):
         assert dirEntry.mtime > 0.0
         assert hasattr(dirEntry, "st_mode")
         contents[dirEntry.path] = dirEntry
-    assert len(contents) == 186
+    assert len(contents) == 930

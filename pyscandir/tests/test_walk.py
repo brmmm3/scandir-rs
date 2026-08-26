@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 
 import time
 
 import pytest
-from scandir_rs import Walk, ReturnType
+from scandir_rs import ReturnType, Walk
 
 from .common import CreateTempFileTree
 

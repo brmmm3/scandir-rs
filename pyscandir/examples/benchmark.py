@@ -1,15 +1,12 @@
-#!/usr/bin/python3
-
 import os
+import platform
 import sys
 import time
-import platform
 
 import psutil
 from diskinfo import DiskInfo
+from scandir_rs import Count, ReturnType, Scandir, Walk
 from tabulate import tabulate
-
-from scandir_rs import Count, Walk, Scandir, ReturnType
 
 
 def scantree(path):
@@ -25,9 +22,9 @@ def scantree(path):
 
 
 def GetDiskInfo():
-    partition = [
+    partition = next([
         p for p in psutil.disk_partitions(all=False) if p.mountpoint in ("/", "C:\\")
-    ][0]
+    ])
     disks = DiskInfo().get_disk_list()
     for disk in disks:
         if partition.device.startswith(disk.get_path()):

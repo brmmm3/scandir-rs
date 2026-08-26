@@ -54,6 +54,18 @@ maturin = ">=1.15.0"
 [tool.poetry.group.dev.dependencies]
 pytest = ">=9.1.1"
 
+[tool.ruff.lint]
+extend-select = ["BLE", "S"]
+extend-ignore = [
+    "BLE001", # Do not catch blind exception: `Exception`
+    "S101",   # Use of assert detected
+    "S108",   # Use of exec detected
+    "S112",   # try-except-continue detected
+    "S113",   # Probable use of `requests` call without timeout
+    "S602",   # Use of subprocess call with shell=True detected
+    "S605",   # Starting a process with a shell, possible injection detected
+]
+
 [dependency-groups]
 dev = [
     "pytest == 9.1.1",

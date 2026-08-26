@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import os
+import stat
 import sys
 import time
-import stat
 from datetime import datetime
-from tkinter import Tk, messagebox, BooleanVar, PhotoImage
-from tkinter.ttk import Label, Checkbutton, Separator, Style
+from tkinter import BooleanVar, PhotoImage, Tk, messagebox
+from tkinter.ttk import Checkbutton, Label, Separator, Style
 
 from scandir_rs import Count
 
@@ -19,22 +16,23 @@ GB = MB * KB
 def GetFileIconWin(pathName):
     import io
 
-    # noinspection PyUnresolvedReferences
-    from win32com.shell import shell
-    from PIL import Image, ImageTk
     import win32api
     import win32con
-    import win32ui
     import win32gui
+    import win32ui
+    from PIL import Image, ImageTk
+
+    # noinspection PyUnresolvedReferences
+    from win32com.shell import shell
 
     SHGFI_ICON = 0x000000100
     SHGFI_ICONLOCATION = 0x000001000
     SHIL_SIZE = 0x00001  # Small icon
 
-    ret, info = shell.SHGetFileInfo(
+    _ret, info = shell.SHGetFileInfo(
         pathName, 0, SHGFI_ICONLOCATION | SHGFI_ICON | SHIL_SIZE
     )
-    hIcon, iIcon, dwAttr, name, typeName = info
+    hIcon, _iIcon, _dwAttr, _name, _typeName = info
     ico_x = win32api.GetSystemMetrics(win32con.SM_CXICON)
     hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
     hbmp = win32ui.CreateBitmap()
@@ -111,17 +109,17 @@ class FastProperties(Tk):
         self.addCell(
             10,
             "Created:",
-            datetime.fromtimestamp(stats.st_ctime).strftime("%A, %d. %B %Y, %H:%M:%S"),
+            datetime.fromtimestamp(stats.st_ctime, tz=datetime.timezone.utc).strftime("%A, %d. %B %Y, %H:%M:%S"),
         )
         self.addCell(
             11,
             "Modified:",
-            datetime.fromtimestamp(stats.st_mtime).strftime("%A, %d. %B %Y, %H:%M:%S"),
+            datetime.fromtimestamp(stats.st_mtime, tz=datetime.timezone.utc).strftime("%A, %d. %B %Y, %H:%M:%S"),
         )
         self.addCell(
             12,
             "Accessed:",
-            datetime.fromtimestamp(stats.st_atime).strftime("%A, %d. %B %Y, %H:%M:%S"),
+            datetime.fromtimestamp(stats.st_atime, tz=datetime.timezone.utc).strftime("%A, %d. %B %Y, %H:%M:%S"),
         )
         Separator(self, orient="horizontal").grid(row=13, columnspan=3, sticky="we")
         self.addCell(14, "Attributes:", "")
@@ -218,7 +216,7 @@ class FastProperties(Tk):
             self.scanner = None
         sys.exit(0)
 
-    def addCell(self, row: int, title, value: str = None):
+    def addCell(self, row: int, title, value: str | None = None):
         if isinstance(title, str):
             lblTitle = Label(self, text=title)
         else:
@@ -252,12 +250,12 @@ class FastProperties(Tk):
     @staticmethod
     def formatByteSize(size: int):
         if size < KB:
-            return f"{str(size)} Bytes"
+            return f"{size!s} Bytes"
         if size < MB:
-            return f"{'{0:.2f}'.format(size / KB)} kB"
+            return f"{f'{size / KB:.2f}'} kB"
         if size < GB:
-            return f"{'{0:.2f}'.format(size / MB)} MB"
-        return f"{'{0:.2f}'.format(size / GB)} GB"
+            return f"{f'{size / MB:.2f}'} MB"
+        return f"{f'{size / GB:.2f}'} GB"
 
     @staticmethod
     def formatBigNumbers(nr: int):

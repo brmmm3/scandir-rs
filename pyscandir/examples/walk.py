@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 
 import os
 
-from scandir_rs import Walk, ReturnType
+from scandir_rs import ReturnType, Walk
 
 dirName = "C:/Windows" if os.name == 'nt' else "/tmp"
 

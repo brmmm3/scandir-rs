@@ -1,16 +1,15 @@
-import os
-import sys
-import subprocess
-import fnmatch
 import concurrent.futures
-from typing import List
+import fnmatch
+import os
+import subprocess
+import sys
 
 
-def Run(args: List[str]) -> subprocess.CompletedProcess:
+def Run(args: list[str]) -> subprocess.CompletedProcess:
     print("RUN:", " ".join(args))
     if os.name == "nt":
-        return subprocess.run(args, shell=True, capture_output=True)
-    return subprocess.run(" ".join(args), shell=True, capture_output=True)
+        return subprocess.run(args, shell=True, capture_output=True, check=False)
+    return subprocess.run(" ".join(args), shell=True, capture_output=True, check=False)
 
 
 def ShowResult(title: str, prc: subprocess.CompletedProcess):
@@ -72,7 +71,7 @@ def BuildWheel(
     return 0
 
 
-def GetPyEnvVersions() -> List[str] | None:
+def GetPyEnvVersions() -> list[str] | None:
     tmpVersions = [sys.version.split()[0]]
     if "--versions" in sys.argv:
         tmpVersions = sys.argv[sys.argv.index("--versions") + 1].split(",")

@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 
 import os
 import threading
 
-from scandir_rs import Scandir, ReturnType
+from scandir_rs import ReturnType, Scandir
 
 
 def Counter(sd):

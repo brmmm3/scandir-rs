@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 
 import pytest
-from scandir_rs import Scandir, ReturnType
+from scandir_rs import ReturnType, Scandir
 
 from .common import CreateTempFileTree
 

@@ -1,16 +1,12 @@
-# -*- coding: utf-8 -*-
-
-import os
-import sys
 import json
-import timeit
+import os
 import platform
-from typing import Dict
+import sys
+import timeit
 
 import psutil
-from tabulate import tabulate
-
 import scandir_rs as scandir
+from tabulate import tabulate
 
 GB = 1024 * 1024 * 1024
 if os.name == "nt":
@@ -23,9 +19,9 @@ else:
 
 def GetDiskInfo():
     from diskinfo import DiskInfo
-    partition = [
+    partition = next([
         p for p in psutil.disk_partitions(all=False) if p.mountpoint in ("/", "C:\\")
-    ][0]
+    ])
     disks = DiskInfo().get_disk_list()
     for disk in disks:
         if partition.device.startswith(disk.get_path()):
@@ -56,8 +52,7 @@ def CreateTestData():
         )
         print("Downloading linux-5.9.tar.gz...")
         with open(LINUX_KERNEL_ARCHIVE, "wb") as F:
-            for chunk in r.iter_content(chunk_size=4096):
-                F.write(chunk)
+            F.writelines(r.iter_content(chunk_size=4096))
     if not os.path.exists(LINUX_DIR):
         print("Extracting linux-5.9.tar.gz...")
         os.makedirs(LINUX_DIR)
@@ -68,7 +63,7 @@ def CreateTestData():
     return tempDir
 
 
-def RunCountBenchmarks(dirName: str) -> Dict[str, float]:
+def RunCountBenchmarks(dirName: str) -> dict[str, float]:
     print(f"Running Count benchmarks in directory: {dirName}")
     print(scandir.Count(dirName).collect())
     stats = json.loads(scandir.Count(dirName, return_type=scandir.ReturnType.Ext).collect().to_json())
@@ -96,7 +91,7 @@ scandir.Count('{dirName}', return_type=scandir.ReturnType.Ext).collect()
         "Count.collect(Ext)": dtScandirCountCollectExt / 3}
 
 
-def RunWalkBenchmarks(dirName: str) -> Dict[str, float]:
+def RunWalkBenchmarks(dirName: str) -> dict[str, float]:
     print(f"Running Walk benchmarks in directory: {dirName}")
     dtOsWalk = timeit.timeit(
         f"""
@@ -177,7 +172,7 @@ toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext).collect()
         "Walk.collect(Ext)": dtScandirWalkCollectExt}
 
 
-def RunScandirBenchmarks(dirName: str) -> Dict[str, float]:
+def RunScandirBenchmarks(dirName: str) -> dict[str, float]:
     print(f"Running Scandir benchmarks in directory: {dirName}")
     dtOsScandir = timeit.timeit(
         f"""

@@ -2,7 +2,8 @@
 
 resolver = "2"
 
-members = ["scandir", "pyscandir"]
+members = ["scandir", "pyscandir", "cscandir"]
+
 
 [profile.release]
 codegen-units = 1

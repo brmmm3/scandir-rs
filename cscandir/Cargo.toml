@@ -1,0 +1,13 @@
+[package]
+name = "cscandir"
+version = "2.9.10"
+edition = "2024"
+description = "C wrapper for scandir-rs"
+license = "MIT"
+
+[lib]
+name = "cscandir"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+scandir = { path = "../scandir" }

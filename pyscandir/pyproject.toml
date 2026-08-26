@@ -60,6 +60,7 @@ extend-ignore = [
     "BLE001", # Do not catch blind exception: `Exception`
     "S101",   # Use of assert detected
     "S108",   # Use of exec detected
+    "S110",   # Try, Except, Pass detected
     "S112",   # try-except-continue detected
     "S113",   # Probable use of `requests` call without timeout
     "S602",   # Use of subprocess call with shell=True detected

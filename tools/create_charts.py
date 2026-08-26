@@ -1,5 +1,5 @@
-import os
 import json
+import os
 
 import plotly.graph_objects as go
 
@@ -150,16 +150,14 @@ def UpdateData(lang: str, bs: str, path: str, newData: dict):
             d[key] = newData[key]
 
 
-py_nt_linux = json.loads(
-    open("tools/benchmark_results_nt_linux-5.9_python.json").read()
-)
-py_nt_windows = json.loads(
-    open("tools/benchmark_results_nt_Windows_python.json").read()
-)
-py_linux_linux = json.loads(
-    open("tools/benchmark_results_posix_linux-5.9_python.json").read()
-)
-py_linux_usr = json.loads(open("tools/benchmark_results_posix_usr_python.json").read())
+with open("tools/benchmark_results_nt_linux-5.9_python.json") as F:
+    py_nt_linux = json.loads(F.read())
+with open("tools/benchmark_results_nt_Windows_python.json") as F:
+    py_nt_windows = json.loads(F.read())
+with open("tools/benchmark_results_posix_linux-5.9_python.json") as F:
+    py_linux_linux = json.loads(F.read())
+with open("tools/benchmark_results_posix_usr_python.json") as F:
+    py_linux_usr = json.loads(F.read())
 
 UpdateData("Python", "Windows", "linux-5.9", py_nt_linux)
 UpdateData("Python", "Windows", "Windows", py_nt_windows)

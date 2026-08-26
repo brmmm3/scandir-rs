@@ -553,12 +553,13 @@ jobs:
           command: sdist
           args: --out dist
           rust-toolchain: nightly
+          working-directory: pyscandir
 
       - name: "Upload sdist"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: wheels-sdist
-          path: dist/*.tar.gz
+          path: pyscandir/dist/*.tar.gz
 
   release:
     name: "Release"

@@ -37,8 +37,6 @@ manylinux = "2_34"
 strip = true
 module-name = "scandir_rs"
 include = [
-    { path = "Cargo.toml", format = "sdist" },
-    { path = "Cargo.lock", format = "sdist" },
     { path = "pyproject.toml", format = "sdist" },
     { path = "README.md", format = "sdist" },
     { path = "LICENSE", format = "sdist" },

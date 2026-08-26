@@ -314,18 +314,18 @@ def BenchmarkDir(path: str, bCount: bool, bWalk: bool, bScandir: bool):
     if tableWalk:
         print(tabulate(tableWalk, headers=["Time [s]", "Method"], tablefmt="github"))
         print()
-        print(f"Walk.iter **~{stats["os.walk"] / stats["Walk.iter"]:.1f} times faster** than os.walk.")
-        print(f"Walk(Ext).iter **~{stats["os.walk(Ext)"] / stats["Walk.iter(Ext)"]:.1f} times faster** than os.walk(Ext).")
+        factor = stats['os.walk'] / stats['Walk.iter']
+        print(f"Walk.iter **~{factor:.1f} times faster** than os.walk.")
+        factor = stats['os.walk(Ext)'] / stats['Walk.iter(Ext)']
+        print(f"Walk(Ext).iter **~{factor:.1f} times faster** than os.walk(Ext).")
         print()
     if tableScandir:
         print(tabulate(tableScandir, headers=["Time [s]", "Method"], tablefmt="github"))
         print()
-        print(
-            f"Scandir.iter **~{stats["scantree (os.scandir)"] / stats["Scandir.iter"]:.1f} times faster** than scantree(os.scandir)."
-        )
-        print(
-            f"Scandir(Ext).iter **~{stats["scantree (os.scandir)"] / stats["Scandir.iter(Ext)"]:.1f} times faster** than scantree(os.scandir)."
-        )
+        factor = stats["scantree (os.scandir)"] / stats["Scandir.iter"]
+        print(f"Scandir.iter **~{factor:.1f} times faster** than scantree(os.scandir).")
+        factor = stats["scantree (os.scandir)"] / stats["Scandir.iter(Ext)"]
+        print(f"Scandir(Ext).iter **~{factor:.1f} times faster** than scantree(os.scandir).")
     with open(f"benchmark_results_{os.name}_{os.path.basename(path)}.json", "w") as F:
         F.write(json.dumps(stats))
 

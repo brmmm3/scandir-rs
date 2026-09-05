@@ -5,8 +5,9 @@ import sys
 import timeit
 
 import psutil
-import scandir_rs as scandir
 from tabulate import tabulate
+
+import scandir_rs as scandir
 
 GB = 1024 * 1024 * 1024
 if os.name == "nt":

@@ -5,8 +5,9 @@ import time
 
 import psutil
 from diskinfo import DiskInfo
-from scandir_rs import Count, ReturnType, Scandir, Walk
 from tabulate import tabulate
+
+from scandir_rs import Count, ReturnType, Scandir, Walk
 
 
 def scantree(path):

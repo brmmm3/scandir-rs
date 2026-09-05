@@ -1,5 +1,6 @@
 
 import pytest
+
 from scandir_rs import Count, ReturnType
 
 from .common import CreateTempFileTree

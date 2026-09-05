@@ -1,10 +1,10 @@
 [package]
 name = "scandir_rs"
-version = "2.10.0"
+version = "2.10.1"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast file tree scanner written in Rust"
 edition = "2024"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/brmmm3/scandir-rs"
 homepage = "https://github.com/brmmm3/scandir-rs"
 readme = "README.md"
@@ -36,8 +36,8 @@ bincode-next = { version = "3.1", features = [
 serde = { version = "1.0", optional = true }
 serde_derive = { version = "1.0", optional = true }
 serde_json = { version = "1.0", optional = true }
-#scandir = { version = "2.10.0" }
-scandir = { path = "../scandir", version = "2.10.0" }
+#scandir = { version = "2.10.1" }
+scandir = { path = "../scandir", version = "2.10.1" }
 
 [features]
 default = ["speedy", "bincode", "json"]

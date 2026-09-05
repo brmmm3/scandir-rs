@@ -1,9 +1,9 @@
 [project]
 name = "scandir-rs"
-version = "2.10.0"
+version = "2.10.1"
 authors = [{ name = "Martin Bammer", email = "mrbm74@gmail.com" }]
 description = "A fast file tree scanner written in Rust"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 dependencies = []
 requires-python = ">=3.10"
@@ -44,6 +44,7 @@ include = [
     { path = "src/**/*", format = "sdist" },
     { path = "tests/**/*", format = "sdist" },
     { path = "examples/**/*", format = "sdist" },
+    { path = "scandir_rs.pyi", format = "wheel" },
 ]
 exclude = ["../**", "**/target/**", "**/__pycache__/**"]
 

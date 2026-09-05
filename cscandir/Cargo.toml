@@ -1,9 +1,9 @@
 [package]
 name = "cscandir"
-version = "2.10.0"
+version = "2.10.1"
 edition = "2024"
 description = "C wrapper for scandir-rs"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "cscandir"

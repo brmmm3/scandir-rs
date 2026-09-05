@@ -1,11 +1,10 @@
 """Type stubs for scandin_rs — a fast file tree scanner written in Rust."""
 
-from __future__ import annotations
 
-import sys
+from collections.abc import Iterator
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Self
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -34,17 +33,15 @@ class DirEntry:
     is_symlink: bool
     is_dir: bool
     is_file: bool
-    st_ctime: Optional[datetime]
-    st_mtime: Optional[datetime]
-    st_atime: Optional[datetime]
+    st_ctime: datetime | None
+    st_mtime: datetime | None
+    st_atime: datetime | None
     st_size: int
     ctime: float
     mtime: float
     atime: float
 
-    def as_dict(self) -> Dict[str, Any]: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
+    def as_dict(self) -> dict[str, Any]: ...
 
     # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
@@ -64,9 +61,7 @@ class DirEntryExt(DirEntry):
     st_dev: int
     st_rdev: int
 
-    def as_dict(self) -> Dict[str, Any]: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
+    def as_dict(self) -> dict[str, Any]: ...
 
     # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
@@ -77,7 +72,7 @@ class ScandirResult:
     """Result item from Scandir — either a DirEntry / DirEntryExt or an error."""
 
     path: str
-    error: Optional[Tuple[str, str]]
+    error: tuple[str, str] | None
     is_dir: bool
     is_file: bool
     is_symlink: bool
@@ -85,9 +80,8 @@ class ScandirResult:
     mtime: float
     atime: float
     size: int
-    ext: Optional[DirEntryExt]
+    ext: DirEntryExt | None
 
-    def __repr__(self) -> str: ...
 
     # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
@@ -105,10 +99,10 @@ class Statistics:
     pipes: int
     size: int
     usage: int
-    errors: List[str]
+    errors: list[str]
     duration: float
 
-    def as_dict(self, duration: Optional[bool] = None) -> Dict[str, Any]: ...
+    def as_dict(self, duration: bool | None = None) -> dict[str, Any]: ...
 
     # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
@@ -118,15 +112,13 @@ class Statistics:
 class Toc:
     """Tree-of-contents: grouped file/directory paths from a Walk operation."""
 
-    dirs: List[str]
-    files: List[str]
-    symlinks: List[str]
-    other: List[str]
-    errors: List[str]
+    dirs: list[str]
+    files: list[str]
+    symlinks: list[str]
+    other: list[str]
+    errors: list[str]
 
-    def as_dict(self) -> Dict[str, Any]: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
+    def as_dict(self) -> dict[str, Any]: ...
 
     # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
@@ -147,18 +139,18 @@ class Scandir:
     def __init__(
         self,
         root_path: str,
-        sorted: Optional[bool] = None,
-        skip_hidden: Optional[bool] = None,
-        max_depth: Optional[int] = None,
-        max_file_cnt: Optional[int] = None,
-        dir_include: Optional[List[str]] = None,
-        dir_exclude: Optional[List[str]] = None,
-        file_include: Optional[List[str]] = None,
-        file_exclude: Optional[List[str]] = None,
-        case_sensitive: Optional[bool] = None,
-        follow_links: Optional[bool] = None,
-        return_type: Optional[ReturnType] = None,
-        store: Optional[bool] = None,
+        sorted: bool | None = None,
+        skip_hidden: bool | None = None,
+        max_depth: int | None = None,
+        max_file_cnt: int | None = None,
+        dir_include: list[str] | None = None,
+        dir_exclude: list[str] | None = None,
+        file_include: list[str] | None = None,
+        file_exclude: list[str] | None = None,
+        case_sensitive: bool | None = None,
+        follow_links: bool | None = None,
+        return_type: ReturnType | None = None,
+        store: bool | None = None,
     ) -> None: ...
 
     # Configuration
@@ -173,21 +165,21 @@ class Scandir:
     # Data access
     def collect(
         self,
-    ) -> Tuple[List[Union[DirEntry, DirEntryExt]], List[Tuple[str, str]]]: ...
-    def has_results(self, only_new: Optional[bool] = None) -> bool: ...
-    def results_cnt(self, only_new: Optional[bool] = None) -> int: ...
+    ) -> tuple[list[DirEntry | DirEntryExt], list[tuple[str, str]]]: ...
+    def has_results(self, only_new: bool | None = None) -> bool: ...
+    def results_cnt(self, only_new: bool | None = None) -> int: ...
     def results(
-        self, only_new: Optional[bool] = None
-    ) -> Tuple[List[Union[DirEntry, DirEntryExt]], List[Tuple[str, str]]]: ...
-    def has_entries(self, only_new: Optional[bool] = None) -> bool: ...
-    def entries_cnt(self, only_new: Optional[bool] = None) -> int: ...
+        self, only_new: bool | None = None
+    ) -> tuple[list[DirEntry | DirEntryExt], list[tuple[str, str]]]: ...
+    def has_entries(self, only_new: bool | None = None) -> bool: ...
+    def entries_cnt(self, only_new: bool | None = None) -> int: ...
     def entries(
-        self, only_new: Optional[bool] = None
-    ) -> List[Union[DirEntry, DirEntryExt]]: ...
+        self, only_new: bool | None = None
+    ) -> list[DirEntry | DirEntryExt]: ...
     def has_errors(self) -> bool: ...
     def errors_cnt(self) -> int: ...
-    def errors(self, only_new: Optional[bool] = None) -> List[Tuple[str, str]]: ...
-    def as_dict(self, only_new: Optional[bool] = None) -> Dict[str, Any]: ...
+    def errors(self, only_new: bool | None = None) -> list[tuple[str, str]]: ...
+    def as_dict(self, only_new: bool | None = None) -> dict[str, Any]: ...
 
     # Properties
     statistics: Statistics
@@ -196,7 +188,7 @@ class Scandir:
     busy: bool
 
     # Iterator protocol
-    def __iter__(self) -> Iterator[Union[DirEntry, DirEntryExt]]: ...
+    def __iter__(self) -> Iterator[DirEntry | DirEntryExt]: ...
 
     # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
@@ -212,18 +204,18 @@ class Walk:
     def __init__(
         self,
         root_path: str,
-        sorted: Optional[bool] = None,
-        skip_hidden: Optional[bool] = None,
-        max_depth: Optional[int] = None,
-        max_file_cnt: Optional[int] = None,
-        dir_include: Optional[List[str]] = None,
-        dir_exclude: Optional[List[str]] = None,
-        file_include: Optional[List[str]] = None,
-        file_exclude: Optional[List[str]] = None,
-        case_sensitive: Optional[bool] = None,
-        follow_links: Optional[bool] = None,
-        return_type: Optional[ReturnType] = None,
-        store: Optional[bool] = None,
+        sorted: bool | None = None,
+        skip_hidden: bool | None = None,
+        max_depth: int | None = None,
+        max_file_cnt: int | None = None,
+        dir_include: list[str] | None = None,
+        dir_exclude: list[str] | None = None,
+        file_include: list[str] | None = None,
+        file_exclude: list[str] | None = None,
+        case_sensitive: bool | None = None,
+        follow_links: bool | None = None,
+        return_type: ReturnType | None = None,
+        store: bool | None = None,
     ) -> None: ...
 
     # Configuration
@@ -237,12 +229,12 @@ class Walk:
 
     # Data access
     def collect(self) -> Toc: ...
-    def has_results(self, only_new: Optional[bool] = None) -> bool: ...
-    def results_cnt(self, only_new: Optional[bool] = None) -> int: ...
-    def results(self, only_new: Optional[bool] = None) -> List[Tuple[str, Toc]]: ...
+    def has_results(self, only_new: bool | None = None) -> bool: ...
+    def results_cnt(self, only_new: bool | None = None) -> int: ...
+    def results(self, only_new: bool | None = None) -> list[tuple[str, Toc]]: ...
     def has_errors(self) -> bool: ...
     def errors_cnt(self) -> int: ...
-    def errors(self, only_new: Optional[bool] = None) -> List[Tuple[str, str]]: ...
+    def errors(self, only_new: bool | None = None) -> list[tuple[str, str]]: ...
 
     # Properties
     statistics: Statistics
@@ -250,7 +242,7 @@ class Walk:
     finished: bool
 
     # Iterator protocol
-    def __iter__(self) -> Iterator[Tuple[str, List[str], List[str]]]: ...
+    def __iter__(self) -> Iterator[tuple[str, list[str], list[str]]]: ...
 
     # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
@@ -266,16 +258,16 @@ class Count:
     def __init__(
         self,
         root_path: str,
-        skip_hidden: Optional[bool] = None,
-        max_depth: Optional[int] = None,
-        max_file_cnt: Optional[int] = None,
-        dir_include: Optional[List[str]] = None,
-        dir_exclude: Optional[List[str]] = None,
-        file_include: Optional[List[str]] = None,
-        file_exclude: Optional[List[str]] = None,
-        case_sensitive: Optional[bool] = None,
-        follow_links: Optional[bool] = None,
-        return_type: Optional[ReturnType] = None,
+        skip_hidden: bool | None = None,
+        max_depth: int | None = None,
+        max_file_cnt: int | None = None,
+        dir_include: list[str] | None = None,
+        dir_exclude: list[str] | None = None,
+        file_include: list[str] | None = None,
+        file_exclude: list[str] | None = None,
+        case_sensitive: bool | None = None,
+        follow_links: bool | None = None,
+        return_type: ReturnType | None = None,
     ) -> None: ...
 
     # Configuration
@@ -292,7 +284,7 @@ class Count:
     def has_results(self) -> bool: ...
     def results(self) -> Statistics: ...
     def has_errors(self) -> bool: ...
-    def as_dict(self, duration: Optional[bool] = None) -> Dict[str, Any]: ...
+    def as_dict(self, duration: bool | None = None) -> dict[str, Any]: ...
 
     # Properties
     duration: float
@@ -300,12 +292,12 @@ class Count:
     busy: bool
 
     # Context-manager protocol
-    def __enter__(self) -> Count: ...
+    def __enter__(self) -> Self: ...
     def __exit__(
         self,
-        ty: Optional[type],
-        value: Optional[BaseException],
-        traceback: Optional[Any],
+        ty: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: object,
     ) -> None: ...
 
     # Feature-gated serialization

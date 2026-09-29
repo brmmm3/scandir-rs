@@ -1,0 +1,21 @@
+[package]
+name = "cxxscandir"
+version = "2.10.1"
+edition = "2024"
+description = "C++ wrapper for scandir-rs using cxx"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "cxxscandir"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+cxx = "1.0"
+libc = "0.2"
+scandir = { path = "../scandir" }
+
+[build-dependencies]
+cxx-build = "1.0"
+
+[features]
+default = []

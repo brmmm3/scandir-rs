@@ -23,14 +23,13 @@ public final class JScandir {
         } else {
             // Try standard locations
             String[] paths = {
-                "../../target/release",
-                "../target/release",
-                "target/release",
-                "target/debug",
-                "/usr/local/lib",
-                "/usr/lib"
+                    "../../target/release",
+                    "../target/release",
+                    "target/release",
+                    "target/debug",
+                    "/usr/local/lib",
+                    "/usr/lib"
             };
-            String libName = System.mapLibraryName("jscandir");
             boolean loaded = false;
             for (String path : paths) {
                 try {
@@ -40,7 +39,8 @@ public final class JScandir {
                         loaded = true;
                         break;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
             if (!loaded) {
                 System.loadLibrary("jscandir");
@@ -48,12 +48,13 @@ public final class JScandir {
         }
     }
 
-    private JScandir() {}
+    private JScandir() {
+    }
 
     /**
      * Collects directory entries with full metadata.
      * 
-     * @param root The root directory path to scan
+     * @param root    The root directory path to scan
      * @param options Scan options (null for defaults)
      * @return CollectResult containing entries, errors, and statistics
      * @throws JScandirException if the scan fails
@@ -63,42 +64,40 @@ public final class JScandir {
     /**
      * Collects directory entries with full metadata.
      * 
-     * @param root The root directory path to scan
+     * @param root    The root directory path to scan
      * @param options Scan options (null for defaults)
      * @return CollectResult containing entries, errors, and statistics
      * @throws JScandirException if the scan fails
      */
-    public static CollectResult collect(Path root, Options options) {
+    public static CollectResult collect(Path root, Options options) throws JScandirException {
         return collect(root.toString(), options);
     }
 
     /**
      * Collects aggregate directory statistics without materializing entries.
      * 
-     * @param root The root directory path to scan
+     * @param root    The root directory path to scan
      * @param options Scan options (null for defaults)
      * @return Statistics object
      * @throws JScandirException if the scan fails
      */
     public static native Statistics count(String root, Options options) throws JScandirException;
 
-    public static Statistics count(Path root, Options options) {
+    public static Statistics count(Path root, Options options) throws JScandirException {
         return count(root.toString(), options);
     }
 
     /**
      * Collects directory entries grouped by directory (Walk).
      * 
-     * @param root The root directory path to scan
+     * @param root    The root directory path to scan
      * @param options Scan options (null for defaults)
      * @return WalkResult with per-directory breakdown
      * @throws JScandirException if the scan fails
      */
     public static native WalkResult walk(String root, Options options) throws JScandirException;
 
-    public static WalkResult walk(Path root, Options options) {
+    public static WalkResult walk(Path root, Options options) throws JScandirException {
         return walk(root.toString(), options);
     }
-
-    private JScandir() {}
 }

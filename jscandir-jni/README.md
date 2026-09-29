@@ -2,7 +2,7 @@
 
 Java JNI wrapper for the `scandir-rs` directory scanner.
 
-Uses traditional Java Native Interface (JNI) for C interop. Compatible with Java 8+.
+Uses traditional Java Native Interface (JNI) for C interop. Compatible with Java 17+.
 
 ## Usage
 

@@ -33,11 +33,11 @@ class JScandirTest {
     @Test
     void optionsBuilderWorks() {
         Options opts = new Options()
-            .sorted(true)
-            .skipHidden(false)
-            .maxDepth(5)
-            .fileInclude("*.java", "*.kt")
-            .dirExclude("target", "build");
+                .sorted(true)
+                .skipHidden(false)
+                .maxDepth(5)
+                .fileInclude("*.java", "*.kt")
+                .dirExclude("target", "build");
 
         assertTrue(opts.isSorted());
         assertFalse(opts.isSkipHidden());
@@ -63,7 +63,6 @@ class JScandirTest {
 
     @Test
     void entryConstruction() {
-        Statistics.StatisticsBuilder builder = new Statistics.StatisticsBuilder();
         // Test that result classes can be instantiated
         Statistics stats = new Statistics(2, 4, 1, 0, 0, 0, 1024, 2048, 0.123);
         assertNotNull(stats);

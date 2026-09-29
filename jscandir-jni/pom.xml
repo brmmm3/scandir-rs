@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.github.brmmm3</groupId>
@@ -67,14 +67,14 @@
                     </archive>
                 </configuration>
             </plugin>
-            <!-- Native library compilation using CMake -->
+            <!-- Native library compilation using native-maven-plugin (JNI bridge) -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>native-maven-plugin</artifactId>
                 <version>1.0.0</version>
                 <extensions>true</extensions>
                 <configuration>
-                    <compilerProvider>generic</compilerProvider>
+                    <compilerProvider>g++</compilerProvider>
                     <sources>
                         <directory>src/main/cpp</directory>
                         <includes>
@@ -82,15 +82,12 @@
                             <include>**/*.c</include>
                         </includes>
                     </sources>
-                    <compilerExecutable>${env.CC:-gcc}</compilerExecutable>
-                    <compilerExecutable>${env.CXX:-g++}</compilerExecutable>
                     <compilerStartOptions>
                         <compilerStartOption>-std=c++17</compilerStartOption>
                         <compilerStartOption>-fPIC</compilerStartOption>
                         <compilerStartOption>-Wall</compilerStartOption>
                         <compilerStartOption>-Wextra</compilerStartOption>
                     </compilerStartOptions>
-                    <linkerExecutable>${env.CXX:-g++}</linkerExecutable>
                     <linkerStartOptions>
                         <linkerStartOption>-shared</linkerStartOption>
                     </linkerStartOptions>
@@ -98,21 +95,8 @@
                         <library>cscandir</library>
                     </libraries>
                     <librarySearchDirectories>
-                        <librarySearchDirectory>../../target/release</librarySearchDirectory>
                         <librarySearchDirectory>${project.basedir}/../target/release</librarySearchDirectory>
                     </librarySearchDirectories>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.4.2</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <addClasspath>true</addClasspath>
-                        </manifest>
-                    </archive>
                 </configuration>
             </plugin>
         </plugins>

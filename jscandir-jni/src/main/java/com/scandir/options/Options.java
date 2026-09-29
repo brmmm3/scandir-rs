@@ -21,7 +21,8 @@ public final class Options {
     private boolean followLinks = false;
     private ReturnType returnType = ReturnType.BASE;
 
-    private Options() {}
+    public Options() {
+    }
 
     public static Options defaultOptions() {
         return new Options();
@@ -94,40 +95,74 @@ public final class Options {
         return this;
     }
 
-    public boolean isSorted() { return sorted; }
-    public boolean isSkipHidden() { return skipHidden; }
-    public long getMaxDepth() { return maxDepth; }
-    public long getMaxFileCnt() { return maxFileCnt; }
-    public List<String> getDirInclude() { return List.copyOf(dirInclude); }
-    public List<String> getDirExclude() { return List.copyOf(dirExclude); }
-    public List<String> getFileInclude() { return List.copyOf(fileInclude); }
-    public List<String> getFileExclude() { return List.copyOf(fileExclude); }
-    public boolean isCaseSensitive() { return caseSensitive; }
-    public boolean isFollowLinks() { return followLinks; }
-    public ReturnType getReturnType() { return returnType; }
+    public boolean isSorted() {
+        return sorted;
+    }
+
+    public boolean isSkipHidden() {
+        return skipHidden;
+    }
+
+    public long getMaxDepth() {
+        return maxDepth;
+    }
+
+    public long getMaxFileCnt() {
+        return maxFileCnt;
+    }
+
+    public List<String> getDirInclude() {
+        return List.copyOf(dirInclude);
+    }
+
+    public List<String> getDirExclude() {
+        return List.copyOf(dirExclude);
+    }
+
+    public List<String> getFileInclude() {
+        return List.copyOf(fileInclude);
+    }
+
+    public List<String> getFileExclude() {
+        return List.copyOf(fileExclude);
+    }
+
+    public boolean isCaseSensitive() {
+        return caseSensitive;
+    }
+
+    public boolean isFollowLinks() {
+        return followLinks;
+    }
+
+    public ReturnType getReturnType() {
+        return returnType;
+    }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Options)) return false;
+        if (this == o)
+            return true;
+        if (!(o instanceof Options))
+            return false;
         Options that = (Options) o;
         return sorted == that.sorted &&
-               skipHidden == that.skipHidden &&
-               maxDepth == that.maxDepth &&
-               maxFileCnt == that.maxFileCnt &&
-               caseSensitive == that.caseSensitive &&
-               followLinks == that.followLinks &&
-               returnType == that.returnType &&
-               dirInclude.equals(that.dirInclude) &&
-               dirExclude.equals(that.dirExclude) &&
-               fileInclude.equals(that.fileInclude) &&
-               fileExclude.equals(that.fileExclude);
+                skipHidden == that.skipHidden &&
+                maxDepth == that.maxDepth &&
+                maxFileCnt == that.maxFileCnt &&
+                caseSensitive == that.caseSensitive &&
+                followLinks == that.followLinks &&
+                returnType == that.returnType &&
+                dirInclude.equals(that.dirInclude) &&
+                dirExclude.equals(that.dirExclude) &&
+                fileInclude.equals(that.fileInclude) &&
+                fileExclude.equals(that.fileExclude);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(sorted, skipHidden, maxDepth, maxFileCnt,
-            dirInclude, dirExclude, fileInclude, fileExclude,
-            caseSensitive, followLinks, returnType);
+                dirInclude, dirExclude, fileInclude, fileExclude,
+                caseSensitive, followLinks, returnType);
     }
 }

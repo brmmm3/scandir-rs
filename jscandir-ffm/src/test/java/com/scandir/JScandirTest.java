@@ -32,29 +32,29 @@ class JScandirTest {
     void collectReturnsEntriesAndStatistics() throws Exception {
         Path root = createTestTree();
         Options options = Options.defaultOptions();
-        
+
         // This will fail because native library isn't loaded in test environment
         // but we can test the Options construction
         Options opts = Options.defaultOptions()
-            .sorted(true)
-            .skipHidden(true)
-            .maxDepth(10)
-            .fileInclude("*.txt");
-        
-        assertTrue(options.isSorted());
-        assertTrue(options.isSkipHidden());
-        assertEquals(10, options.getMaxDepth());
-        assertEquals(List.of("*.txt"), options.getFileInclude());
+                .sorted(true)
+                .skipHidden(true)
+                .maxDepth(10)
+                .fileInclude("*.txt");
+
+        assertTrue(opts.isSorted());
+        assertTrue(opts.isSkipHidden());
+        assertEquals(10, opts.getMaxDepth());
+        assertEquals(List.of("*.txt"), opts.getFileInclude());
     }
 
     @Test
     void optionsBuilderWorks() {
         Options opts = new Options()
-            .sorted(true)
-            .skipHidden(false)
-            .maxDepth(5)
-            .fileInclude("*.java", "*.kt")
-            .dirExclude("target", "build");
+                .sorted(true)
+                .skipHidden(false)
+                .maxDepth(5)
+                .fileInclude("*.java", "*.kt")
+                .dirExclude("target", "build");
 
         assertTrue(opts.isSorted());
         assertFalse(opts.isSkipHidden());

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Performance
 
-- Streaming channel bounded(4096) to limit backlog memory growth.
+- Streaming channel bounded(16384) to limit backlog memory growth.
 
 ## [2.10.1] - 2026-09-05
 

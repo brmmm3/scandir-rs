@@ -256,7 +256,7 @@ pub fn start<T: Send + 'static + std::fmt::Debug>(
     ) -> Result<(), Error>,
 ) -> Result<(Option<thread::JoinHandle<()>>, Option<Receiver<T>>), Error> {
     let filter = create_filter(&options)?;
-    let (tx, rx) = bounded(4096);
+    let (tx, rx) = bounded(16384);
     stop.store(false, Ordering::Relaxed);
     // Create root DirEntry here, so that errors are immediately returned
     let dir_entry: DirEntryType = jwalk_meta::DirEntry::from_path(

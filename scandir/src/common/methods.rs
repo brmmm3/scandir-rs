@@ -8,7 +8,7 @@ use std::{fs, thread};
 #[cfg(unix)]
 use expanduser::expanduser;
 
-use flume::{Receiver, Sender, unbounded};
+use flume::{Receiver, Sender, bounded};
 use glob_sl::{MatchOptions, Pattern};
 use parking_lot::Mutex;
 
@@ -256,7 +256,7 @@ pub fn start<T: Send + 'static + std::fmt::Debug>(
     ) -> Result<(), Error>,
 ) -> Result<(Option<thread::JoinHandle<()>>, Option<Receiver<T>>), Error> {
     let filter = create_filter(&options)?;
-    let (tx, rx) = unbounded();
+    let (tx, rx) = bounded(4096);
     stop.store(false, Ordering::Relaxed);
     // Create root DirEntry here, so that errors are immediately returned
     let dir_entry: DirEntryType = jwalk_meta::DirEntry::from_path(

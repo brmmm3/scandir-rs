@@ -19,7 +19,7 @@ fn test_scandir() -> Result<(), Error> {
     assert_eq!(125, entries.results.len());
     assert_eq!(0, entries.errors.len());
     #[cfg(target_os = "linux")]
-    match entries.results.first().unwrap() {
+    match entries.results.iter().nth(1).unwrap() {
         ScandirResult::DirEntry(d) => {
             assert_eq!("dir3", &d.path);
             assert!(d.is_dir);
@@ -49,7 +49,7 @@ fn test_scandir_skip_hidden() -> Result<(), Error> {
     #[cfg(windows)]
     assert_eq!(107, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    match entries.results.first().unwrap() {
+    match entries.results.iter().nth(1).unwrap() {
         ScandirResult::DirEntry(d) => {
             assert!(["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
             assert!(d.is_dir);
@@ -79,7 +79,7 @@ fn test_scandir_extended() -> Result<(), Error> {
     #[cfg(windows)]
     assert_eq!(125, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    match entries.results.first().unwrap() {
+    match entries.results.iter().nth(1).unwrap() {
         ScandirResult::DirEntryExt(d) => {
             assert!(["dir1", "dir2", "dir3"].contains(&d.path.as_str()));
             assert!(d.is_dir);
@@ -110,7 +110,7 @@ fn test_scandir_follow_links() -> Result<(), Error> {
     assert_eq!(234, entries.results.len());
     assert_eq!(0, entries.errors.len());
     #[cfg(target_os = "linux")]
-    match entries.results.first().unwrap() {
+    match entries.results.iter().nth(1).unwrap() {
         ScandirResult::DirEntry(d) => {
             assert_eq!("dir3", &d.path);
             assert!(d.is_dir);

@@ -113,3 +113,66 @@ fn test_count_follow_links() -> Result<(), Error> {
     assert_eq!(0, count.hlinks);
     tests_common::cleanup(temp_dir)
 }
+
+#[test]
+fn test_count_extended_dir_include() -> Result<(), Error> {
+    #[cfg(unix)]
+    let temp_dir = tests_common::create_temp_file_tree(3, 3, 4, 5, 6, 7)?;
+    #[cfg(windows)]
+    let temp_dir = tests_common::create_temp_file_tree(3, 3, 4, 5, 3)?;
+    let count = Count::new(temp_dir.path())?
+        .extended(true)
+        .dir_include(Some(vec!["**/dir1/**".to_string()]))
+        .collect()?;
+    assert!(count.errors.is_empty());
+    //assert!(count.duration > 0.0); --> Fails on MAC
+    assert_eq!(0, count.devices);
+    #[cfg(windows)]
+    {
+        assert_eq!(40, count.files);
+        assert_eq!(13, count.dirs);
+        assert_eq!(27, count.slinks);
+    }
+    #[cfg(unix)]
+    {
+        assert_eq!(12, count.files);
+        assert_eq!(4, count.dirs);
+        assert_eq!(18, count.slinks);
+        assert_eq!(21, count.pipes);
+    }
+    assert_eq!(15, count.hlinks);
+    tests_common::cleanup(temp_dir)
+}
+
+#[test]
+fn test_count_extended_dir_exclude() -> Result<(), Error> {
+    #[cfg(unix)]
+    let temp_dir = tests_common::create_temp_file_tree(3, 3, 4, 5, 6, 7)?;
+    #[cfg(windows)]
+    let temp_dir = tests_common::create_temp_file_tree(3, 3, 4, 5, 3)?;
+    let count = Count::new(temp_dir.path())?
+        .extended(true)
+        .dir_exclude(Some(vec![
+            "**/dir0/**".to_string(),
+            "**/dir1/**".to_string(),
+        ]))
+        .collect()?;
+    assert!(count.errors.is_empty());
+    //assert!(count.duration > 0.0); --> Fails on MAC
+    assert_eq!(0, count.devices);
+    #[cfg(windows)]
+    {
+        assert_eq!(40, count.files);
+        assert_eq!(13, count.dirs);
+        assert_eq!(27, count.slinks);
+    }
+    #[cfg(unix)]
+    {
+        assert_eq!(24, count.files);
+        assert_eq!(8, count.dirs);
+        assert_eq!(36, count.slinks);
+        assert_eq!(42, count.pipes);
+    }
+    assert_eq!(30, count.hlinks);
+    tests_common::cleanup(temp_dir)
+}

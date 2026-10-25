@@ -5,6 +5,16 @@ use bincode_next::error::EncodeError;
 #[cfg(feature = "speedy")]
 use speedy::{Readable, Writable};
 
+// ponytail: shared conversion for all ctime/mtime/atime variants.
+#[inline]
+fn system_time_to_f64(t: Option<SystemTime>) -> f64 {
+    let duration = t
+        .unwrap_or(UNIX_EPOCH)
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_err| Duration::new(0, 0));
+    (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
+}
+
 #[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[cfg_attr(
     any(feature = "bincode", feature = "json"),
@@ -25,32 +35,17 @@ pub struct DirEntry {
 impl DirEntry {
     #[inline]
     pub fn ctime(&self) -> f64 {
-        let duration = self
-            .st_ctime
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
+        system_time_to_f64(self.st_ctime)
     }
 
     #[inline]
     pub fn mtime(&self) -> f64 {
-        let duration = self
-            .st_mtime
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
+        system_time_to_f64(self.st_mtime)
     }
 
     #[inline]
     pub fn atime(&self) -> f64 {
-        let duration = self
-            .st_atime
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
+        system_time_to_f64(self.st_atime)
     }
 
     #[cfg(feature = "speedy")]
@@ -80,12 +75,16 @@ pub struct DirEntryExt {
     pub is_symlink: bool,
     pub is_dir: bool,
     pub is_file: bool,
-    /// Creation time in seconds as float
+    /// POSIX change time (inode metadata change); on Linux == Python os.stat().st_ctime, on Windows == creation time
     pub st_ctime: Option<SystemTime>,
     /// Modification time in seconds as float
     pub st_mtime: Option<SystemTime>,
     /// Access time in seconds as float
     pub st_atime: Option<SystemTime>,
+    /// Birth time (actual file creation time). None on filesystems/kernels without btime support
+    /// (ext3, FAT, kernel<4.11, musl target). Available on Linux gnu + kernel>=4.13 + statx
+    /// STATX_BTIME mask (CIFS nounix SMB2/3 supported via Steve French commit 6e70e26dc52b).
+    pub st_btime: Option<SystemTime>,
     /// Size of file / entry
     pub st_size: u64,
     /// File system block size
@@ -111,32 +110,22 @@ pub struct DirEntryExt {
 impl DirEntryExt {
     #[inline]
     pub fn ctime(&self) -> f64 {
-        let duration = self
-            .st_ctime
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
+        system_time_to_f64(self.st_ctime)
     }
 
     #[inline]
     pub fn mtime(&self) -> f64 {
-        let duration = self
-            .st_mtime
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
+        system_time_to_f64(self.st_mtime)
     }
 
     #[inline]
     pub fn atime(&self) -> f64 {
-        let duration = self
-            .st_atime
-            .unwrap_or(UNIX_EPOCH)
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_err| Duration::new(0, 0));
-        (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
+        system_time_to_f64(self.st_atime)
+    }
+
+    #[inline]
+    pub fn btime(&self) -> f64 {
+        system_time_to_f64(self.st_btime)
     }
 
     #[cfg(feature = "speedy")]

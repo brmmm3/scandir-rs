@@ -13,6 +13,10 @@ impl Toc {
     pub fn from(entry: &scandir::Toc) -> Self {
         Toc(entry.clone())
     }
+
+    pub fn from_owned(entry: scandir::Toc) -> Self {
+        Toc(entry)
+    }
 }
 
 #[pymethods]

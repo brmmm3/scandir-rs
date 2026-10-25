@@ -1,8 +1,49 @@
+# -*- coding: utf-8 -*-
+"""
+# Professional scandir-rs Benchmark — Comparing Three APIs
+
+## API differences
+
+  Count   Counts entries and returns Statistics (directories, files, symlinks, total size, etc.). Comparable to du -s.
+  Walk    Yields (root, dirs, files) tuples, similar to os.walk.
+  Scandir Returns DirEntry objects with metadata such as paths, sizes, timestamps, and permissions. Comparable to os.scandir plus stat.
+
+## Return types
+
+  Base (default) Basic metadata: path, size, timestamps, and file type.
+  Ext            Extended metadata, including hard-link count, device number, and inode. Requires additional system calls.
+
+
+## Usage
+
+  Count(dir).collect()                               # Statistics
+  Count(dir, return_type=ReturnType.Ext).collect()   # Statistics (includes hard-link count)
+
+  Walk(dir)                                          # Iterate over (root, dirs, files)
+  Walk(dir, return_type=ReturnType.Ext)              # Iterate over (root, dirs, files, symlinks, other, errors)
+  Walk(dir).collect()                                # Toc (directory and file lists)
+
+  Scandir(dir)                                       # Iterate over DirEntry objects
+  Scandir(dir, return_type=ReturnType.Ext)           # Iterate over DirEntryExt (includes st_mode/atime/ctime/mtime)
+  Scandir(dir).collect()                             # List[DirEntry]
+  Scandir(dir, return_type=ReturnType.Ext).collect() # List[DirEntryExt]
+
+## Run
+
+  python benchmark.py                 # Run all tests
+  python benchmark.py --count --walk  # Run only Count and Walk tests
+
+## References
+
+  examples/count.py, examples/walk.py, examples/scandir.py
+"""
+
 import json
 import os
 import platform
 import sys
 import timeit
+import subprocess
 
 import psutil
 from tabulate import tabulate
@@ -57,18 +98,33 @@ def CreateTestData():
     if not os.path.exists(LINUX_DIR):
         print("Extracting linux-5.9.tar.gz...")
         os.makedirs(LINUX_DIR)
-        # cmdLine = f"tar xzf {LINUX_KERNEL_ARCHIVE} -C {LINUX_DIR}"
-        cmdLine = f"7z x {LINUX_KERNEL_ARCHIVE} -so | 7z x -aoa -si -ttar -o{LINUX_DIR}"
-        print(f"Running: {cmdLine}")
-        os.system(cmdLine)
+        # The path is a file-level constant, not user input; use subprocess to avoid a shell-injection vector.
+        # Replace os.system("7z x ... | 7z x ...") with a Popen pipeline, explicit argv, and return-code checks.
+        p1 = subprocess.Popen(["7z", "x", LINUX_KERNEL_ARCHIVE, "-so"], stdout=subprocess.PIPE)
+        try:
+            p2 = subprocess.Popen(
+                ["7z", "x", "-aoa", "-si", "-ttar", f"-o{LINUX_DIR}"],
+                stdin=p1.stdout,
+            )
+            p1.stdout.close()  # Allow p1 to receive SIGPIPE after p2 exits.
+            rc2 = p2.wait()
+        finally:
+            rc1 = p1.wait()
+        if rc1 != 0 or rc2 != 0:
+            raise RuntimeError(f"extraction failed: 7z[1] rc={rc1}, 7z[2] rc={rc2}")
     return tempDir
 
 
 def RunCountBenchmarks(dirName: str) -> dict[str, float]:
+    """Count API — Counts entries without storing them, uses minimal memory, and returns Statistics"""
     print(f"Running Count benchmarks in directory: {dirName}")
+    # Count(dir).collect() → Statistics { dirs, files, slinks, size, ... }
     print(scandir.Count(dirName).collect())
+    # Count(dir, return_type=ReturnType.Ext).collect() → Statistics { ..., hlinks, devices, pipes }
     stats = json.loads(scandir.Count(dirName, return_type=scandir.ReturnType.Ext).collect().to_json())
     print(stats)
+
+    # Count.collect (Base) — Basic statistics.
     dtScandirCountCollect = timeit.timeit(
         f"""
 scandir.Count('{dirName}').collect()
@@ -78,6 +134,7 @@ scandir.Count('{dirName}').collect()
     ) / 3
     print(f"scandir.Count (collect): {dtScandirCountCollect}")
 
+    # Count.collect (Ext) — extended statistics (including hard-link counts, etc.)
     dtScandirCountCollectExt = timeit.timeit(
         f"""
 scandir.Count('{dirName}', return_type=scandir.ReturnType.Ext).collect()
@@ -93,7 +150,10 @@ scandir.Count('{dirName}', return_type=scandir.ReturnType.Ext).collect()
 
 
 def RunWalkBenchmarks(dirName: str) -> dict[str, float]:
+    """Walk API — similar to os.walk, returning (root, dirs, files) tuples"""
     print(f"Running Walk benchmarks in directory: {dirName}")
+
+    # Python comparison: os.walk (without retrieving stat information)
     dtOsWalk = timeit.timeit(
         f"""
 for root, dirs, files in os.walk('{dirName}'):
@@ -104,6 +164,7 @@ for root, dirs, files in os.walk('{dirName}'):
     ) / 3
     print(f"os.walk {dtOsWalk}")
 
+    # Python comparison: os.walk + os.stat (simulating Ext mode)
     dtOsWalkExt = timeit.timeit(
         f"""
 dirStats = dict()
@@ -127,6 +188,7 @@ for root, dirs, files in os.walk('{dirName}'):
     ) / 3
     print(f"os.walk(Ext) {dtOsWalkExt}")
 
+    # Walk.iter (Base) — Walk(dir) → Iterates over (root, dirs, files) tuples.
     dtScandirWalkIter = timeit.timeit(
         f"""
 for result in scandir.Walk('{dirName}'):
@@ -137,6 +199,7 @@ for result in scandir.Walk('{dirName}'):
     ) / 3
     print(f"scandir.Walk (iter): {dtScandirWalkIter}")
 
+    # Walk.iter (Ext) — Walk(dir, return_type=ReturnType.Ext) → Iterates over (root, dirs, files, symlinks, other, errors) tuples.
     dtScandirWalkIterExt = timeit.timeit(
         f"""
 for result in scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext):
@@ -147,6 +210,7 @@ for result in scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext):
     ) / 3
     print(f"scandir.Walk(Ext) (iter): {dtScandirWalkIterExt}")
 
+    # Walk.collect (Base) — Walk(dir).collect() → Toc { dirs: [...], files: [...] }
     dtScandirWalkCollect = timeit.timeit(
         f"""
 toc = scandir.Walk('{dirName}').collect()
@@ -156,6 +220,7 @@ toc = scandir.Walk('{dirName}').collect()
     ) / 3
     print(f"scandir.Walk (collect): {dtScandirWalkCollect}")
 
+    # Walk.collect (Ext) — Walk(dir, return_type=ReturnType.Ext).collect() → Toc (including extended information).
     dtScandirWalkCollectExt = timeit.timeit(
         f"""
 toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext).collect()
@@ -174,7 +239,10 @@ toc = scandir.Walk('{dirName}', return_type=scandir.ReturnType.Ext).collect()
 
 
 def RunScandirBenchmarks(dirName: str) -> dict[str, float]:
+    """Scandir API — Returns full metadata for each entry (DirEntry/DirEntryExt)."""
     print(f"Running Scandir benchmarks in directory: {dirName}")
+
+    # Python comparison: recursive os.scandir + stat (the best native Python approach)
     dtOsScandir = timeit.timeit(
         f"""
 def scantree(path):
@@ -210,6 +278,7 @@ for entry in scantree(os.path.expanduser('{dirName}')):
     ) / 3
     print(f"scantree (os.scandir): {dtOsScandir}")
 
+    # Scandir.iter (Base) — Scandir(dir) → iterate over DirEntry objects (path, size, timestamp, file type)
     dtScandirScandirIter = timeit.timeit(
         f"""
 for result in scandir.Scandir('{dirName}'):
@@ -220,6 +289,7 @@ for result in scandir.Scandir('{dirName}'):
     ) / 3
     print(f"scandir.Scandir (iter): {dtScandirScandirIter}")
 
+    # Scandir.iter (Ext) — Scandir(dir, return_type=ReturnType.Ext) → iterate over DirEntryExt objects
     dtScandirScandirIterExt = timeit.timeit(
         f"""
 for result in scandir.Scandir('{dirName}', return_type=scandir.ReturnType.Ext):
@@ -230,6 +300,7 @@ for result in scandir.Scandir('{dirName}', return_type=scandir.ReturnType.Ext):
     ) / 3
     print(f"scandir.Scandir(Ext) (iter): {dtScandirScandirIterExt}")
 
+    # Scandir.collect (Base) — Scandir(dir).collect() → List[DirEntry] (collect all entries into memory)
     dtScandirScandirCollect = timeit.timeit(
         f"""
 entries = scandir.Scandir('{dirName}').collect()
@@ -239,6 +310,7 @@ entries = scandir.Scandir('{dirName}').collect()
     ) / 3
     print(f"scandir.Scandir (collect): {dtScandirScandirCollect}")
 
+    # Scandir.collect (Ext) — Scandir(dir, return_type=ReturnType.Ext).collect() → List[DirEntryExt]
     dtScandirScandirCollectExt = timeit.timeit(
         f"""
 entries = scandir.Scandir('{dirName}', return_type=scandir.ReturnType.Ext).collect()

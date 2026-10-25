@@ -21,5 +21,6 @@ fn init(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<walk::Walk>()?;
     m.add_class::<scandir::Scandir>()?;
     m.add_class::<scandir::ScandirResult>()?;
+    m.add_class::<scandir::ScandirResults>()?;
     Ok(())
 }

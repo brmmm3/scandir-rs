@@ -1,4 +1,5 @@
 use std::io::ErrorKind;
+use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -18,6 +19,12 @@ use crate::count::Statistics;
 pub struct Count {
     instance: scandir::Count,
     busy: bool,
+}
+
+impl Drop for Count {
+    fn drop(&mut self) {
+        self.instance.stop();
+    }
 }
 
 #[pymethods]
@@ -72,7 +79,11 @@ impl Count {
     }
 
     pub fn clear(&mut self) {
+        if self.instance.busy() {
+            return;
+        }
         self.instance.clear();
+        self.busy = false;
     }
 
     pub fn start(&mut self) -> PyResult<()> {
@@ -96,9 +107,26 @@ impl Count {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<Py<PyAny>> {
-        let results = py.detach(|| self.instance.collect())?;
-        Ok(Py::new(py, Statistics::from(&results)).unwrap().into_any())
+    #[pyo3(signature = (timeout=None))]
+    pub fn collect(&mut self, timeout: Option<f64>, py: Python) -> PyResult<Option<Py<PyAny>>> {
+        match timeout {
+            Some(secs) if secs > 0.0 => {
+                let duration = Duration::from_secs_f64(secs);
+                let result = py.detach(|| self.instance.collect_timeout(duration))?;
+                match result {
+                    Some(statistics) => Ok(Some(
+                        Py::new(py, Statistics::from_owned(statistics))?.into_any(),
+                    )),
+                    None => Ok(None),
+                }
+            }
+            _ => {
+                let results = py.detach(|| self.instance.collect())?;
+                Ok(Some(
+                    Py::new(py, Statistics::from_owned(results))?.into_any(),
+                ))
+            }
+        }
     }
 
     pub fn has_results(&mut self) -> bool {
@@ -106,7 +134,7 @@ impl Count {
     }
 
     pub fn results(&mut self, py: Python) -> Py<PyAny> {
-        Py::new(py, Statistics::from(&self.instance.results()))
+        Py::new(py, Statistics::from_owned(self.instance.results()))
             .unwrap()
             .into_any()
     }
@@ -132,7 +160,7 @@ impl Count {
 
     #[pyo3(signature = (duration=None))]
     fn as_dict(&mut self, duration: Option<bool>, py: Python) -> PyResult<Py<PyAny>> {
-        Statistics::from(&self.instance.results()).as_dict(duration, py)
+        Statistics::from_owned(self.instance.results()).as_dict(duration, py)
     }
 
     #[cfg(feature = "speedy")]
@@ -181,10 +209,9 @@ impl Count {
         _value: Option<&Bound<PyAny>>,
         _traceback: Option<&Bound<PyAny>>,
     ) -> PyResult<bool> {
-        if !self.instance.stop() {
-            return Ok(false);
-        }
-        self.instance.join();
+        // stop() already takes and joins the thread internally; returning False only means the thread wasn’t running, so there’s no need to join it again.
+        let _ = self.instance.stop();
+        self.busy = false;
         match ty {
             Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
@@ -192,7 +219,8 @@ impl Count {
     }
 
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        if slf.busy {
+        // Use instance.busy() instead of a local busy flag to avoid the flag getting stuck after break.
+        if slf.instance.busy() {
             return Err(PyRuntimeError::new_err("Busy"));
         }
         slf.instance.start()?;
@@ -204,11 +232,14 @@ impl Count {
         if !self.busy {
             return Ok(None);
         }
-        if !self.instance.busy() {
+        if self.instance.busy() {
+            // Release GIL while waiting for worker progress (aiu)
+            py.detach(|| std::thread::sleep(Duration::from_millis(100)));
+        } else {
             self.busy = false;
         }
         Ok(Some(
-            Py::new(py, Statistics::from(&self.instance.results()))
+            Py::new(py, Statistics::from_owned(self.instance.results()))
                 .unwrap()
                 .into_any(),
         ))

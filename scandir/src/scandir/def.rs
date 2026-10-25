@@ -159,9 +159,40 @@ impl ScandirResults {
         self.results.len() + self.errors.len()
     }
 
-    pub fn extend(&mut self, results: &ScandirResults) {
-        self.results.extend_from_slice(&results.results);
-        self.errors.extend_from_slice(&results.errors);
+    pub fn extend(&mut self, other: &ScandirResults) {
+        self.results.extend_from_slice(&other.results);
+        self.errors.extend_from_slice(&other.errors);
+    }
+
+    #[inline]
+    pub fn push_entry(&mut self, entry: ScandirResult) {
+        self.results.push(entry);
+    }
+
+    /// Return all directory entries, with optional filtering and no extra memory allocation.
+    #[inline]
+    pub fn dirs(&self) -> impl Iterator<Item = &ScandirResult> {
+        self.results.iter().filter(|e| e.is_dir())
+    }
+
+    /// Return all file entries, with optional filtering and no extra memory allocation.
+    #[inline]
+    pub fn files(&self) -> impl Iterator<Item = &ScandirResult> {
+        self.results.iter().filter(|e| e.is_file())
+    }
+
+    /// Return all symbolic link entries, with optional filtering and no extra memory allocation.
+    #[inline]
+    pub fn symlinks(&self) -> impl Iterator<Item = &ScandirResult> {
+        self.results.iter().filter(|e| e.is_symlink())
+    }
+
+    /// Return all entries of other types, with optional filtering and no extra memory allocation.
+    #[inline]
+    pub fn other(&self) -> impl Iterator<Item = &ScandirResult> {
+        self.results
+            .iter()
+            .filter(|e| !e.is_dir() && !e.is_file() && !e.is_symlink())
     }
 
     #[cfg(feature = "speedy")]

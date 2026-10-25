@@ -1,15 +1,16 @@
 use std::io::ErrorKind;
-use std::thread;
+use std::sync::Arc;
 use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::types::{PyBytes, PyDict, PyType};
 use pyo3::{IntoPyObjectExt, prelude::*};
-use scandir::{ErrorsType, ScandirResult, ScandirResults};
+use scandir::{ErrorsType, ScandirResult};
 
 use crate::common::ReturnType;
 use crate::count::Statistics;
 use crate::direntry::{DirEntry, DirEntryExt};
+use crate::scandir::ScandirResults as PyScandirResults;
 
 fn result2py(result: &ScandirResult, py: Python) -> Option<Py<PyAny>> {
     match result {
@@ -25,7 +26,13 @@ fn result2py(result: &ScandirResult, py: Python) -> Option<Py<PyAny>> {
 #[derive(Debug)]
 pub struct Scandir {
     instance: scandir::Scandir,
-    entries: ScandirResults,
+    entries: scandir::ScandirResults,
+}
+
+impl Drop for Scandir {
+    fn drop(&mut self) {
+        self.instance.stop();
+    }
 }
 
 #[pymethods]
@@ -72,7 +79,7 @@ impl Scandir {
                     }
                 },
             },
-            entries: ScandirResults::new(),
+            entries: scandir::ScandirResults::new(),
         })
     }
 
@@ -106,14 +113,26 @@ impl Scandir {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<(Vec<Py<PyAny>>, ErrorsType)> {
-        let entries = py.detach(|| self.instance.collect())?;
-        let results = entries
-            .results
-            .iter()
-            .filter_map(|r| result2py(r, py))
-            .collect();
-        Ok((results, entries.errors))
+    #[pyo3(signature = (timeout=None))]
+    pub fn collect(
+        &mut self,
+        timeout: Option<f64>,
+        py: Python,
+    ) -> PyResult<Option<PyScandirResults>> {
+        match timeout {
+            Some(secs) if secs > 0.0 => {
+                let duration = Duration::from_secs_f64(secs);
+                let result = py.detach(|| self.instance.collect_timeout(duration))?;
+                match result {
+                    Some(entries) => Ok(Some(PyScandirResults::from_inner(Arc::new(entries)))),
+                    None => Ok(None),
+                }
+            }
+            _ => {
+                let entries = py.detach(|| self.instance.collect())?;
+                Ok(Some(PyScandirResults::from_inner(entries)))
+            }
+        }
     }
 
     #[pyo3(signature = (only_new=None))]
@@ -127,14 +146,9 @@ impl Scandir {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn results(&mut self, only_new: Option<bool>, py: Python) -> (Vec<Py<PyAny>>, ErrorsType) {
+    pub fn results(&mut self, only_new: Option<bool>) -> PyScandirResults {
         let entries = self.instance.results(only_new.unwrap_or(true));
-        let results = entries
-            .results
-            .iter()
-            .filter_map(|e| result2py(e, py))
-            .collect();
-        (results, entries.errors)
+        PyScandirResults::from_inner(Arc::new(entries))
     }
 
     #[pyo3(signature = (only_new=None))]
@@ -173,21 +187,21 @@ impl Scandir {
     pub fn as_dict(&mut self, only_new: Option<bool>, py: Python) -> PyResult<Py<PyAny>> {
         let pyresults = PyDict::new(py);
         let entries = self.instance.results(only_new.unwrap_or(true));
-        for entry in entries.results {
+        for entry in entries.results.into_iter() {
             let _ = match entry {
-                ScandirResult::DirEntry(e) => pyresults.set_item(
-                    e.path.clone().into_py_any(py)?,
-                    Py::new(py, DirEntry::from(&e)).unwrap().into_any(),
-                ),
-                ScandirResult::DirEntryExt(e) => pyresults.set_item(
-                    e.path.clone().into_py_any(py)?,
-                    Py::new(py, DirEntryExt::from(&e)).unwrap().into_any(),
-                ),
-                ScandirResult::Error((path, e)) => pyresults.set_item(path.into_py_any(py)?, e),
+                ScandirResult::DirEntry(e) => {
+                    let path = e.path.clone();
+                    pyresults.set_item(path, Py::new(py, DirEntry::from_owned(e))?.into_any())
+                }
+                ScandirResult::DirEntryExt(e) => {
+                    let path = e.path.clone();
+                    pyresults.set_item(path, Py::new(py, DirEntryExt::from_owned(e))?.into_any())
+                }
+                ScandirResult::Error((path, e)) => pyresults.set_item(path, e),
             };
         }
         for error in entries.errors {
-            let _ = pyresults.set_item(error.0.into_py_any(py)?, error.1.into_py_any(py)?);
+            let _ = pyresults.set_item(error.0, error.1);
         }
         Ok(pyresults.into_any().unbind())
     }
@@ -263,10 +277,8 @@ impl Scandir {
         _value: Option<&Bound<PyAny>>,
         _traceback: Option<&Bound<PyAny>>,
     ) -> PyResult<bool> {
-        if !self.instance.stop() {
-            return Ok(false);
-        }
-        self.instance.join();
+        // stop() already takes and joins the thread internally; returning False only means the thread wasn’t running, so there’s no need to join it again.
+        let _ = self.instance.stop();
         match ty {
             Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
@@ -287,10 +299,14 @@ impl Scandir {
             if let Some(entry) = self.entries.results.pop() {
                 match entry {
                     ScandirResult::DirEntry(e) => {
-                        return Ok(Some(Py::new(py, DirEntry::from(&e)).unwrap().into_any()));
+                        return Ok(Some(
+                            Py::new(py, DirEntry::from_owned(e)).unwrap().into_any(),
+                        ));
                     }
                     ScandirResult::DirEntryExt(e) => {
-                        return Ok(Some(Py::new(py, DirEntryExt::from(&e)).unwrap().into_any()));
+                        return Ok(Some(
+                            Py::new(py, DirEntryExt::from_owned(e)).unwrap().into_any(),
+                        ));
                     }
                     ScandirResult::Error(error) => {
                         return Ok(Some(error.into_py_any(py)?));
@@ -300,15 +316,15 @@ impl Scandir {
             if let Some(error) = self.entries.errors.pop() {
                 return Ok(Some(error.into_py_any(py)?));
             }
-            let entries = self.instance.results(true);
+            // Event-driven wait: release GIL while waiting for results
+            let entries = py.detach(|| self.instance.results_timeout(Duration::from_millis(100)));
             if entries.is_empty() {
                 if !self.instance.busy() {
                     break;
                 }
-                thread::sleep(Duration::from_millis(10));
-            } else {
-                self.entries.extend(&entries);
+                continue;
             }
+            self.entries.extend(&entries);
         }
         Ok(None)
     }

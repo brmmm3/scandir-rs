@@ -18,13 +18,17 @@ impl DirEntry {
     pub fn from(entry: &scandir::DirEntry) -> Self {
         DirEntry(entry.clone())
     }
+
+    pub fn from_owned(entry: scandir::DirEntry) -> Self {
+        DirEntry(entry)
+    }
 }
 
 #[pymethods]
 impl DirEntry {
     #[getter]
-    fn path(&self) -> String {
-        self.0.path.clone()
+    fn path(&self) -> &str {
+        &self.0.path
     }
 
     #[getter]
@@ -79,7 +83,7 @@ impl DirEntry {
 
     fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
-        pydict.set_item("path", self.0.path.clone())?;
+        pydict.set_item("path", &self.0.path)?;
         pydict.set_item("is_symlink", self.0.is_symlink)?;
         pydict.set_item("is_dir", self.0.is_dir)?;
         pydict.set_item("is_file", self.0.is_file)?;
@@ -138,13 +142,17 @@ impl DirEntryExt {
     pub fn from(entry: &scandir::DirEntryExt) -> Self {
         DirEntryExt(entry.clone())
     }
+
+    pub fn from_owned(entry: scandir::DirEntryExt) -> Self {
+        DirEntryExt(entry)
+    }
 }
 
 #[pymethods]
 impl DirEntryExt {
     #[getter]
-    fn path(&self) -> String {
-        self.0.path.clone()
+    fn path(&self) -> &str {
+        &self.0.path
     }
 
     #[getter]
@@ -244,7 +252,7 @@ impl DirEntryExt {
 
     fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
-        pydict.set_item("path", self.0.path.clone())?;
+        pydict.set_item("path", &self.0.path)?;
         pydict.set_item("is_symlink", self.0.is_symlink)?;
         pydict.set_item("is_dir", self.0.is_dir)?;
         pydict.set_item("is_file", self.0.is_file)?;

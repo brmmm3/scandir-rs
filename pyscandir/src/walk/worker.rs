@@ -1,6 +1,6 @@
+use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::ErrorKind;
-use std::thread;
 use std::time::Duration;
 
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
@@ -18,8 +18,14 @@ pub struct Walk {
     instance: scandir::Walk,
     return_type: ReturnType,
     // For iterator
-    entries: Vec<(String, scandir::Toc)>,
-    idx: usize,
+    entries: VecDeque<(String, scandir::Toc)>,
+    iterating: bool,
+}
+
+impl Drop for Walk {
+    fn drop(&mut self) {
+        self.instance.stop();
+    }
 }
 
 #[pymethods]
@@ -67,8 +73,8 @@ impl Walk {
                 },
             },
             return_type,
-            entries: Vec::new(),
-            idx: usize::MAX,
+            entries: VecDeque::new(),
+            iterating: false,
         })
     }
 
@@ -79,7 +85,7 @@ impl Walk {
     pub fn clear(&mut self) {
         self.instance.clear();
         self.entries.clear();
-        self.idx = usize::MAX;
+        self.iterating = false;
     }
 
     pub fn start(&mut self) -> PyResult<()> {
@@ -103,8 +109,22 @@ impl Walk {
         Ok(true)
     }
 
-    pub fn collect(&mut self, py: Python) -> PyResult<Toc> {
-        Ok(Toc::from(&py.detach(|| self.instance.collect())?))
+    #[pyo3(signature = (timeout=None))]
+    pub fn collect(&mut self, timeout: Option<f64>, py: Python) -> PyResult<Option<Toc>> {
+        match timeout {
+            Some(secs) if secs > 0.0 => {
+                let duration = Duration::from_secs_f64(secs);
+                let result = py.detach(|| self.instance.collect_timeout(duration))?;
+                match result {
+                    Some(toc) => Ok(Some(Toc::from_owned(toc))),
+                    None => Ok(None),
+                }
+            }
+            _ => {
+                let toc = py.detach(|| self.instance.collect())?;
+                Ok(Some(Toc::from_owned(toc)))
+            }
+        }
     }
 
     #[pyo3(signature = (only_new=None))]
@@ -127,7 +147,7 @@ impl Walk {
         for result in self.instance.results(only_new.unwrap_or(false)) {
             results.push((
                 result.0,
-                Py::new(py, Toc::from(&result.1)).unwrap().into_py_any(py)?,
+                Py::new(py, Toc::from_owned(result.1))?.into_py_any(py)?,
             ));
         }
         Ok(results)
@@ -217,10 +237,9 @@ impl Walk {
         _value: Option<&Bound<PyAny>>,
         _traceback: Option<&Bound<PyAny>>,
     ) -> PyResult<bool> {
-        if !self.instance.stop() {
-            return Ok(false);
-        }
-        self.instance.join();
+        // stop() already takes and joins the thread internally; returning False only means the thread wasn’t running, so there’s no need to join it again.
+        let _ = self.instance.stop();
+        self.iterating = false;
         match ty {
             Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
             None => Ok(false),
@@ -228,51 +247,47 @@ impl Walk {
     }
 
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        if slf.idx < usize::MAX {
+        if slf.iterating {
             return Err(PyRuntimeError::new_err("Busy"));
         }
         slf.instance.start()?;
         slf.entries.clear();
-        slf.idx = 0;
+        slf.iterating = true;
         Ok(slf)
     }
 
     fn __next__(&mut self, py: Python) -> PyResult<Option<Py<PyAny>>> {
         loop {
-            if let Some((root_dir, toc)) = self.entries.get(self.idx) {
-                self.idx += 1;
+            if let Some((root_dir, toc)) = self.entries.pop_front() {
                 if self.return_type == ReturnType::Base {
-                    return Ok(Some(
-                        (root_dir, toc.dirs.clone(), toc.files.clone()).into_py_any(py)?,
-                    ));
+                    return Ok(Some((root_dir, toc.dirs, toc.files).into_py_any(py)?));
                 } else {
                     return Ok(Some(
                         (
                             root_dir,
-                            toc.dirs.clone(),
-                            toc.files.clone(),
-                            toc.symlinks.clone(),
-                            toc.other.clone(),
-                            toc.errors.clone(),
+                            toc.dirs,
+                            toc.files,
+                            toc.symlinks,
+                            toc.other,
+                            toc.errors,
                         )
                             .into_py_any(py)?,
                     ));
                 }
             } else {
-                self.entries.clear();
-                self.entries
-                    .extend_from_slice(&self.instance.results(true)[..]);
-                if self.entries.is_empty() {
+                // Event-driven wait: release GIL while waiting for results
+                let new_entries =
+                    py.detach(|| self.instance.results_timeout(Duration::from_millis(100)));
+                if new_entries.is_empty() {
                     if !self.instance.busy() {
                         break;
                     }
-                    thread::sleep(Duration::from_millis(10));
                     continue;
                 }
-                self.idx = 0;
+                self.entries.extend(new_entries);
             }
         }
-        self.idx = usize::MAX;
+        self.iterating = false;
         Ok(None)
     }
 

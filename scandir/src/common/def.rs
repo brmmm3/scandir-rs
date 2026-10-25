@@ -15,7 +15,7 @@ pub struct Filter {
     pub options: Option<MatchOptions>,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReturnType {
     Base,
     Ext,

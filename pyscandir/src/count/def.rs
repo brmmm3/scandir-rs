@@ -16,6 +16,10 @@ impl Statistics {
     pub fn from(entry: &scandir::Statistics) -> Self {
         Statistics(entry.clone())
     }
+
+    pub fn from_owned(entry: scandir::Statistics) -> Self {
+        Statistics(entry)
+    }
 }
 
 #[pymethods]
@@ -61,8 +65,8 @@ impl Statistics {
     }
 
     #[getter]
-    fn errors(&self) -> Vec<String> {
-        self.0.errors.clone()
+    fn errors(&self) -> Vec<&str> {
+        self.0.errors.iter().map(|s| s.as_str()).collect()
     }
 
     #[getter]

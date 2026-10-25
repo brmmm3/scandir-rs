@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 #[cfg(feature = "bincode")]
 use bincode_next::error::EncodeError;
-use flume::{Receiver, Sender};
+use flume::{Receiver, RecvTimeoutError, Sender};
 
 use jwalk_meta::WalkDirGeneric;
 use parking_lot::Mutex;
@@ -17,7 +17,7 @@ use crate::count::Statistics;
 use crate::scandir::{ScandirResult, ScandirResults};
 use crate::{
     DirEntry, DirEntryExt, DirEntryType, ErrorsType, Filter, Options, ReturnType,
-    check_and_expand_path, filter_children, get_root_path_len, start,
+    check_and_expand_path, create_filter, filter_children, get_root_path_len, start,
 };
 
 #[inline]
@@ -30,6 +30,7 @@ fn create_entry(
     let mut st_ctime: Option<SystemTime> = None;
     let mut st_mtime: Option<SystemTime> = None;
     let mut st_atime: Option<SystemTime> = None;
+    let mut st_btime: Option<SystemTime> = None;
     let mut st_mode: u32 = 0;
     let mut st_ino: u64 = 0;
     let mut st_dev: u64 = 0;
@@ -53,7 +54,8 @@ fn create_entry(
     #[cfg(windows)]
     let st_rdev: u64 = 0;
     if let Some(ref metadata) = dir_entry.metadata {
-        st_ctime = metadata.created;
+        st_ctime = metadata.changed;
+        st_btime = metadata.created;
         st_mtime = metadata.modified;
         st_atime = metadata.accessed;
         st_size = metadata.size;
@@ -93,29 +95,19 @@ fn create_entry(
         }
     }
     let is_file = file_type.is_file();
-    let path_str = match dir_entry.parent_path.to_str() {
-        Some(v) => v,
-        None => {
-            return ScandirResult::Error((
-                dir_entry.parent_path.to_string_lossy().to_string(),
-                "Invalid dirname".to_string(),
-            ));
-        }
-    };
-    let mut path = if path_str.len() > root_path_len {
-        PathBuf::from(&path_str[root_path_len..])
+    let path_str = dir_entry.parent_path.to_string_lossy();
+    let file_name = dir_entry.file_name.to_string_lossy();
+    let path_str: &str = &path_str;
+    let file_name: &str = &file_name;
+    let path = if path_str.len() > root_path_len {
+        let relative = &path_str[root_path_len..];
+        let mut p = String::with_capacity(relative.len() + 1 + file_name.len());
+        p.push_str(relative);
+        p.push('/');
+        p.push_str(file_name);
+        p
     } else {
-        PathBuf::new()
-    };
-    path.push(&dir_entry.file_name);
-    let path = match path.to_str() {
-        Some(v) => v.to_string(),
-        None => {
-            return ScandirResult::Error((
-                path.to_string_lossy().to_string(),
-                "Invalid path".to_string(),
-            ));
-        }
+        file_name.to_owned()
     };
     let entry: ScandirResult = match return_type {
         ReturnType::Base => ScandirResult::DirEntry(DirEntry {
@@ -129,13 +121,25 @@ fn create_entry(
             st_size,
         }),
         ReturnType::Ext => ScandirResult::DirEntryExt(DirEntryExt {
-            path,
+            // Base branch above moves `path`, Ext branch must re-build it.
+            // Returned by the closure as the last statement, no shared use beyond this fn.
+            path: if path_str.len() > root_path_len {
+                let relative = &path_str[root_path_len..];
+                let mut p = String::with_capacity(relative.len() + 1 + file_name.len());
+                p.push_str(relative);
+                p.push('/');
+                p.push_str(file_name);
+                p
+            } else {
+                file_name.to_owned()
+            },
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
             is_file,
             st_ctime,
             st_mtime,
             st_atime,
+            st_btime,
             st_mode,
             st_ino,
             st_dev,
@@ -151,6 +155,7 @@ fn create_entry(
     entry
 }
 
+/// Streaming mode worker: sends entries through channel for incremental consumption.
 fn worker_thread(
     dir_entry: DirEntryType,
     options: Options,
@@ -159,7 +164,7 @@ fn worker_thread(
     stop: Arc<AtomicBool>,
 ) -> Result<(), Error> {
     let root_path_len = get_root_path_len(&options.root_path)?;
-    let return_type = options.return_type.clone();
+    let return_type = options.return_type;
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
         let _ = tx.send(create_entry(root_path_len, &return_type, &dir_entry));
@@ -168,6 +173,8 @@ fn worker_thread(
 
     let max_file_cnt = options.max_file_cnt;
     let mut file_cnt = 0;
+    let stop_cb = stop.clone();
+    let tx_outer = tx.clone(); // H3: outer for-loop needs Sender; process_read_dir closure still moves original `tx`
 
     for result in WalkDirGeneric::new(&options.root_path)
         .skip_hidden(options.skip_hidden)
@@ -176,6 +183,111 @@ fn worker_thread(
         .max_depth(options.max_depth)
         .read_metadata(true)
         .read_metadata_ext(options.return_type == ReturnType::Ext)
+        .read_hardlink_info(options.return_type == ReturnType::Ext)
+        .process_read_dir(move |_, root_dir, _, children| {
+            if stop_cb.load(Ordering::Relaxed) {
+                return;
+            }
+            if let Some(root_dir) = root_dir.to_str() {
+                if root_dir.len() + 1 < root_path_len {
+                    return;
+                }
+            } else {
+                return;
+            }
+            for e in filter_children(children, &filter, root_path_len) {
+                if tx.send(ScandirResult::Error((String::new(), e))).is_err() {
+                    stop_cb.store(true, Ordering::Relaxed);
+                    return;
+                }
+            }
+            #[allow(clippy::needless_return)]
+            children
+                .iter_mut()
+                .for_each(|dir_entry_result| match dir_entry_result {
+                    Ok(dir_entry) => {
+                        if tx
+                            .send(create_entry(root_path_len, &return_type, dir_entry))
+                            .is_err()
+                        {
+                            stop_cb.store(true, Ordering::Relaxed);
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        if tx
+                            .send(ScandirResult::Error((String::new(), e.to_string())))
+                            .is_err()
+                        {
+                            stop_cb.store(true, Ordering::Relaxed);
+                            return;
+                        }
+                    }
+                });
+        })
+    {
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        match result {
+            Ok(dir_entry) => {
+                if !dir_entry.file_type.is_dir() {
+                    file_cnt += 1;
+                    if max_file_cnt > 0 && file_cnt > max_file_cnt {
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                // H3: outer iterator yielded I/O error — forward as ScandirResult::Error
+                // (same pattern as process_read_dir callback at line 195).
+                if tx_outer
+                    .send(ScandirResult::Error((String::new(), e.to_string())))
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Direct mode worker: accumulates results in-process, returns via JoinHandle.
+/// Eliminates channel overhead — zero additional memory for channel buffering.
+fn worker_thread_direct(
+    dir_entry: DirEntryType,
+    options: Options,
+    filter: Option<Filter>,
+    stop: Arc<AtomicBool>,
+) -> Result<ScandirResults, Error> {
+    let root_path_len = get_root_path_len(&options.root_path)?;
+    let return_type = options.return_type;
+
+    // If root path points to a file then return just this one entry
+    if !dir_entry.file_type.is_dir() {
+        let mut results = ScandirResults::new();
+        results.push_entry(create_entry(root_path_len, &return_type, &dir_entry));
+        return Ok(results);
+    }
+
+    let max_file_cnt = options.max_file_cnt;
+    let mut file_cnt = 0;
+    let mut entries = ScandirResults::new();
+
+    // Collect filter errors via Arc<parking_lot::Mutex> (no poisoning)
+    let filter_errors: Arc<parking_lot::Mutex<Vec<String>>> =
+        Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let filter_errors_clone = filter_errors.clone();
+
+    for result in WalkDirGeneric::new(&options.root_path)
+        .skip_hidden(options.skip_hidden)
+        .follow_links(options.follow_links)
+        .sort(options.sorted)
+        .max_depth(options.max_depth)
+        .read_metadata(true)
+        .read_metadata_ext(return_type == ReturnType::Ext)
+        .read_hardlink_info(return_type == ReturnType::Ext)
         .process_read_dir(move |_, root_dir, _, children| {
             if let Some(root_dir) = root_dir.to_str() {
                 if root_dir.len() + 1 < root_path_len {
@@ -184,32 +296,47 @@ fn worker_thread(
             } else {
                 return;
             }
-            filter_children(children, &filter, root_path_len);
-            #[allow(clippy::needless_return)]
-            children.iter_mut().for_each(|dir_entry_result| {
-                if let Ok(dir_entry) = dir_entry_result
-                    && tx
-                        .send(create_entry(root_path_len, &return_type, dir_entry))
-                        .is_err()
-                {
-                    return;
-                }
-            });
+            let errs = filter_children(children, &filter, root_path_len);
+            if !errs.is_empty() {
+                filter_errors_clone.lock().extend(errs);
+            }
+            // Only filter children here — do NOT send through channel
+            // The outer for loop will yield each DirEntry
         })
     {
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        if let Ok(dir_entry) = result
-            && !dir_entry.file_type.is_dir()
-        {
-            file_cnt += 1;
-            if max_file_cnt > 0 && file_cnt > max_file_cnt {
-                break;
+        match result {
+            Ok(dir_entry) => {
+                entries.push_entry(create_entry(root_path_len, &return_type, &dir_entry));
+                if !dir_entry.file_type.is_dir() {
+                    file_cnt += 1;
+                    if max_file_cnt > 0 && file_cnt > max_file_cnt {
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                if entries.errors.len() < 1000 {
+                    entries.errors.push((String::new(), e.to_string()));
+                }
             }
         }
     }
-    Ok(())
+
+    // Merge filter errors collected in callback
+    let mut guard = filter_errors.lock();
+    let errs: Vec<String> = guard.drain(..).collect();
+    if entries.errors.len() < 1000 {
+        entries.errors.extend(
+            errs.into_iter()
+                .take(1000 - entries.errors.len())
+                .map(|e| (String::new(), e)),
+        );
+    }
+
+    Ok(entries)
 }
 
 /// Class for iterating a file tree and returning `Entry` objects
@@ -219,7 +346,7 @@ pub struct Scandir {
     options: Options,
     store: bool,
     // Results
-    entries: ScandirResults,
+    entries: Arc<ScandirResults>,
     duration: Arc<Mutex<f64>>,
     finished: Arc<AtomicBool>,
     // Internal
@@ -248,8 +375,8 @@ impl Scandir {
                 follow_links: false,
                 return_type: ReturnType::Base,
             },
-            store: store.unwrap_or(true),
-            entries: ScandirResults::new(),
+            store: store.unwrap_or(false),
+            entries: Arc::new(ScandirResults::new()),
             duration: Arc::new(Mutex::new(0.0)),
             finished: Arc::new(AtomicBool::new(false)),
             thr: None,
@@ -356,7 +483,7 @@ impl Scandir {
     }
 
     pub fn clear(&mut self) {
-        self.entries.clear();
+        Arc::make_mut(&mut self.entries).clear();
         *self.duration.lock() = 0.0;
     }
 
@@ -402,14 +529,75 @@ impl Scandir {
         false
     }
 
-    pub fn collect(&mut self) -> Result<ScandirResults, Error> {
+    /// Collect all results using direct mode (no channel overhead).
+    /// Worker thread accumulates results in-process and returns via JoinHandle.
+    /// This eliminates channel memory accumulation that caused unbounded growth.
+    pub fn collect(&mut self) -> Result<Arc<ScandirResults>, Error> {
+        if self.options.return_type > ReturnType::Ext {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Parameter return_type has invalid value",
+            ));
+        }
+        if self.busy() {
+            return Err(Error::other("Busy"));
+        }
+        self.clear();
+
+        let filter = create_filter(&self.options)?;
+        let options = self.options.clone();
+        let stop = self.stop.clone();
+        let duration = self.duration.clone();
+        let finished = self.finished.clone();
+
+        stop.store(false, Ordering::Relaxed);
+        let dir_entry: DirEntryType = jwalk_meta::DirEntry::from_path(
+            0,
+            &options.root_path,
+            true,
+            true,
+            options.follow_links,
+            Some(Arc::new(Vec::new())),
+        )?;
+
+        let start_time = Instant::now();
+        let handle = thread::spawn(move || {
+            let result = worker_thread_direct(dir_entry, options, filter, stop);
+            *duration.lock() = start_time.elapsed().as_secs_f64();
+            finished.store(true, Ordering::Relaxed);
+            result
+        });
+
+        let results = handle
+            .join()
+            .map_err(|_| Error::other("Worker thread panicked"))??;
+
+        // bs1: write back to self so collect mode API (has_errors/errors_cnt/errors) works
+        // Approach D: Share ownership via Arc; O(1) clone instead of deep-cloning 440,000 entries.
+        let arc = Arc::new(results);
+        self.entries = arc.clone();
+        Ok(arc)
+    }
+
+    /// Collect results with a timeout for time-bounded operation.
+    /// Returns `Ok(Some(ScandirResults))` when collection completes within timeout.
+    /// Returns `Ok(None)` if timeout expires before completion.
+    /// The worker thread continues running after timeout — call `stop()` to abort.
+    pub fn collect_timeout(&mut self, timeout: Duration) -> Result<Option<ScandirResults>, Error> {
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
             }
-            self.join();
+            let deadline = Instant::now() + timeout;
+            while !self.finished() && self.busy() {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    return Ok(None);
+                }
+                let _ = self.receive_all_timeout(remaining.min(Duration::from_millis(100)));
+            }
         }
-        Ok(self.results(true))
+        Ok(Some(self.results(false)))
     }
 
     pub fn has_results(&mut self, only_new: bool) -> bool {
@@ -441,21 +629,73 @@ impl Scandir {
     pub fn results(&mut self, only_new: bool) -> ScandirResults {
         let mut results = ScandirResults::new();
         if let Some(ref rx) = self.rx {
+            results.results.reserve(rx.len());
             while let Ok(entry) = rx.try_recv() {
                 if let ScandirResult::Error(e) = entry {
                     results.errors.push(e);
                 } else {
-                    results.results.push(entry);
+                    results.push_entry(entry);
                 }
             }
         }
         if self.store {
-            self.entries.extend(&results);
+            Arc::make_mut(&mut self.entries).extend(&results);
         }
         if !only_new && self.store {
-            return self.entries.clone();
+            return std::mem::take(Arc::make_mut(&mut self.entries));
         }
         results
+    }
+
+    /// Receive results with a timeout. Waits up to `timeout` for the first result,
+    /// then drains all available results from the channel.
+    fn receive_all_timeout(&mut self, timeout: Duration) -> ScandirResults {
+        let mut results = ScandirResults::new();
+        if let Some(ref rx) = self.rx {
+            results.results.reserve(rx.len());
+            // First, try non-blocking drain
+            while let Ok(entry) = rx.try_recv() {
+                match entry {
+                    ScandirResult::Error(e) => results.errors.push(e),
+                    other => results.push_entry(other),
+                }
+            }
+            // If nothing available and worker busy, wait for first result
+            if results.is_empty() {
+                match rx.recv_timeout(timeout) {
+                    Ok(entry) => {
+                        match entry {
+                            ScandirResult::Error(e) => results.errors.push(e),
+                            other => results.push_entry(other),
+                        }
+                        // Drain remaining
+                        while let Ok(entry) = rx.try_recv() {
+                            match entry {
+                                ScandirResult::Error(e) => results.errors.push(e),
+                                other => results.push_entry(other),
+                            }
+                        }
+                    }
+                    Err(RecvTimeoutError::Timeout) => {}
+                    Err(RecvTimeoutError::Disconnected) => {
+                        // H2: worker thread panicked — channel disconnected.
+                        // Mark finished so outer busy()/finished() loops exit instead of spinning.
+                        self.finished.store(true, Ordering::Relaxed);
+                    }
+                }
+            }
+        }
+        if self.store {
+            Arc::make_mut(&mut self.entries).extend(&results);
+        }
+        results
+    }
+
+    /// Retrieve results with a timeout for event-driven consumption.
+    /// Waits up to `timeout` for results to arrive when channel is empty.
+    /// Returns new results only (always only_new=true behavior).
+    pub fn results_timeout(&mut self, timeout: Duration) -> ScandirResults {
+        self.receive_all_timeout(timeout)
     }
 
     pub fn has_entries(&mut self, only_new: bool) -> bool {

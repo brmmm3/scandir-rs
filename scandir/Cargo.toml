@@ -16,8 +16,8 @@ name = "scandir"
 crate-type = ["lib"]
 
 [dependencies]
-jwalk-meta = "0.9"
-parking_lot = "0.12"
+jwalk-meta = "1.1"
+parking_lot = "0.13"
 rayon = "1.12"
 flume = "0.12.0"
 glob-sl = "0.4"

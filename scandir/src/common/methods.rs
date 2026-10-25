@@ -197,12 +197,24 @@ pub fn filter_direntry(
 
 #[inline]
 pub fn filter_dir(root_path_len: usize, dir_entry: &DirEntryType, filter_ref: &Filter) -> bool {
-    let mut key = dir_entry.parent_path.to_path_buf();
-    key.push(&dir_entry.file_name);
-    let key = match key.to_str() {
-        Some(v) => v.get(root_path_len..).unwrap_or("").to_string(),
-        None => return false,
+    // Skip key construction entirely when no directory filter is configured
+    if filter_ref.dir_include.is_empty() && filter_ref.dir_exclude.is_empty() {
+        return true;
+    }
+    let file_name = match dir_entry.file_name.to_str() {
+        Some(s) => s,
+        None => return true,
     };
+    let parent_str = match dir_entry.parent_path.to_str() {
+        Some(s) => s,
+        None => return true,
+    };
+    // ponytail: only the suffix past root_path_len is used; allocate just that.
+    let parent_suffix = parent_str.get(root_path_len..).unwrap_or("");
+    let mut key = String::with_capacity(parent_suffix.len() + 1 + file_name.len());
+    key.push_str(parent_suffix);
+    key.push('/');
+    key.push_str(file_name);
     !(filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false)
         || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true))
 }
@@ -212,7 +224,8 @@ pub fn filter_children(
     children: &mut Vec<Result<DirEntryType, jwalk_meta::Error>>,
     filter: &Option<Filter>,
     root_path_len: usize,
-) {
+) -> Vec<String> {
+    let mut errors = Vec::new();
     if let Some(filter_ref) = &filter {
         children.retain(|dir_entry_result| {
             dir_entry_result
@@ -236,9 +249,13 @@ pub fn filter_children(
                     }
                     true
                 })
-                .unwrap_or(false)
+                .unwrap_or_else(|e| {
+                    errors.push(e.to_string());
+                    false
+                })
         });
     }
+    errors
 }
 
 #[allow(clippy::type_complexity)]
@@ -265,7 +282,7 @@ pub fn start<T: Send + 'static + std::fmt::Debug>(
         true,
         true,
         options.follow_links,
-        Arc::new(Vec::new()),
+        Some(Arc::new(Vec::new())),
     )?;
     Ok((
         Some(thread::spawn(move || {

@@ -38,6 +38,11 @@ impl Statistics {
         }
     }
 
+    /// Construct from owned Statistics by moving it, allowing the binding layer to avoid a deep copy.
+    pub fn from_owned(s: Statistics) -> Self {
+        s
+    }
+
     pub fn clear(&mut self) {
         self.dirs = 0;
         self.files = 0;

@@ -77,9 +77,13 @@ Options opts = new Options()
 ## Architecture
 
 Uses traditional JNI for C interop.
-The `src/main/cpp/jscandir_jni.cpp` bridge calls the C `cscandir_collect` and `cscandir_count` APIs. JNI incurs a per-entry Java object and string conversion cost; when processing large trees, `count` is cheaper because it does not allocate entry objects. JNI UTF-16 strings are converted to/from the C API's UTF-8 explicitly. C-owned buffers are freed after conversion.
+The `src/main/cpp/jscandir_jni.cpp` bridge calls the C `cscandir_collect` and `cscandir_count` APIs.
+JNI incurs a per-entry Java object and string conversion cost; when processing large trees, `count` is cheaper because it does not allocate entry objects.
+JNI UTF-16 strings are converted to/from the C API's UTF-8 explicitly. C-owned buffers are freed after conversion.
 
-The Maven build creates `target/native` and invokes `g++` with the active JDK's JNI headers, then links the bridge against the release C library in `../target/release`. Build that library first from the repository root with `cargo build -p cscandir --release`. The bridge build currently targets Linux; Windows and macOS require platform-specific compiler, header, linker, and library-name settings.
+The Maven build creates `target/native` and invokes `g++` with the active JDK's JNI headers, then links the bridge against the release C library in `../target/release`.
+Build that library first from the repository root with `cargo build -p cscandir --release`.
+The bridge build currently targets Linux; Windows and macOS require platform-specific compiler, header, linker, and library-name settings.
 
 ## Examples
 

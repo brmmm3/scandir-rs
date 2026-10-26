@@ -68,11 +68,15 @@ Options opts = Options.defaultOptions()
 
 ## Architecture and performance
 
-Uses the stable Java Foreign Function & Memory API to call the supported `cscandir_collect` and `cscandir_count` functions. Output pointers are decoded in place into Java result objects and C-owned output allocations are freed in `finally` blocks. FFM avoids the extra JNI bridge but collecting still materializes Java entry objects and copies UTF-8 names into Java strings. The C ABI is synchronous and does not export `walk`; `JScandir.walk` groups the single collect result in Java (it is not a streaming walk).
+Uses the stable Java Foreign Function & Memory API to call the supported `cscandir_collect` and `cscandir_count` functions.
+Output pointers are decoded in place into Java result objects and C-owned output allocations are freed in `finally` blocks.
+FFM avoids the extra JNI bridge but collecting still materializes Java entry objects and copies UTF-8 names into Java strings.
+The C ABI is synchronous and does not export `walk`; `JScandir.walk` groups the single collect result in Java (it is not a streaming walk).
 
 ## License
 
 MIT OR Apache-2.0
+
 ## Examples
 
 ```bash
@@ -91,9 +95,9 @@ java --enable-native-access=ALL-UNNAMED -Dcscandir.lib.path="$LIB" \
 ```
 
 Available examples:
+
 - `ScandirCollect` - Basic entry collection with extended metadata
 - `ScandirWalk` - Directory tree walk with per-directory breakdown
 - `ScandirCount` - Fast statistics only (no entry materialization)
 - `ScandirFilter` - File/directory filtering with patterns
 - `CifsCtimeCheck` - ctime check with a `unix:ctime` cross-check (requires a mounted CIFS tree to validate CIFS behavior)
-

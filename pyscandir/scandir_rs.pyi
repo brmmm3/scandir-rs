@@ -1,33 +1,22 @@
-"""Type stubs for scandin_rs — a fast file tree scanner written in Rust."""
-
+"""Type stubs for ``scandir_rs``."""
 
 from collections.abc import Iterator
 from datetime import datetime
 from enum import Enum
-from typing import Any, Self
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+from typing import Any, Self, TypeAlias
 
 __version__: str
 
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
 
 class ReturnType(str, Enum):
-    """Return type selector for scandir / walk operations."""
+    """Return type selector for scandir and walk operations."""
 
     Base = "Base"
     Ext = "Ext"
 
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
 
 class DirEntry:
-    """Minimal directory entry with path, type flags and basic timestamps."""
+    """Minimal directory entry with basic file metadata."""
 
     path: str
     is_symlink: bool
@@ -42,14 +31,13 @@ class DirEntry:
     atime: float
 
     def as_dict(self) -> dict[str, Any]: ...
-
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...
 
+
 class DirEntryExt(DirEntry):
-    """Extended directory entry with full POSIX stat fields."""
+    """Directory entry with extended stat metadata."""
 
     st_blksize: int
     st_blocks: int
@@ -62,14 +50,20 @@ class DirEntryExt(DirEntry):
     st_rdev: int
 
     def as_dict(self) -> dict[str, Any]: ...
-
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...
 
+
+Entry: TypeAlias = DirEntry | DirEntryExt
+WalkItem: TypeAlias = (
+    tuple[str, list[str], list[str]]
+    | tuple[str, list[str], list[str], list[str], list[str], list[str]]
+)
+
+
 class ScandirResult:
-    """Result item from Scandir — either a DirEntry / DirEntryExt or an error."""
+    """Metadata and optional error information for one scan result."""
 
     path: str
     error: tuple[str, str] | None
@@ -82,14 +76,28 @@ class ScandirResult:
     size: int
     ext: DirEntryExt | None
 
-
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...
 
+
+class ScandirResults:
+    """Collected entries and errors from a ``Scandir`` operation."""
+
+    results: list[Entry]
+    dirs: list[Entry]
+    files: list[Entry]
+    symlinks: list[Entry]
+    other: list[Entry]
+    errors: list[tuple[str, str]]
+
+    def as_dict(self) -> dict[str, Entry | str]: ...
+    def __len__(self) -> int: ...
+    def __bool__(self) -> bool: ...
+
+
 class Statistics:
-    """Aggregate statistics from a Count or Scandir operation."""
+    """Aggregate statistics returned by ``Count`` and ``Scandir``."""
 
     dirs: int
     files: int
@@ -103,14 +111,13 @@ class Statistics:
     duration: float
 
     def as_dict(self, duration: bool | None = None) -> dict[str, Any]: ...
-
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...
 
+
 class Toc:
-    """Tree-of-contents: grouped file/directory paths from a Walk operation."""
+    """Grouped file and directory names from a ``Walk`` operation."""
 
     dirs: list[str]
     files: list[str]
@@ -119,22 +126,13 @@ class Toc:
     errors: list[str]
 
     def as_dict(self) -> dict[str, Any]: ...
-
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...
 
-# ---------------------------------------------------------------------------
-# Iterator classes
-# ---------------------------------------------------------------------------
 
 class Scandir:
-    """Async directory scanner that yields DirEntry / DirEntryExt objects.
-
-    Can be used as a simple iterator (blocks until finished) or started
-    manually for concurrent / incremental access.
-    """
+    """Asynchronous directory scanner yielding entries and errors."""
 
     def __init__(
         self,
@@ -153,53 +151,44 @@ class Scandir:
         store: bool | None = None,
     ) -> None: ...
 
-    # Configuration
     def extended(self, extended: bool) -> None: ...
     def clear(self) -> None: ...
-
-    # Lifecycle
     def start(self) -> None: ...
     def join(self) -> bool: ...
     def stop(self) -> bool: ...
-
-    # Data access
-    def collect(
-        self,
-    ) -> tuple[list[DirEntry | DirEntryExt], list[tuple[str, str]]]: ...
+    def collect(self, timeout: float | None = None) -> ScandirResults | None: ...
     def has_results(self, only_new: bool | None = None) -> bool: ...
     def results_cnt(self, only_new: bool | None = None) -> int: ...
-    def results(
-        self, only_new: bool | None = None
-    ) -> tuple[list[DirEntry | DirEntryExt], list[tuple[str, str]]]: ...
+    def results(self, only_new: bool | None = None) -> ScandirResults: ...
     def has_entries(self, only_new: bool | None = None) -> bool: ...
     def entries_cnt(self, only_new: bool | None = None) -> int: ...
-    def entries(
-        self, only_new: bool | None = None
-    ) -> list[DirEntry | DirEntryExt]: ...
+    def entries(self, only_new: bool | None = None) -> list[Entry]: ...
     def has_errors(self) -> bool: ...
     def errors_cnt(self) -> int: ...
     def errors(self, only_new: bool | None = None) -> list[tuple[str, str]]: ...
-    def as_dict(self, only_new: bool | None = None) -> dict[str, Any]: ...
+    def as_dict(self, only_new: bool | None = None) -> dict[str, Entry | str]: ...
 
-    # Properties
     statistics: Statistics
     duration: float
     finished: bool
     busy: bool
 
-    # Iterator protocol
-    def __iter__(self) -> Iterator[DirEntry | DirEntryExt]: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(
+        self,
+        ty: type[BaseException] | None = None,
+        value: BaseException | None = None,
+        traceback: object = None,
+    ) -> bool: ...
+    def __iter__(self) -> Iterator[Entry | tuple[str, str]]: ...
 
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...
 
-class Walk:
-    """Recursive directory walker yielding (root, dirs, files) tuples.
 
-    Supports optional symlink / other / error groups when return_type=ReturnType.Ext.
-    """
+class Walk:
+    """Recursive directory walker yielding grouped directory entries."""
 
     def __init__(
         self,
@@ -218,17 +207,12 @@ class Walk:
         store: bool | None = None,
     ) -> None: ...
 
-    # Configuration
     def extended(self, extended: bool) -> None: ...
     def clear(self) -> None: ...
-
-    # Lifecycle
     def start(self) -> None: ...
     def join(self) -> bool: ...
     def stop(self) -> bool: ...
-
-    # Data access
-    def collect(self) -> Toc: ...
+    def collect(self, timeout: float | None = None) -> Toc | None: ...
     def has_results(self, only_new: bool | None = None) -> bool: ...
     def results_cnt(self, only_new: bool | None = None) -> int: ...
     def results(self, only_new: bool | None = None) -> list[tuple[str, Toc]]: ...
@@ -236,24 +220,27 @@ class Walk:
     def errors_cnt(self) -> int: ...
     def errors(self, only_new: bool | None = None) -> list[tuple[str, str]]: ...
 
-    # Properties
     statistics: Statistics
     duration: float
     finished: bool
+    busy: bool
 
-    # Iterator protocol
-    def __iter__(self) -> Iterator[tuple[str, list[str], list[str]]]: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(
+        self,
+        ty: type[BaseException] | None = None,
+        value: BaseException | None = None,
+        traceback: object = None,
+    ) -> bool: ...
+    def __iter__(self) -> Iterator[WalkItem]: ...
 
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...
 
-class Count:
-    """Directory counter that collects file/directory statistics.
 
-    Supports context-manager protocol (``with Count(path) as c: ...``).
-    """
+class Count:
+    """Directory counter that collects file and directory statistics."""
 
     def __init__(
         self,
@@ -270,37 +257,30 @@ class Count:
         return_type: ReturnType | None = None,
     ) -> None: ...
 
-    # Configuration
     def extended(self, extended: bool) -> None: ...
     def clear(self) -> None: ...
-
-    # Lifecycle
     def start(self) -> None: ...
     def join(self) -> bool: ...
     def stop(self) -> bool: ...
-
-    # Data access
-    def collect(self) -> Statistics: ...
+    def collect(self, timeout: float | None = None) -> Statistics | None: ...
     def has_results(self) -> bool: ...
     def results(self) -> Statistics: ...
     def has_errors(self) -> bool: ...
     def as_dict(self, duration: bool | None = None) -> dict[str, Any]: ...
 
-    # Properties
     duration: float
     finished: bool
     busy: bool
 
-    # Context-manager protocol
     def __enter__(self) -> Self: ...
     def __exit__(
         self,
-        ty: type[BaseException] | None,
-        value: BaseException | None,
-        traceback: object,
-    ) -> None: ...
+        ty: type[BaseException] | None = None,
+        value: BaseException | None = None,
+        traceback: object = None,
+    ) -> bool: ...
+    def __iter__(self) -> Iterator[Statistics]: ...
 
-    # Feature-gated serialization
     def to_speedy(self) -> bytes: ...
     def to_bincode(self) -> bytes: ...
     def to_json(self) -> str: ...

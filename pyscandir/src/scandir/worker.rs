@@ -2,23 +2,21 @@ use std::io::ErrorKind;
 use std::sync::Arc;
 use std::time::Duration;
 
-use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
-use pyo3::types::{PyBytes, PyDict, PyType};
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError};
+use pyo3::types::{PyBytes, PyDict};
 use pyo3::{IntoPyObjectExt, prelude::*};
 use scandir::{ErrorsType, ScandirResult};
 
-use crate::common::ReturnType;
+use crate::common::{ReturnType, timeout_from_secs};
 use crate::count::Statistics;
 use crate::direntry::{DirEntry, DirEntryExt};
 use crate::scandir::ScandirResults as PyScandirResults;
 
-fn result2py(result: &ScandirResult, py: Python) -> Option<Py<PyAny>> {
+fn result2py(result: &ScandirResult, py: Python) -> PyResult<Option<Py<PyAny>>> {
     match result {
-        ScandirResult::DirEntry(e) => Some(Py::new(py, DirEntry::from(e)).unwrap().into_any()),
-        ScandirResult::DirEntryExt(e) => {
-            Some(Py::new(py, DirEntryExt::from(e)).unwrap().into_any())
-        }
-        ScandirResult::Error((_path, _e)) => None,
+        ScandirResult::DirEntry(e) => Ok(Some(Py::new(py, DirEntry::from(e))?.into_any())),
+        ScandirResult::DirEntryExt(e) => Ok(Some(Py::new(py, DirEntryExt::from(e))?.into_any())),
+        ScandirResult::Error((_path, _e)) => Ok(None),
     }
 }
 
@@ -26,7 +24,9 @@ fn result2py(result: &ScandirResult, py: Python) -> Option<Py<PyAny>> {
 #[derive(Debug)]
 pub struct Scandir {
     instance: scandir::Scandir,
-    entries: scandir::ScandirResults,
+    entries: std::collections::VecDeque<ScandirResult>,
+    errors: std::collections::VecDeque<(String, String)>,
+    iterating: bool,
 }
 
 impl Drop for Scandir {
@@ -79,7 +79,9 @@ impl Scandir {
                     }
                 },
             },
-            entries: scandir::ScandirResults::new(),
+            entries: std::collections::VecDeque::new(),
+            errors: std::collections::VecDeque::new(),
+            iterating: false,
         })
     }
 
@@ -90,6 +92,8 @@ impl Scandir {
     pub fn clear(&mut self) {
         self.instance.clear();
         self.entries.clear();
+        self.errors.clear();
+        self.iterating = false;
     }
 
     pub fn start(&mut self) -> PyResult<()> {
@@ -119,9 +123,8 @@ impl Scandir {
         timeout: Option<f64>,
         py: Python,
     ) -> PyResult<Option<PyScandirResults>> {
-        match timeout {
-            Some(secs) if secs > 0.0 => {
-                let duration = Duration::from_secs_f64(secs);
+        match timeout_from_secs(timeout)? {
+            Some(duration) => {
                 let result = py.detach(|| self.instance.collect_timeout(duration))?;
                 match result {
                     Some(entries) => Ok(Some(PyScandirResults::from_inner(Arc::new(entries)))),
@@ -162,12 +165,14 @@ impl Scandir {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn entries(&mut self, only_new: Option<bool>, py: Python) -> Vec<Py<PyAny>> {
-        self.instance
-            .entries(only_new.unwrap_or(true))
-            .iter()
-            .filter_map(|e| result2py(e, py))
-            .collect()
+    pub fn entries(&mut self, only_new: Option<bool>, py: Python) -> PyResult<Vec<Py<PyAny>>> {
+        let mut converted = Vec::new();
+        for entry in self.instance.entries(only_new.unwrap_or(true)) {
+            if let Some(entry) = result2py(&entry, py)? {
+                converted.push(entry);
+            }
+        }
+        Ok(converted)
     }
 
     pub fn has_errors(&mut self) -> bool {
@@ -188,52 +193,48 @@ impl Scandir {
         let pyresults = PyDict::new(py);
         let entries = self.instance.results(only_new.unwrap_or(true));
         for entry in entries.results.into_iter() {
-            let _ = match entry {
+            match entry {
                 ScandirResult::DirEntry(e) => {
                     let path = e.path.clone();
-                    pyresults.set_item(path, Py::new(py, DirEntry::from_owned(e))?.into_any())
+                    pyresults.set_item(path, Py::new(py, DirEntry::from_owned(e))?.into_any())?
                 }
                 ScandirResult::DirEntryExt(e) => {
                     let path = e.path.clone();
-                    pyresults.set_item(path, Py::new(py, DirEntryExt::from_owned(e))?.into_any())
+                    pyresults.set_item(path, Py::new(py, DirEntryExt::from_owned(e))?.into_any())?
                 }
-                ScandirResult::Error((path, e)) => pyresults.set_item(path, e),
-            };
+                ScandirResult::Error((path, e)) => pyresults.set_item(path, e)?,
+            }
         }
         for error in entries.errors {
-            let _ = pyresults.set_item(error.0, error.1);
+            pyresults.set_item(error.0, error.1)?;
         }
         Ok(pyresults.into_any().unbind())
     }
 
     #[cfg(feature = "speedy")]
     pub fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
-        self.instance
+        let bytes = self
+            .instance
             .to_speedy()
-            .map(|v| {
-                PyBytes::new_with(py, v.len(), |b| {
-                    b.copy_from_slice(&v);
-                    Ok(())
-                })
-                .unwrap()
-                .into()
-            })
-            .map_err(|e| PyException::new_err(e.to_string()))
+            .map_err(|e| PyException::new_err(e.to_string()))?;
+        Ok(PyBytes::new_with(py, bytes.len(), |b| {
+            b.copy_from_slice(&bytes);
+            Ok(())
+        })?
+        .into())
     }
 
     #[cfg(feature = "bincode")]
     pub fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
-        self.instance
+        let bytes = self
+            .instance
             .to_bincode()
-            .map(|v| {
-                PyBytes::new_with(py, v.len(), |b| {
-                    b.copy_from_slice(&v);
-                    Ok(())
-                })
-                .unwrap()
-                .into()
-            })
-            .map_err(|e| PyException::new_err(e.to_string()))
+            .map_err(|e| PyException::new_err(e.to_string()))?;
+        Ok(PyBytes::new_with(py, bytes.len(), |b| {
+            b.copy_from_slice(&bytes);
+            Ok(())
+        })?
+        .into())
     }
 
     #[cfg(feature = "json")]
@@ -273,47 +274,49 @@ impl Scandir {
     #[pyo3(signature = (ty=None, _value=None, _traceback=None))]
     fn __exit__(
         &mut self,
-        ty: Option<&Bound<PyType>>,
+        ty: Option<&Bound<PyAny>>,
         _value: Option<&Bound<PyAny>>,
         _traceback: Option<&Bound<PyAny>>,
     ) -> PyResult<bool> {
         // stop() already takes and joins the thread internally; returning False only means the thread wasn’t running, so there’s no need to join it again.
         let _ = self.instance.stop();
-        match ty {
-            Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
-            None => Ok(false),
-        }
+        self.iterating = false;
+        let _ = ty;
+        Ok(false)
     }
 
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
+        if slf.iterating {
+            return Ok(slf);
+        }
         if slf.instance.busy() {
             return Err(PyRuntimeError::new_err("Busy"));
         }
-        slf.instance.start()?;
+        slf.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))?;
         slf.entries.clear();
+        slf.errors.clear();
+        slf.iterating = true;
         Ok(slf)
     }
 
     fn __next__(&mut self, py: Python) -> PyResult<Option<Py<PyAny>>> {
         loop {
-            if let Some(entry) = self.entries.results.pop() {
+            if let Some(entry) = self.entries.pop_front() {
                 match entry {
                     ScandirResult::DirEntry(e) => {
-                        return Ok(Some(
-                            Py::new(py, DirEntry::from_owned(e)).unwrap().into_any(),
-                        ));
+                        return Ok(Some(Py::new(py, DirEntry::from_owned(e))?.into_any()));
                     }
                     ScandirResult::DirEntryExt(e) => {
-                        return Ok(Some(
-                            Py::new(py, DirEntryExt::from_owned(e)).unwrap().into_any(),
-                        ));
+                        return Ok(Some(Py::new(py, DirEntryExt::from_owned(e))?.into_any()));
                     }
                     ScandirResult::Error(error) => {
                         return Ok(Some(error.into_py_any(py)?));
                     }
                 }
             }
-            if let Some(error) = self.entries.errors.pop() {
+            if let Some(error) = self.errors.pop_front() {
                 return Ok(Some(error.into_py_any(py)?));
             }
             // Event-driven wait: release GIL while waiting for results
@@ -324,8 +327,10 @@ impl Scandir {
                 }
                 continue;
             }
-            self.entries.extend(&entries);
+            self.entries.extend(entries.results);
+            self.errors.extend(entries.errors);
         }
+        self.iterating = false;
         Ok(None)
     }
 

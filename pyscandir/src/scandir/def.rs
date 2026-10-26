@@ -108,24 +108,25 @@ impl ScandirResult {
 }
 
 /// Convert a slice of ScandirResult to Python objects
-fn results_to_py(results: &[scandir::ScandirResult], py: Python) -> Vec<Py<PyAny>> {
-    results
-        .iter()
-        .filter_map(|r| result2py_inner(r, py))
-        .collect()
+fn results_to_py(results: &[scandir::ScandirResult], py: Python) -> PyResult<Vec<Py<PyAny>>> {
+    let mut converted = Vec::with_capacity(results.len());
+    for result in results {
+        if let Some(result) = result2py_inner(result, py)? {
+            converted.push(result);
+        }
+    }
+    Ok(converted)
 }
 
-fn result2py_inner(result: &scandir::ScandirResult, py: Python) -> Option<Py<PyAny>> {
+fn result2py_inner(result: &scandir::ScandirResult, py: Python) -> PyResult<Option<Py<PyAny>>> {
     match result {
-        scandir::ScandirResult::DirEntry(e) => Some(
-            Py::new(py, crate::direntry::DirEntry::from(e))
-                .unwrap()
-                .into_any(),
-        ),
+        scandir::ScandirResult::DirEntry(e) => Ok(Some(
+            Py::new(py, crate::direntry::DirEntry::from(e))?.into_any(),
+        )),
         scandir::ScandirResult::DirEntryExt(e) => {
-            Some(Py::new(py, DirEntryExt::from(e)).unwrap().into_any())
+            Ok(Some(Py::new(py, DirEntryExt::from(e))?.into_any()))
         }
-        scandir::ScandirResult::Error(_) => None,
+        scandir::ScandirResult::Error(_) => Ok(None),
     }
 }
 
@@ -148,40 +149,44 @@ impl ScandirResults {
 #[pymethods]
 impl ScandirResults {
     #[getter]
-    fn results(&self, py: Python) -> Vec<Py<PyAny>> {
+    fn results(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         results_to_py(&self.inner.results, py)
     }
 
     #[getter]
-    fn dirs(&self, py: Python) -> Vec<Py<PyAny>> {
+    fn dirs(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         self.inner
             .dirs()
-            .filter_map(|r| result2py_inner(r, py))
-            .collect()
+            .map(|result| result2py_inner(result, py))
+            .collect::<PyResult<Vec<_>>>()
+            .map(|results| results.into_iter().flatten().collect())
     }
 
     #[getter]
-    fn files(&self, py: Python) -> Vec<Py<PyAny>> {
+    fn files(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         self.inner
             .files()
-            .filter_map(|r| result2py_inner(r, py))
-            .collect()
+            .map(|result| result2py_inner(result, py))
+            .collect::<PyResult<Vec<_>>>()
+            .map(|results| results.into_iter().flatten().collect())
     }
 
     #[getter]
-    fn symlinks(&self, py: Python) -> Vec<Py<PyAny>> {
+    fn symlinks(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         self.inner
             .symlinks()
-            .filter_map(|r| result2py_inner(r, py))
-            .collect()
+            .map(|result| result2py_inner(result, py))
+            .collect::<PyResult<Vec<_>>>()
+            .map(|results| results.into_iter().flatten().collect())
     }
 
     #[getter]
-    fn other(&self, py: Python) -> Vec<Py<PyAny>> {
+    fn other(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         self.inner
             .other()
-            .filter_map(|r| result2py_inner(r, py))
-            .collect()
+            .map(|result| result2py_inner(result, py))
+            .collect::<PyResult<Vec<_>>>()
+            .map(|results| results.into_iter().flatten().collect())
     }
 
     #[getter]
@@ -192,30 +197,26 @@ impl ScandirResults {
     fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
         for entry in &self.inner.results {
-            let _ = match entry {
+            match entry {
                 scandir::ScandirResult::DirEntry(e) => {
                     let path = e.path.clone();
                     pydict.set_item(
                         path,
-                        Py::new(py, crate::direntry::DirEntry::from_owned(e.clone()))
-                            .unwrap()
-                            .into_any(),
-                    )
+                        Py::new(py, crate::direntry::DirEntry::from_owned(e.clone()))?.into_any(),
+                    )?
                 }
                 scandir::ScandirResult::DirEntryExt(e) => {
                     let path = e.path.clone();
                     pydict.set_item(
                         path,
-                        Py::new(py, DirEntryExt::from_owned(e.clone()))
-                            .unwrap()
-                            .into_any(),
-                    )
+                        Py::new(py, DirEntryExt::from_owned(e.clone()))?.into_any(),
+                    )?
                 }
-                scandir::ScandirResult::Error((path, e)) => pydict.set_item(path, e),
-            };
+                scandir::ScandirResult::Error((path, e)) => pydict.set_item(path, e)?,
+            }
         }
         for error in &self.inner.errors {
-            let _ = pydict.set_item(error.0.clone(), error.1.clone());
+            pydict.set_item(error.0.clone(), error.1.clone())?;
         }
         Ok(pydict.into_any().unbind())
     }

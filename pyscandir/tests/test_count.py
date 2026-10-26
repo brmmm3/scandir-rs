@@ -50,6 +50,51 @@ def test_count_extended_dir_include(tempDir):
 
 def test_count_extended_dir_exclude(tempDir):
     count = Count(tempDir.name, return_type=ReturnType.Ext,
-                  dir_exclude=["dir0", "dir1"]).collect()
-    assert count.as_dict() == {'dirs': 30, 'files': 900,
-                               'size': 122880, 'usage': 122880}
+                  dir_exclude=["dir0/**", "dir1/**"]).collect()
+    assert count.as_dict() == {'dirs': 24, 'files': 720,
+                               'size': 98304, 'usage': 98304}
+
+
+def test_count_iteration_yields_only_changed_statistics(tempDir):
+    snapshots = [statistics.as_dict() for statistics in Count(tempDir.name)]
+
+    assert snapshots
+    assert all(previous != current for previous, current in zip(snapshots, snapshots[1:]))
+    assert snapshots[-1]["files"] == 900
+
+
+def test_count_context_manager_does_not_suppress_value_error(tempDir):
+    with pytest.raises(ValueError, match="caller error"):
+        with Count(tempDir.name):
+            raise ValueError("caller error")
+
+
+def test_count_iter_returns_active_iterator_unchanged(tempDir):
+    iterator = iter(Count(tempDir.name))
+
+    assert iter(iterator) is iterator
+    snapshots = list(iterator)
+    assert snapshots[-1].files == 900
+
+
+@pytest.mark.parametrize("timeout", [-1.0, float("nan"), float("inf"), 1e19, 1e300])
+def test_count_rejects_invalid_collect_timeout(tempDir, timeout):
+    with pytest.raises(ValueError, match="timeout"):
+        Count(tempDir.name).collect(timeout=timeout)
+
+
+def test_count_collect_timeout_returns_statistics(tempDir):
+    statistics = Count(tempDir.name).collect(timeout=10.0)
+
+    assert statistics is not None
+    assert statistics.files == 900
+
+
+def test_count_root_relative_directory_include(tempDir):
+    statistics = Count(
+        tempDir.name,
+        dir_include=["dir0/**"],
+    ).collect()
+
+    assert statistics.as_dict()["dirs"] == 3
+    assert statistics.as_dict()["files"] == 90

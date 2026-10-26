@@ -78,34 +78,34 @@ impl Statistics {
     pub fn as_dict(&self, duration: Option<bool>, py: Python) -> PyResult<Py<PyAny>> {
         let pyresult = PyDict::new(py);
         if self.0.dirs > 0 {
-            pyresult.set_item("dirs", self.0.dirs).unwrap();
+            pyresult.set_item("dirs", self.0.dirs)?;
         }
         if self.0.files > 0 {
-            pyresult.set_item("files", self.0.files).unwrap();
+            pyresult.set_item("files", self.0.files)?;
         }
         if self.0.slinks > 0 {
-            pyresult.set_item("slinks", self.0.slinks).unwrap();
+            pyresult.set_item("slinks", self.0.slinks)?;
         }
         if self.0.hlinks > 0 {
-            pyresult.set_item("hlinks", self.0.hlinks).unwrap();
+            pyresult.set_item("hlinks", self.0.hlinks)?;
         }
         if self.0.devices > 0 {
-            pyresult.set_item("devices", self.0.devices).unwrap();
+            pyresult.set_item("devices", self.0.devices)?;
         }
         if self.0.pipes > 0 {
-            pyresult.set_item("pipes", self.0.pipes).unwrap();
+            pyresult.set_item("pipes", self.0.pipes)?;
         }
         if self.0.size > 0 {
-            pyresult.set_item("size", self.0.size).unwrap();
+            pyresult.set_item("size", self.0.size)?;
         }
         if self.0.usage > 0 {
-            pyresult.set_item("usage", self.0.usage).unwrap();
+            pyresult.set_item("usage", self.0.usage)?;
         }
         if !self.0.errors.is_empty() {
-            pyresult.set_item("errors", self.0.errors.to_vec()).unwrap();
+            pyresult.set_item("errors", self.0.errors.to_vec())?;
         }
         if duration.unwrap_or(false) {
-            pyresult.set_item("duration", self.0.duration).unwrap();
+            pyresult.set_item("duration", self.0.duration)?;
         }
         Ok(pyresult.into_any().unbind())
     }

@@ -1,14 +1,13 @@
 use std::collections::VecDeque;
-use std::fmt::Debug;
 use std::io::ErrorKind;
 use std::time::Duration;
 
-use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError, PyValueError};
-use pyo3::types::{PyBytes, PyType};
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError};
+use pyo3::types::PyBytes;
 use pyo3::{IntoPyObjectExt, prelude::*};
 use scandir::ErrorsType;
 
-use crate::common::ReturnType;
+use crate::common::{ReturnType, timeout_from_secs};
 use crate::count::Statistics;
 use crate::toc::Toc;
 
@@ -111,9 +110,8 @@ impl Walk {
 
     #[pyo3(signature = (timeout=None))]
     pub fn collect(&mut self, timeout: Option<f64>, py: Python) -> PyResult<Option<Toc>> {
-        match timeout {
-            Some(secs) if secs > 0.0 => {
-                let duration = Duration::from_secs_f64(secs);
+        match timeout_from_secs(timeout)? {
+            Some(duration) => {
                 let result = py.detach(|| self.instance.collect_timeout(duration))?;
                 match result {
                     Some(toc) => Ok(Some(Toc::from_owned(toc))),
@@ -173,32 +171,28 @@ impl Walk {
 
     #[cfg(feature = "speedy")]
     pub fn to_speedy(&self, py: Python) -> PyResult<Py<PyBytes>> {
-        self.instance
+        let bytes = self
+            .instance
             .to_speedy()
-            .map(|v| {
-                PyBytes::new_with(py, v.len(), |b| {
-                    b.copy_from_slice(&v);
-                    Ok(())
-                })
-                .unwrap()
-                .into()
-            })
-            .map_err(|e| PyException::new_err(e.to_string()))
+            .map_err(|e| PyException::new_err(e.to_string()))?;
+        Ok(PyBytes::new_with(py, bytes.len(), |b| {
+            b.copy_from_slice(&bytes);
+            Ok(())
+        })?
+        .into())
     }
 
     #[cfg(feature = "bincode")]
     pub fn to_bincode(&self, py: Python) -> PyResult<Py<PyBytes>> {
-        self.instance
+        let bytes = self
+            .instance
             .to_bincode()
-            .map(|v| {
-                PyBytes::new_with(py, v.len(), |b| {
-                    b.copy_from_slice(&v);
-                    Ok(())
-                })
-                .unwrap()
-                .into()
-            })
-            .map_err(|e| PyException::new_err(e.to_string()))
+            .map_err(|e| PyException::new_err(e.to_string()))?;
+        Ok(PyBytes::new_with(py, bytes.len(), |b| {
+            b.copy_from_slice(&bytes);
+            Ok(())
+        })?
+        .into())
     }
 
     #[cfg(feature = "json")]
@@ -233,24 +227,27 @@ impl Walk {
     #[pyo3(signature = (ty=None, _value=None, _traceback=None))]
     fn __exit__(
         &mut self,
-        ty: Option<&Bound<PyType>>,
+        ty: Option<&Bound<PyAny>>,
         _value: Option<&Bound<PyAny>>,
         _traceback: Option<&Bound<PyAny>>,
     ) -> PyResult<bool> {
         // stop() already takes and joins the thread internally; returning False only means the thread wasn’t running, so there’s no need to join it again.
         let _ = self.instance.stop();
         self.iterating = false;
-        match ty {
-            Some(ty) => Python::attach(|py| ty.eq(py.get_type::<PyValueError>())),
-            None => Ok(false),
-        }
+        let _ = ty;
+        Ok(false)
     }
 
     fn __iter__(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
         if slf.iterating {
+            return Ok(slf);
+        }
+        if slf.instance.busy() {
             return Err(PyRuntimeError::new_err("Busy"));
         }
-        slf.instance.start()?;
+        slf.instance
+            .start()
+            .map_err(|e| PyException::new_err(e.to_string()))?;
         slf.entries.clear();
         slf.iterating = true;
         Ok(slf)

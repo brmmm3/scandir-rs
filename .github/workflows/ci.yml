@@ -300,22 +300,22 @@ jobs:
           - {
             runner: ubuntu-latest,
             target: x86_64,
-            interpreter: "3.10 3.11 3.12 3.13 3.14 3.15 pypy3.11"
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12"
           }
           - {
             runner: ubuntu-latest,
             target: x86,
-            interpreter: "3.10 3.11 3.12 3.13 3.14 3.15 pypy3.11"
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12"
           }
           - {
             runner: ubuntu-latest,
             target: aarch64,
-            interpreter: "3.10 3.11 3.12 3.13 3.14 3.15 pypy3.11"
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12"
           }
           - {
             runner: ubuntu-latest,
             target: armv7,
-            interpreter: "3.10 3.11 3.12 3.13 3.14 3.15 pypy3.11"
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12"
           }
 
     steps:
@@ -373,7 +373,7 @@ jobs:
           - {
             runner: windows-latest,
             target: x86,
-            interpreter: "3.10 3.11 3.12 3.13 3.14",
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12",
             maturin-args: "--release --out dist"
           }
     steps:
@@ -426,13 +426,13 @@ jobs:
           - {
             runner: windows-latest,
             target: x64,
-            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11",
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12",
             maturin-args: "--release --out dist"
           }
           - {
             runner: windows-latest,
             target: x86,
-            interpreter: "3.10 3.11 3.12 3.13 3.14",
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12",
             maturin-args: "--release --out dist"
           }
     steps:
@@ -494,12 +494,12 @@ jobs:
           - {
             runner: macos-latest,
             target: x86_64,
-            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12"
           }
           - {
             runner: macos-latest,
             target: aarch64,
-            interpreter: "3.10 3.11 3.12 3.13 3.14 pypy3.11"
+            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12"
           }
     steps:
       - name: "Checkout"

@@ -23,9 +23,10 @@ binding provides synchronous scan and count operations.
 
 ## Installation and native prerequisites
 
-Python is installed as a Python package; see the [Python guide](python.html).
-The Rust crate can be added through Cargo. The C, Go, Java, and C# bindings
-require the `cscandir` native library. Build it from a source checkout with:
+Install the 3.0.0 Rust and Python packages through Cargo and PyPI; see their
+language guides for the exact commands. The C, Go, Java, and C# bindings use the
+`cscandir` native library. Install the 3.0.0 package for your target platform,
+or build it from a source checkout with:
 
 ```sh
 cargo build -p cscandir --release
@@ -38,16 +39,11 @@ system loader can find it, or configure the binding-specific search path
 described in its guide. The JNI bridge build documented in this repository
 currently targets Linux.
 
-These language bindings are maintained in this repository. The project guides
-document building from source; do not assume a language-specific binary package
-or Maven/NuGet publication unless the relevant distribution metadata says one is
-available.
-
-The repository's changelog marks 3.0.0 as unreleased; the latest tagged release
-in this checkout is 2.10.1. New bindings and APIs documented from the current
-source may therefore require building that source rather than installing a
-published package. Check the changelog and package registry before selecting a
-version for a production dependency.
+All packages are released at version 3.0.0 for their supported platforms. For
+wrappers that link to `cscandir`, use the matching native package for the target
+operating system and architecture, and configure its library path as described
+in the binding guide. The source-build instructions remain available for local
+development and custom builds.
 
 ## GitHub Pages setup
 

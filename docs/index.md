@@ -7,9 +7,9 @@ title: Home
 metadata, walking directory trees, and counting entries. These guides show how
 to use it from supported languages in your own projects.
 
-The repository currently contains unreleased 3.0.0 work; the latest tagged
-release is 2.10.1. See [getting started](getting-started.html) for version and
-installation notes before using APIs or bindings from the current source.
+Version 3.0.0 is released for supported platforms. See
+[getting started](getting-started.html) and the language guides for package
+installation and platform-specific native dependencies.
 
 ## Choose a language
 

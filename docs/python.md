@@ -10,12 +10,11 @@ worker APIs can expose intermediate results.
 ## Install
 
 ```sh
-python -m pip install scandir-rs
+python -m pip install scandir-rs==3.0.0
 ```
 
-If a compatible wheel is not available for your platform, install Rust and
-Maturin, activate a virtual environment, then build the extension from a
-checkout:
+To build the extension from source instead, install Rust and Maturin, activate
+a virtual environment, then build from a checkout:
 
 ```sh
 python -m pip install maturin
@@ -23,9 +22,10 @@ cd pyscandir
 maturin develop --release
 ```
 
-Linux wheel availability depends on the platform's libc and wheel compatibility.
-Consult the [Python package guide](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/README.md)
-for current wheel/build details.
+Version 3.0.0 wheels are released for supported Python and platform
+combinations. Linux wheel compatibility follows the platform's libc and wheel
+tags; consult the [Python package guide](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/README.md)
+for platform details.
 
 ## Count
 
@@ -53,10 +53,9 @@ while counter.busy:
 stats = counter.collect()
 ```
 
-The unreleased 3.0.0 source adds `collect(timeout=seconds)`, which returns
-`None` if that wait times out; the worker continues running. This timeout
-argument may not be present in the published package you install. Call `stop()`
-to cancel a running worker, or `join()` to wait for it.
+Version 3.0.0 adds `collect(timeout=seconds)`, which returns `None` if the wait
+times out; the worker continues running. Call `stop()` to cancel a running
+worker, or `join()` to wait for it. Install version 3.0.0 to use this argument.
 
 ## Iterate files or walk directories
 
@@ -84,8 +83,7 @@ Both classes accept options such as `sorted`, `skip_hidden`, `max_depth`,
 `max_file_cnt`, directory/file include and exclude globs, `case_sensitive`, and
 `follow_links`. For a full collected result use `Scandir(...).collect()`; the
 returned `ScandirResults` exposes entries grouped by type and traversal errors.
-In the unreleased 3.0.0 source, this returns `ScandirResults`; the published
-2.10.1 package returns an `(entries, errors)` tuple instead.
+In version 2.10.1, this method returned an `(entries, errors)` tuple instead.
 
 ## Defaults and references
 

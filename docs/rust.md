@@ -4,21 +4,16 @@ title: Rust
 
 The `scandir` crate provides native `Count`, `Walk`, and `Scandir` APIs. It
 returns Rust-owned results and supports worker threads, progress/result polling,
-cancellation, and (in current source) timeout-bounded collection.
+cancellation, and timeout-bounded collection.
 
 ## Add the crate
 
-Add the current published `scandir` release to your application's
-`Cargo.toml` (for example, `scandir = "2.10.1"` when that is the current
-published version), then import the API you need:
-
 ```toml
 [dependencies]
-scandir = "2.10.1"
+scandir = "3.0.0"
 ```
 
-Use the version available from your package registry; unreleased repository
-work may have APIs not present in an older published version.
+Cargo downloads the released crate for your target platform.
 
 ## Count entries
 
@@ -81,10 +76,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 For responsive applications, call `start()`, poll `busy()` and `results(true)`
 for newly available results, and finish with `collect()`. Call `stop()` to
-request cancellation. The unreleased 3.0.0 source also provides
-`collect_timeout()`; a timeout returns `None` while the worker continues, so call
-`stop()` if you want to abort it. This method is not part of the published
-2.10.1 crate.
+request cancellation. Version 3.0.0 also provides `collect_timeout()`; a timeout
+returns `None` while the worker continues, so call `stop()` if you want to abort
+it. This method is not part of version 2.10.1.
 
 ## Options
 

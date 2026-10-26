@@ -1,0 +1,58 @@
+---
+title: Getting started
+---
+
+## Pick an API
+
+| Need | Suggested interface | Notes |
+| --- | --- | --- |
+| Native Rust traversal and background-worker controls | Rust | Direct access to `Count`, `Walk`, and `Scandir`. |
+| Python iteration and Python `DirEntry`-style objects | Python | Native extension; releases the GIL while scanning. |
+| A C interface for a native application | C | Synchronous `collect` and `count` functions. |
+| C++ calling Rust without a C ABI wrapper | C++ | Uses the `cxx` bridge and the Rust scanner directly. |
+| Go | Go | cgo wrapper around the synchronous C ABI; requires a native library. |
+| Java 17 projects using established native interop | Java JNI | Builds a JNI bridge and the C ABI library. |
+| Java 25 projects using the stable FFM API | Java FFM | Calls the C ABI directly, without a JNI bridge. |
+| .NET applications | C# | Managed wrapper using P/Invoke and a native C ABI library. |
+
+The C ABI currently exposes only synchronous `collect` and `count`. Go, JNI,
+FFM, and C# walk-style helpers group a fully collected result in the wrapper;
+they are not streaming. Rust provides the native walk and background-worker
+APIs; Python also exposes background workers and iteration. The current C++
+binding provides synchronous scan and count operations.
+
+## Installation and native prerequisites
+
+Python is installed as a Python package; see the [Python guide](python.html).
+The Rust crate can be added through Cargo. The C, Go, Java, and C# bindings
+require the `cscandir` native library. Build it from a source checkout with:
+
+```sh
+cargo build -p cscandir --release
+```
+
+This produces `target/release/libcscandir.so` on Linux,
+`target/release/libcscandir.dylib` on macOS, or
+`target/release/cscandir.dll` on Windows. Place the library where the operating
+system loader can find it, or configure the binding-specific search path
+described in its guide. The JNI bridge build documented in this repository
+currently targets Linux.
+
+These language bindings are maintained in this repository. The project guides
+document building from source; do not assume a language-specific binary package
+or Maven/NuGet publication unless the relevant distribution metadata says one is
+available.
+
+The repository's changelog marks 3.0.0 as unreleased; the latest tagged release
+in this checkout is 2.10.1. New bindings and APIs documented from the current
+source may therefore require building that source rather than installing a
+published package. Check the changelog and package registry before selecting a
+version for a production dependency.
+
+## GitHub Pages setup
+
+The site is a Jekyll project in the repository's `docs/` directory and uses the
+Cayman theme. To publish it, open the repository's
+**Settings → Pages**, select the desired branch and the `/docs` folder as the
+build source, and save. GitHub Pages will build the site; no local Jekyll setup
+is required for ordinary content edits.

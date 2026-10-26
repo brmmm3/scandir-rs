@@ -209,11 +209,13 @@ pub fn filter_dir(root_path_len: usize, dir_entry: &DirEntryType, filter_ref: &F
         Some(s) => s,
         None => return true,
     };
-    // ponytail: only the suffix past root_path_len is used; allocate just that.
+    // Only the suffix past root_path_len is used; allocate just that.
     let parent_suffix = parent_str.get(root_path_len..).unwrap_or("");
     let mut key = String::with_capacity(parent_suffix.len() + 1 + file_name.len());
     key.push_str(parent_suffix);
-    key.push('/');
+    if !parent_suffix.is_empty() {
+        key.push('/');
+    }
     key.push_str(file_name);
     !(filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false)
         || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true))

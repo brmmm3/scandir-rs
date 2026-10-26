@@ -584,6 +584,11 @@ impl Scandir {
     /// Returns `Ok(None)` if timeout expires before completion.
     /// The worker thread continues running after timeout — call `stop()` to abort.
     pub fn collect_timeout(&mut self, timeout: Duration) -> Result<Option<ScandirResults>, Error> {
+        let mut collected = if self.store {
+            ScandirResults::new()
+        } else {
+            std::mem::take(Arc::make_mut(&mut self.entries))
+        };
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
@@ -592,12 +597,23 @@ impl Scandir {
             while !self.finished() && self.busy() {
                 let remaining = deadline.saturating_duration_since(Instant::now());
                 if remaining.is_zero() {
+                    if !self.store {
+                        *Arc::make_mut(&mut self.entries) = collected;
+                    }
                     return Ok(None);
                 }
-                let _ = self.receive_all_timeout(remaining.min(Duration::from_millis(100)));
+                let entries = self.receive_all_timeout(remaining.min(Duration::from_millis(100)));
+                if !self.store {
+                    collected.extend(&entries);
+                }
             }
         }
-        Ok(Some(self.results(false)))
+        if self.store {
+            Ok(Some(self.results(false)))
+        } else {
+            collected.extend(&self.results(true));
+            Ok(Some(collected))
+        }
     }
 
     pub fn has_results(&mut self, only_new: bool) -> bool {

@@ -576,6 +576,7 @@ impl Walk {
     /// Returns `Ok(Some(Toc))` immediately if already finished.
     /// The worker thread continues running after timeout — call `stop()` to abort.
     pub fn collect_timeout(&mut self, timeout: Duration) -> Result<Option<Toc>, Error> {
+        let mut entries = std::mem::take(&mut self.entries);
         if !self.finished() {
             if !self.busy() {
                 self.start()?;
@@ -584,21 +585,24 @@ impl Walk {
             while !self.finished() && self.busy() {
                 let remaining = deadline.saturating_duration_since(Instant::now());
                 if remaining.is_zero() {
-                    // Timeout expired, return partial results
-                    let mut toc = Toc::new();
-                    for (root_dir, dir_toc) in self.results(false) {
-                        toc.extend(&root_dir, &dir_toc);
+                    entries.extend(self.receive_all());
+                    if self.store {
+                        self.entries.extend(entries);
+                    } else {
+                        self.entries = entries;
                     }
                     return Ok(None);
                 }
-                let entries = self.receive_all_timeout(remaining.min(Duration::from_millis(100)));
-                if self.store {
-                    self.entries.extend_from_slice(&entries);
-                }
+                entries.extend(self.receive_all_timeout(remaining.min(Duration::from_millis(100))));
             }
         }
+        entries.extend(self.receive_all());
+        if self.store {
+            self.entries.extend(entries);
+            entries = std::mem::take(&mut self.entries);
+        }
         let mut toc = Toc::new();
-        for (root_dir, dir_toc) in self.results(false) {
+        for (root_dir, dir_toc) in entries {
             toc.extend(&root_dir, &dir_toc);
         }
         Ok(Some(toc))

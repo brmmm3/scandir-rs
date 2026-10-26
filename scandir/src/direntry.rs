@@ -5,7 +5,7 @@ use bincode_next::error::EncodeError;
 #[cfg(feature = "speedy")]
 use speedy::{Readable, Writable};
 
-// ponytail: shared conversion for all ctime/mtime/atime variants.
+// Shared conversion for all ctime/mtime/atime variants.
 #[inline]
 fn system_time_to_f64(t: Option<SystemTime>) -> f64 {
     let duration = t

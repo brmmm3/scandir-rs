@@ -373,7 +373,7 @@ jobs:
           - {
             runner: windows-latest,
             target: x86,
-            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12",
+            interpreter: "3.11 3.12 3.13 3.14 3.15",  # No pypy for x86 on Windows
             maturin-args: "--release --out dist"
           }
     steps:
@@ -432,7 +432,7 @@ jobs:
           - {
             runner: windows-latest,
             target: x86,
-            interpreter: "3.11 3.12 3.13 3.14 3.15 pypy3.11 pypy3.12",
+            interpreter: "3.11 3.12 3.13 3.14 3.15",  # No pypy for x86 on Windows
             maturin-args: "--release --out dist"
           }
     steps:

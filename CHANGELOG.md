@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update dependencies and development/build tooling.
+- Drop support for Python 3.10.
 
 ## [2.10.1] - 2026-09-05
 

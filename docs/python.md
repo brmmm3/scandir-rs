@@ -2,7 +2,7 @@
 title: Python
 ---
 
-The `scandir_rs` PyO3 extension supports Python 3.10 and later. `Count`
+The `scandir_rs` PyO3 extension supports Python 3.11 and later. `Count`
 provides statistics, `Walk` yields directory-grouped names, and `Scandir`
 iterates file entries with metadata. Scanning runs outside the GIL, and the
 worker APIs can expose intermediate results.

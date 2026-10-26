@@ -5,7 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.10.1] - 2026-??-??
+## [3.0.0] - Unreleased
+
+### Added
+
+- Add C++ bindings through the `cxx` bridge, plus Go, Java (JNI and Foreign
+  Function & Memory API), and C# bindings. Add examples and API regression
+  tests for the language wrappers.
+- Add timeout-bounded collection and timed result retrieval to the Rust API,
+  with timeout support exposed by the Python `collect()` methods.
+- Add `ScandirResults` in Rust and Python, with helpers for accessing entries
+  by type, combining results, and viewing errors.
+
+### Performance
+
+- Bound worker result channels to limit memory retained when consumers fall
+  behind, and avoid redundant path construction during extended scans.
+
+### Fixed
+
+- Fix directory filtering for entries directly under the scan root.
+- Improve worker shutdown, panic handling, and Python iterator/context-manager
+  lifecycle behavior.
+- Harden C ABI argument validation, panic containment, output cleanup, and
+  regression coverage; add native-wrapper examples and tests.
+
+### Changed
+
+- Update dependencies and development/build tooling.
+- Drop support for Python 3.10.
+
+## [2.10.1] - 2026-09-05
 
 ### Added
 
@@ -28,6 +58,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update dependencies and tools.
+
+## [2.9.10] - 2026-07-18
+
+### Fixed
+
+- Fix panic on invalid file names.
+
+### Changed
+
+- Switch from bincode to bincode-next.
 
 ## [2.9.9] - 2026-05-26
 
@@ -65,7 +105,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update dependencies.
-- Fix some warnings.
+
+### Fixed
+
+- Fix clippy warnings and a test.
 
 ## [2.9.4] - 2025-04-16
 
@@ -116,12 +159,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.7.3] - 2024-10-22
 
+### Changed
+
+- ATTENTION: `skip_hidden` is now `false` by default!
+
 ### Improved
 
 - Update dependencies.
 - Add support for Python 3.13.
 - Fix continuous integration on github for Linux and Windows.
-- Add support for macos-14 on ARM64.
 
 ## [2.7.2] - 2024-07-09
 

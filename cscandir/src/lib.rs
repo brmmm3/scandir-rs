@@ -1,5 +1,7 @@
 use std::ffi::{CStr, CString, c_char};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
+use std::sync::Arc;
 
 use scandir::{Count, ReturnType, Scandir, ScandirResult};
 
@@ -8,6 +10,20 @@ const CSCANDIR_ERR_INVALID_ARGUMENT: i32 = 1;
 const CSCANDIR_ERR_INVALID_UTF8: i32 = 2;
 const CSCANDIR_ERR_SCAN: i32 = 3;
 const CSCANDIR_ERR_NUL_BYTE: i32 = 4;
+const CSCANDIR_ERR_PANIC: i32 = 5;
+
+struct FfiError(i32, String);
+
+impl From<std::io::Error> for FfiError {
+    fn from(error: std::io::Error) -> Self {
+        let code = if error.kind() == std::io::ErrorKind::InvalidInput {
+            CSCANDIR_ERR_INVALID_ARGUMENT
+        } else {
+            CSCANDIR_ERR_SCAN
+        };
+        Self(code, error.to_string())
+    }
+}
 
 #[repr(C)]
 pub struct CScandirOptions {
@@ -51,6 +67,7 @@ pub struct CScandirEntry {
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct CScandirEntryList {
     pub entries: *mut CScandirEntry,
     pub len: usize,
@@ -58,6 +75,7 @@ pub struct CScandirEntryList {
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct CScandirStringList {
     pub items: *mut *mut c_char,
     pub len: usize,
@@ -65,12 +83,14 @@ pub struct CScandirStringList {
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct CScandirError {
     pub code: i32,
     pub message: *mut c_char,
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct CScandirStatistics {
     pub dirs: i32,
     pub files: i32,
@@ -81,6 +101,39 @@ pub struct CScandirStatistics {
     pub size: u64,
     pub usage: u64,
     pub duration: f64,
+}
+
+// Keep ownership inside Rust until all conversions succeed. These destructors
+// also roll back partially constructed outputs on errors or unwinding.
+impl Drop for CScandirEntry {
+    fn drop(&mut self) {
+        if !self.path.is_null() {
+            // SAFETY: paths are created exclusively by CString::into_raw.
+            drop(unsafe { CString::from_raw(self.path) });
+        }
+    }
+}
+
+impl Drop for CScandirEntryList {
+    fn drop(&mut self) {
+        if !self.entries.is_null() {
+            // SAFETY: these are the unchanged parts of a Vec allocated here.
+            drop(unsafe { Vec::from_raw_parts(self.entries, self.len, self.capacity) });
+        }
+    }
+}
+
+impl Drop for CScandirStringList {
+    fn drop(&mut self) {
+        if !self.items.is_null() {
+            // SAFETY: these are the unchanged parts of a Vec allocated here.
+            let items = unsafe { Vec::from_raw_parts(self.items, self.len, self.capacity) };
+            for item in items {
+                // SAFETY: every item was produced by CString::into_raw.
+                drop(unsafe { CString::from_raw(item) });
+            }
+        }
+    }
 }
 
 fn default_options() -> CScandirOptions {
@@ -107,20 +160,29 @@ fn to_bool(value: u8) -> bool {
     value != 0
 }
 
-fn map_return_type(value: u32) -> Result<ReturnType, String> {
+fn map_return_type(value: u32) -> Result<ReturnType, FfiError> {
     match value {
         0 => Ok(ReturnType::Base),
         1 => Ok(ReturnType::Ext),
-        _ => Err("Invalid return_type value. Expected 0 or 1.".to_string()),
+        _ => Err(FfiError(
+            CSCANDIR_ERR_INVALID_ARGUMENT,
+            "Invalid return_type value. Expected 0 or 1.".to_string(),
+        )),
     }
 }
 
 unsafe fn read_string_array(
     ptrs: *const *const c_char,
     len: usize,
-) -> Result<Option<Vec<String>>, String> {
-    if ptrs.is_null() || len == 0 {
+) -> Result<Option<Vec<String>>, FfiError> {
+    if len == 0 {
         return Ok(None);
+    }
+    if ptrs.is_null() || len > isize::MAX as usize / size_of::<*const c_char>() {
+        return Err(FfiError(
+            CSCANDIR_ERR_INVALID_ARGUMENT,
+            "Invalid filter pointer or length".to_string(),
+        ));
     }
 
     let mut out = Vec::with_capacity(len);
@@ -128,43 +190,39 @@ unsafe fn read_string_array(
         // SAFETY: Caller provides a valid pointer array with len elements.
         let p = unsafe { *ptrs.add(idx) };
         if p.is_null() {
-            return Err(format!("String pointer at index {idx} is null"));
+            return Err(FfiError(
+                CSCANDIR_ERR_INVALID_ARGUMENT,
+                format!("String pointer at index {idx} is null"),
+            ));
         }
         // SAFETY: Caller promises this is a valid NUL-terminated C string.
         let s = unsafe { CStr::from_ptr(p) };
-        let s = s
-            .to_str()
-            .map_err(|_| format!("String at index {idx} is not valid UTF-8"))?;
+        let s = s.to_str().map_err(|_| {
+            FfiError(
+                CSCANDIR_ERR_INVALID_UTF8,
+                format!("String at index {idx} is not valid UTF-8"),
+            )
+        })?;
         out.push(s.to_string());
     }
 
-    if out.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(out))
-    }
+    Ok(Some(out))
 }
 
 unsafe fn clear_entry_list(out_entries: *mut CScandirEntryList) {
     if out_entries.is_null() {
         return;
     }
-    // SAFETY: pointer checked for null.
-    let out_entries = unsafe { &mut *out_entries };
-    out_entries.entries = ptr::null_mut();
-    out_entries.len = 0;
-    out_entries.capacity = 0;
+    // SAFETY: caller supplies writable storage; do not read uninitialized fields.
+    unsafe { out_entries.write(CScandirEntryList::default()) };
 }
 
 unsafe fn clear_string_list(out_errors: *mut CScandirStringList) {
     if out_errors.is_null() {
         return;
     }
-    // SAFETY: pointer checked for null.
-    let out_errors = unsafe { &mut *out_errors };
-    out_errors.items = ptr::null_mut();
-    out_errors.len = 0;
-    out_errors.capacity = 0;
+    // SAFETY: caller supplies writable storage; do not read uninitialized fields.
+    unsafe { out_errors.write(CScandirStringList::default()) };
 }
 
 unsafe fn set_error(out_error: *mut CScandirError, code: i32, message: &str) {
@@ -172,19 +230,12 @@ unsafe fn set_error(out_error: *mut CScandirError, code: i32, message: &str) {
         return;
     }
 
-    // SAFETY: pointer checked for null.
-    let out_error = unsafe { &mut *out_error };
-    out_error.code = code;
-
-    if !out_error.message.is_null() {
-        // SAFETY: Message was previously allocated by CString::into_raw in this library.
-        let _ = unsafe { CString::from_raw(out_error.message) };
-    }
-
-    out_error.message = match CString::new(message) {
+    let message = match CString::new(message) {
         Ok(s) => s.into_raw(),
         Err(_) => ptr::null_mut(),
     };
+    // SAFETY: caller supplies writable storage; outputs are write-only.
+    unsafe { out_error.write(CScandirError { code, message }) };
 }
 
 unsafe fn clear_error(out_error: *mut CScandirError) {
@@ -192,23 +243,13 @@ unsafe fn clear_error(out_error: *mut CScandirError) {
         return;
     }
 
-    // SAFETY: pointer checked for null.
-    let out_error = unsafe { &mut *out_error };
-    out_error.code = CSCANDIR_OK;
-
-    if !out_error.message.is_null() {
-        // SAFETY: Message was previously allocated by CString::into_raw in this library.
-        let _ = unsafe { CString::from_raw(out_error.message) };
-    }
-
-    out_error.message = ptr::null_mut();
+    // SAFETY: caller supplies writable storage; do not read uninitialized fields.
+    unsafe { out_error.write(CScandirError::default()) };
 }
 
-fn entry_to_ffi(entry: &ScandirResult) -> Result<CScandirEntry, i32> {
-    let path = CString::new(entry.path().as_str()).map_err(|_| CSCANDIR_ERR_NUL_BYTE)?;
-
+fn entry_to_ffi(entry: ScandirResult) -> Result<CScandirEntry, FfiError> {
     let mut out = CScandirEntry {
-        path: path.into_raw(),
+        path: ptr::null_mut(),
         is_symlink: u8::from(entry.is_symlink()),
         is_dir: u8::from(entry.is_dir()),
         is_file: u8::from(entry.is_file()),
@@ -241,32 +282,24 @@ fn entry_to_ffi(entry: &ScandirResult) -> Result<CScandirEntry, i32> {
         out.rdev = ext.st_rdev;
     }
 
+    // Move the existing path buffer into CString rather than copying each path.
+    let path = match entry {
+        ScandirResult::DirEntry(e) => e.path,
+        ScandirResult::DirEntryExt(e) => e.path,
+        ScandirResult::Error(_) => unreachable!("errors are separated before conversion"),
+    };
+    out.path = c_string(path)?.into_raw();
+
     Ok(out)
 }
 
-fn entries_to_ffi(entries: &[ScandirResult]) -> Result<CScandirEntryList, i32> {
-    if entries.is_empty() {
-        return Ok(CScandirEntryList {
-            entries: ptr::null_mut(),
-            len: 0,
-            capacity: 0,
-        });
-    }
-
+fn entries_to_ffi(entries: Vec<ScandirResult>) -> Result<CScandirEntryList, FfiError> {
     let mut out = Vec::<CScandirEntry>::with_capacity(entries.len());
     for entry in entries {
-        match entry_to_ffi(entry) {
-            Ok(v) => out.push(v),
-            Err(code) => {
-                for item in out {
-                    if !item.path.is_null() {
-                        // SAFETY: Path was allocated using CString::into_raw in this library.
-                        let _ = unsafe { CString::from_raw(item.path) };
-                    }
-                }
-                return Err(code);
-            }
-        }
+        out.push(entry_to_ffi(entry)?);
+    }
+    if out.is_empty() {
+        return Ok(CScandirEntryList::default());
     }
 
     let list = CScandirEntryList {
@@ -278,30 +311,25 @@ fn entries_to_ffi(entries: &[ScandirResult]) -> Result<CScandirEntryList, i32> {
     Ok(list)
 }
 
-fn strings_to_ffi(items: &[String]) -> Result<CScandirStringList, i32> {
-    if items.is_empty() {
-        return Ok(CScandirStringList {
-            items: ptr::null_mut(),
-            len: 0,
-            capacity: 0,
-        });
-    }
+fn c_string(value: String) -> Result<CString, FfiError> {
+    CString::new(value).map_err(|_| {
+        FfiError(
+            CSCANDIR_ERR_NUL_BYTE,
+            "Output contains a NUL byte".to_string(),
+        )
+    })
+}
 
-    let mut out: Vec<*mut c_char> = Vec::with_capacity(items.len());
+fn strings_to_ffi(items: Vec<String>) -> Result<CScandirStringList, FfiError> {
+    // CString keeps each allocation owned if a later conversion fails.
+    let mut strings = Vec::with_capacity(items.len());
     for item in items {
-        match CString::new(item.as_str()) {
-            Ok(s) => out.push(s.into_raw()),
-            Err(_) => {
-                for p in out {
-                    if !p.is_null() {
-                        // SAFETY: Pointer was allocated using CString::into_raw in this library.
-                        let _ = unsafe { CString::from_raw(p) };
-                    }
-                }
-                return Err(CSCANDIR_ERR_NUL_BYTE);
-            }
-        }
+        strings.push(c_string(item)?);
     }
+    if strings.is_empty() {
+        return Ok(CScandirStringList::default());
+    }
+    let mut out: Vec<*mut c_char> = strings.into_iter().map(CString::into_raw).collect();
 
     let list = CScandirStringList {
         items: out.as_mut_ptr(),
@@ -312,7 +340,10 @@ fn strings_to_ffi(items: &[String]) -> Result<CScandirStringList, i32> {
     Ok(list)
 }
 
-fn apply_scandir_options(scanner: Scandir, options: &CScandirOptions) -> Result<Scandir, String> {
+unsafe fn apply_scandir_options(
+    scanner: Scandir,
+    options: &CScandirOptions,
+) -> Result<Scandir, FfiError> {
     let return_type = map_return_type(options.return_type)?;
 
     // SAFETY: Pointers are read-only and lengths are controlled by the caller.
@@ -340,7 +371,10 @@ fn apply_scandir_options(scanner: Scandir, options: &CScandirOptions) -> Result<
         .return_type(return_type))
 }
 
-fn apply_count_options(counter: Count, options: &CScandirOptions) -> Result<Count, String> {
+unsafe fn apply_count_options(
+    counter: Count,
+    options: &CScandirOptions,
+) -> Result<Count, FfiError> {
     let return_type = map_return_type(options.return_type)?;
 
     // SAFETY: Pointers are read-only and lengths are controlled by the caller.
@@ -377,275 +411,12 @@ pub unsafe extern "C" fn cscandir_options_init(options: *mut CScandirOptions) {
     }
     // SAFETY: pointer checked for null.
     unsafe {
-        *options = default_options();
+        options.write(default_options());
     }
 }
 
-/// # Safety
-///
-/// This function uses unsafe code and raw pointers to interface with C.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cscandir_collect(
-    root_path: *const c_char,
-    options: *const CScandirOptions,
-    out_entries: *mut CScandirEntryList,
-    out_errors: *mut CScandirStringList,
-    out_error: *mut CScandirError,
-) -> i32 {
-    // SAFETY: Output pointers are optional.
-    unsafe {
-        clear_entry_list(out_entries);
-        clear_string_list(out_errors);
-        clear_error(out_error);
-    }
-
-    if root_path.is_null() {
-        // SAFETY: out_error is optional.
-        unsafe {
-            set_error(
-                out_error,
-                CSCANDIR_ERR_INVALID_ARGUMENT,
-                "root_path is null",
-            )
-        };
-        return CSCANDIR_ERR_INVALID_ARGUMENT;
-    }
-
-    // SAFETY: root_path checked for null and expected to point to a valid C string.
-    let root_path_str = match unsafe { CStr::from_ptr(root_path) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            // SAFETY: out_error is optional.
-            unsafe {
-                set_error(
-                    out_error,
-                    CSCANDIR_ERR_INVALID_UTF8,
-                    "root_path is not valid UTF-8",
-                )
-            };
-            return CSCANDIR_ERR_INVALID_UTF8;
-        }
-    };
-
-    let default_opts = default_options();
-    let opt_ref = if options.is_null() {
-        &default_opts
-    } else {
-        // SAFETY: options pointer checked for null.
-        unsafe { &*options }
-    };
-
-    let scanner = match Scandir::new(root_path_str, Some(true)) {
-        Ok(v) => v,
-        Err(e) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, CSCANDIR_ERR_SCAN, &e.to_string()) };
-            return CSCANDIR_ERR_SCAN;
-        }
-    };
-
-    let mut scanner = match apply_scandir_options(scanner, opt_ref) {
-        Ok(v) => v,
-        Err(e) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, CSCANDIR_ERR_INVALID_ARGUMENT, &e) };
-            return CSCANDIR_ERR_INVALID_ARGUMENT;
-        }
-    };
-
-    let results = match scanner.collect() {
-        Ok(v) => v,
-        Err(e) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, CSCANDIR_ERR_SCAN, &e.to_string()) };
-            return CSCANDIR_ERR_SCAN;
-        }
-    };
-
-    let mut entries = match entries_to_ffi(&results.results) {
-        Ok(v) => v,
-        Err(code) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, code, "Failed to convert entry to C string") };
-            return code;
-        }
-    };
-
-    let errors_vec: Vec<String> = results
-        .errors
-        .iter()
-        .map(|(path, err)| {
-            if path.is_empty() {
-                err.clone()
-            } else {
-                format!("{path}: {err}")
-            }
-        })
-        .collect();
-
-    let mut errors = match strings_to_ffi(&errors_vec) {
-        Ok(v) => v,
-        Err(code) => {
-            // SAFETY: entries list came from this library.
-            unsafe { cscandir_free_entry_list(&mut entries as *mut CScandirEntryList) };
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, code, "Failed to convert error text to C string") };
-            return code;
-        }
-    };
-
-    if !out_entries.is_null() {
-        // SAFETY: pointer checked for null.
-        unsafe { *out_entries = entries };
-    } else {
-        // SAFETY: entries list came from this library.
-        unsafe { cscandir_free_entry_list(&mut entries as *mut CScandirEntryList) };
-    }
-
-    if !out_errors.is_null() {
-        // SAFETY: pointer checked for null.
-        unsafe { *out_errors = errors };
-    } else {
-        // SAFETY: errors list came from this library.
-        unsafe { cscandir_free_string_list(&mut errors as *mut CScandirStringList) };
-    }
-
-    CSCANDIR_OK
-}
-
-/// # Safety
-///
-/// This function uses unsafe code and raw pointers to interface with C.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn cscandir_count(
-    root_path: *const c_char,
-    options: *const CScandirOptions,
-    out_stats: *mut CScandirStatistics,
-    out_errors: *mut CScandirStringList,
-    out_error: *mut CScandirError,
-) -> i32 {
-    // SAFETY: Output pointers are optional.
-    unsafe {
-        clear_string_list(out_errors);
-        clear_error(out_error);
-    }
-
-    if !out_stats.is_null() {
-        // SAFETY: out_stats pointer checked for null.
-        unsafe {
-            *out_stats = CScandirStatistics {
-                dirs: 0,
-                files: 0,
-                slinks: 0,
-                hlinks: 0,
-                devices: 0,
-                pipes: 0,
-                size: 0,
-                usage: 0,
-                duration: 0.0,
-            };
-        }
-    }
-
-    if root_path.is_null() {
-        // SAFETY: out_error is optional.
-        unsafe {
-            set_error(
-                out_error,
-                CSCANDIR_ERR_INVALID_ARGUMENT,
-                "root_path is null",
-            )
-        };
-        return CSCANDIR_ERR_INVALID_ARGUMENT;
-    }
-
-    // SAFETY: root_path checked for null and expected to point to a valid C string.
-    let root_path_str = match unsafe { CStr::from_ptr(root_path) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            // SAFETY: out_error is optional.
-            unsafe {
-                set_error(
-                    out_error,
-                    CSCANDIR_ERR_INVALID_UTF8,
-                    "root_path is not valid UTF-8",
-                )
-            };
-            return CSCANDIR_ERR_INVALID_UTF8;
-        }
-    };
-
-    let default_opts = default_options();
-    let opt_ref = if options.is_null() {
-        &default_opts
-    } else {
-        // SAFETY: options pointer checked for null.
-        unsafe { &*options }
-    };
-
-    let counter = match Count::new(root_path_str) {
-        Ok(v) => v,
-        Err(e) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, CSCANDIR_ERR_SCAN, &e.to_string()) };
-            return CSCANDIR_ERR_SCAN;
-        }
-    };
-
-    let mut counter = match apply_count_options(counter, opt_ref) {
-        Ok(v) => v,
-        Err(e) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, CSCANDIR_ERR_INVALID_ARGUMENT, &e) };
-            return CSCANDIR_ERR_INVALID_ARGUMENT;
-        }
-    };
-
-    let stats = match counter.collect() {
-        Ok(v) => v,
-        Err(e) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, CSCANDIR_ERR_SCAN, &e.to_string()) };
-            return CSCANDIR_ERR_SCAN;
-        }
-    };
-
-    if !out_stats.is_null() {
-        // SAFETY: out_stats pointer checked for null.
-        unsafe {
-            *out_stats = CScandirStatistics {
-                dirs: stats.dirs,
-                files: stats.files,
-                slinks: stats.slinks,
-                hlinks: stats.hlinks,
-                devices: stats.devices,
-                pipes: stats.pipes,
-                size: stats.size,
-                usage: stats.usage,
-                duration: stats.duration,
-            };
-        }
-    }
-
-    let mut errors = match strings_to_ffi(&stats.errors) {
-        Ok(v) => v,
-        Err(code) => {
-            // SAFETY: out_error is optional.
-            unsafe { set_error(out_error, code, "Failed to convert error text to C string") };
-            return code;
-        }
-    };
-
-    if !out_errors.is_null() {
-        // SAFETY: pointer checked for null.
-        unsafe { *out_errors = errors };
-    } else {
-        // SAFETY: errors list came from this library.
-        unsafe { cscandir_free_string_list(&mut errors as *mut CScandirStringList) };
-    }
-
-    CSCANDIR_OK
-}
+mod api;
+pub use api::{cscandir_collect, cscandir_count};
 
 /// # Safety
 ///
@@ -658,20 +429,7 @@ pub unsafe extern "C" fn cscandir_free_entry_list(list: *mut CScandirEntryList) 
 
     // SAFETY: pointer checked for null.
     let list = unsafe { &mut *list };
-    if !list.entries.is_null() {
-        // SAFETY: parts were allocated by this library.
-        let entries = unsafe { Vec::from_raw_parts(list.entries, list.len, list.capacity) };
-        for entry in entries {
-            if !entry.path.is_null() {
-                // SAFETY: path was allocated by CString::into_raw in this library.
-                let _ = unsafe { CString::from_raw(entry.path) };
-            }
-        }
-    }
-
-    list.entries = ptr::null_mut();
-    list.len = 0;
-    list.capacity = 0;
+    drop(std::mem::take(list));
 }
 
 /// # Safety
@@ -685,20 +443,7 @@ pub unsafe extern "C" fn cscandir_free_string_list(list: *mut CScandirStringList
 
     // SAFETY: pointer checked for null.
     let list = unsafe { &mut *list };
-    if !list.items.is_null() {
-        // SAFETY: parts were allocated by this library.
-        let items = unsafe { Vec::from_raw_parts(list.items, list.len, list.capacity) };
-        for item in items {
-            if !item.is_null() {
-                // SAFETY: string was allocated by CString::into_raw in this library.
-                let _ = unsafe { CString::from_raw(item) };
-            }
-        }
-    }
-
-    list.items = ptr::null_mut();
-    list.len = 0;
-    list.capacity = 0;
+    drop(std::mem::take(list));
 }
 
 /// # Safety

@@ -13,7 +13,8 @@ enum {
     CSCANDIR_ERR_INVALID_ARGUMENT = 1,
     CSCANDIR_ERR_INVALID_UTF8 = 2,
     CSCANDIR_ERR_SCAN = 3,
-    CSCANDIR_ERR_NUL_BYTE = 4
+    CSCANDIR_ERR_NUL_BYTE = 4,
+    CSCANDIR_ERR_PANIC = 5
 };
 
 typedef enum cscandir_return_type {
@@ -43,6 +44,12 @@ typedef struct cscandir_options {
     uint8_t follow_links;
     uint32_t return_type;
 } cscandir_options;
+
+/* Boolean options accept zero (false) or nonzero (true). Depth/file limits
+ * of zero or SIZE_MAX are unlimited. Filters are UTF-8 glob strings; a nonzero
+ * length requires a non-NULL array with no NULL elements. Directory patterns
+ * are relative to root_path. Count ignores sorted; EXT enables size/usage and
+ * extended file-type accounting. */
 
 typedef struct cscandir_entry {
     char* path;
@@ -96,7 +103,7 @@ typedef struct cscandir_statistics {
     double duration;
 } cscandir_statistics;
 
-/* Initialize options with defaults used by scandir::Scandir. */
+/* Initialize options with defaults used by scandir::Scandir. NULL is a no-op. */
 void cscandir_options_init(cscandir_options* options);
 
 /*
@@ -104,6 +111,26 @@ void cscandir_options_init(cscandir_options* options);
  * - root_path must be a valid UTF-8 C string.
  * - out_entries and out_errors are optional; pass NULL if not needed.
  * - free outputs with cscandir_free_entry_list / cscandir_free_string_list.
+ *
+ * Common collect/count contract:
+ * - options may be NULL for defaults. All input strings must be readable,
+ *   NUL-terminated UTF-8 for the duration of the call.
+ * - All output pointers are optional. Non-NULL outputs must point to aligned,
+ *   writable, non-overlapping storage. They may initially be uninitialized.
+ * - Outputs are overwritten, NOT freed: free previous outputs before reuse.
+ * - On failure lists/statistics are empty/zero and out_error describes the
+ *   failure (if supplied). On success out_error is {CSCANDIR_OK, NULL}.
+ * - Per-entry traversal errors are returned in out_errors while the function
+ *   returns CSCANDIR_OK. Fatal errors return a nonzero status.
+ * - Descendant paths are relative to root_path. Collect also includes the root
+ *   entry, named with its basename; count excludes the root directory.
+ *   Extended metadata fields are populated only when has_ext is nonzero.
+ *   The synthetic root entry may lack stat metadata. Unavailable timestamps
+ *   are zero; other timestamps are Unix seconds.
+ * - All returned buffers belong to this library. Do not modify their contents,
+ *   pointers, lengths or capacities, or free individual items with C free().
+ * - Rust panics are caught when built with unwinding enabled (the default).
+ *   Invalid/dangling pointers and allocation aborts cannot be caught.
  */
 int32_t cscandir_collect(
     const char* root_path,
@@ -126,6 +153,9 @@ int32_t cscandir_count(
     cscandir_error* out_error
 );
 
+/* NULL-safe, reset outputs to zero, and may be repeated on the same storage.
+ * Pass only outputs returned by the API or zero-initialized structs, never
+ * uninitialized structs or shallow copies of an already-freed output. */
 void cscandir_free_entry_list(cscandir_entry_list* list);
 void cscandir_free_string_list(cscandir_string_list* list);
 void cscandir_free_error(cscandir_error* error);

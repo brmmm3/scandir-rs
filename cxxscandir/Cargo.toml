@@ -1,0 +1,19 @@
+[package]
+name = "cxxscandir"
+version = "3.0.0"
+edition = "2024"
+description = "C++ wrapper for scandir-rs using the cxx bridge"
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+cxx = "1.0"
+scandir = { path = "../scandir" }
+
+[build-dependencies]
+cxx-build = "1.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"

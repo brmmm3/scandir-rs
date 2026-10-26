@@ -2,7 +2,7 @@
 
 resolver = "2"
 
-members = ["scandir", "pyscandir", "cscandir"]
+members = ["scandir", "pyscandir", "cscandir", "cxxscandir"]
 
 
 [profile.release]

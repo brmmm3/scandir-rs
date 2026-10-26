@@ -1,13 +1,15 @@
 # `scandir-rs`
 
-`scandir-rs` is a Rust project which provides a [Rust](https://github.com/brmmm3/scandir-rs/blob/master/scandir/README.md)
- and a [Python](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/README.md) module for
- directory iteration, like `os.walk()` or `os.scandir()`, but with more features and **HIGHER** speed.
- Depending on the function call it yields a list of paths, tuple of lists grouped by their entry
- type or `DirEntry` objects that include file type and stat information along with the file name.
- Directory iteration is **many** times faster than `os.walk()`, `os.scandir()`, `walkdir` or
- `scan_dir` (see **benchmarks** for [Rust benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)
- and [Python benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/doc/benchmarks.md)).
+`scandir-rs` provides fast directory iteration, like `os.walk()` or `os.scandir()`,
+with more features and **HIGHER** speed. The project includes a [Rust](scandir/README.md)
+crate and a [Python](pyscandir/README.md) module, as well as bindings for C, C++,
+Go, Java, and C#.
+
+Depending on the API, it yields paths, entries grouped by type, or `DirEntry`
+objects containing file type and stat information. Directory iteration is
+**many** times faster than `os.walk()`, `os.scandir()`, `walkdir`, or `scan_dir`
+(see **benchmarks** for [Rust benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)
+and [Python benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/pyscandir/doc/benchmarks.md)).
 
 <img src="scandir/doc/images/linux_walk_usr.png" width="48%" alt="walk benchmarks">
 <img src="scandir/doc/images/windows_scandir_linux-5.9.png" width="48%" alt="scandir benchmarks">
@@ -20,6 +22,32 @@ The higher performance is achieved through parallelizing the file system access 
  the Linux wheels from [github](https://github.com/brmmm3/scandir-rs/releases/tag/2.7.0).
 
 **Note:** Since 2.8.0 `skip_hidden` is now `false` by default!
+
+## Language bindings
+
+Bindings expose common directory-scanning options such as sorting, hidden-file
+handling, depth and file-count limits, glob filters, link following, and basic
+or extended metadata. Option coverage varies by binding; see each module's
+README for build requirements, API details, and runnable examples.
+
+| Language / interface | Implementation | Documentation |
+| --- | --- | --- |
+| Rust | Native crate API, including background workers and timed result collection | [Rust guide](scandir/README.md) |
+| Python | PyO3 module; the published wheel includes type stubs | [Python guide](pyscandir/README.md) |
+| C | C ABI with collect and count operations | [C guide](cscandir/README.md) |
+| C++ | Rust bindings through the `cxx` bridge | [C++ guide](cxxscandir/README.md) |
+| Go | cgo wrapper around the C ABI | [Go guide](goscandir/README.md) |
+| Java | JNI (Java 17+) and Foreign Function & Memory API (Java 25+) wrappers around the C ABI | [JNI guide](jscandir-jni/README.md), [FFM guide](jscandir-ffm/README.md) |
+| C# | .NET P/Invoke wrapper around the C ABI | [C# guide](csharpscandir/README.md) |
+
+The C ABI provides synchronous `collect` and `count` calls, not a native
+`walk` endpoint. Wrappers that provide a walk-style view using this ABI build
+it from collected entries; the Rust and C++ APIs can use the Rust walk
+implementation directly. Rust and Python also support timeout-bounded
+collection and timed result retrieval.
+
+The project is dual-licensed under [MIT](LICENSE-MIT) or
+[Apache-2.0](LICENSE-APACHE).
 
 ## Python examples
 
@@ -101,7 +129,7 @@ from scandir_rs import Scandir, ReturnType
 
 instance = Scandir("~/workspace")
 instance.extended(True)
-resuolts = instance.collect()
+results = instance.collect()
 ```
 
 ## Rust examples

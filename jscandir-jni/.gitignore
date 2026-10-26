@@ -1,0 +1,16 @@
+target/
+*.class
+*.jar
+*.log
+*.so
+*.dll
+*.dylib
+*.o
+*.obj
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~

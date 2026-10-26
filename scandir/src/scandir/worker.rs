@@ -121,18 +121,7 @@ fn create_entry(
             st_size,
         }),
         ReturnType::Ext => ScandirResult::DirEntryExt(DirEntryExt {
-            // Base branch above moves `path`, Ext branch must re-build it.
-            // Returned by the closure as the last statement, no shared use beyond this fn.
-            path: if path_str.len() > root_path_len {
-                let relative = &path_str[root_path_len..];
-                let mut p = String::with_capacity(relative.len() + 1 + file_name.len());
-                p.push_str(relative);
-                p.push('/');
-                p.push_str(file_name);
-                p
-            } else {
-                file_name.to_owned()
-            },
+            path,
             is_symlink: file_type.is_symlink(),
             is_dir: file_type.is_dir(),
             is_file,

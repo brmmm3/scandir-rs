@@ -82,13 +82,13 @@ bench = [
     "pyyaml",
     "ryaml",
     "ruamel-yaml",
-    "polars == 1.41.1",
-    "altair == 6.1.0",
+    "polars == 2.1.0",
+    "altair == 6.3.0",
     "py-cpuinfo == 9.0.0",
     "vl-convert-python == 1.9.0.post1",
 ]
 
 [project.urls]
 Source = "https://github.com/brmmm3/scandir-rs"
-Homepage = "https://github.com/brmmm3/scandir-rs"
+Homepage = "https://brmmm3.github.io/scandir-rs/"
 "Bug Tracker" = "https://github.com/brmmm3/scandir-rs/issues"

@@ -61,7 +61,7 @@ def test_count_iteration_yields_only_changed_statistics(tempDir):
     snapshots = [statistics.as_dict() for statistics in Count(tempDir.name)]
 
     assert snapshots
-    assert all(previous != current for previous, current in itertools.pairwise(snapshots, snapshots[1:]))
+    assert all(previous != current for previous, current in itertools.pairwise(snapshots))
     assert snapshots[-1]["files"] == 900
 
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 # Professional scandir-rs Benchmark — Comparing Three APIs
 
@@ -41,9 +40,9 @@
 import json
 import os
 import platform
+import subprocess
 import sys
 import timeit
-import subprocess
 
 import psutil
 from tabulate import tabulate

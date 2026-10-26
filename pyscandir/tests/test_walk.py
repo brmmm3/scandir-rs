@@ -105,9 +105,8 @@ def test_walk_relative_directory_include_matches_root_child(tmp_path):
 
 
 def test_walk_context_manager_does_not_suppress_value_error(tmp_path):
-    with pytest.raises(ValueError, match="caller error"):
-        with Walk(str(tmp_path)):
-            raise ValueError("caller error")
+    with pytest.raises(ValueError, match="caller error"), Walk(str(tmp_path)):
+        raise ValueError("caller error")
 
 
 def test_walk_iter_returns_active_iterator_unchanged(tmp_path):

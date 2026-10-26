@@ -1,4 +1,6 @@
 
+import itertools
+
 import pytest
 
 from scandir_rs import Count, ReturnType
@@ -59,14 +61,13 @@ def test_count_iteration_yields_only_changed_statistics(tempDir):
     snapshots = [statistics.as_dict() for statistics in Count(tempDir.name)]
 
     assert snapshots
-    assert all(previous != current for previous, current in zip(snapshots, snapshots[1:]))
+    assert all(previous != current for previous, current in itertools.pairwise(snapshots, snapshots[1:]))
     assert snapshots[-1]["files"] == 900
 
 
 def test_count_context_manager_does_not_suppress_value_error(tempDir):
-    with pytest.raises(ValueError, match="caller error"):
-        with Count(tempDir.name):
-            raise ValueError("caller error")
+    with pytest.raises(ValueError, match="caller error"), Count(tempDir.name):
+        raise ValueError("caller error")
 
 
 def test_count_iter_returns_active_iterator_unchanged(tempDir):

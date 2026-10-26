@@ -29,7 +29,8 @@ References: examples/count.py, examples/walk.py, examples/scandir.py
 """
 import os
 import time
-from scandir_rs import Count, Walk, Scandir, ReturnType
+
+from scandir_rs import Count, ReturnType, Scandir, Walk
 
 target = 'Z:\\品质部\\内部文件\\MSDS模板\\2022'
 
@@ -162,7 +163,7 @@ results.append(('Scandir(Ext).collect', time.time() - t1, len(entries), 0, 0))
 
 # ========== Print results ==========
 print()
-print(f'=== scandir-rs benchmark (warm cache) ===')
+print('=== scandir-rs benchmark (warm cache) ===')
 print(f'| {"Method":<24}| {"Time":<8}| {"vs os.walk":<10}| {"Details":<20}|')
 print(f'|{"-" * 24}|{"-" * 9}|{"-" * 11}|{"-" * 21}|')
 for name, dt, *args in results:

@@ -4,7 +4,7 @@ C++ bindings for `scandir-rs`, built with the [`cxx`](https://cxx.rs/) bridge.
 The wrapper calls the Rust `Scandir` and `Count` APIs directly and returns
 owning C++-usable result structures.
 
-## Build and run the example
+## C++ examples
 
 From the repository root:
 
@@ -14,10 +14,23 @@ make -C cxxscandir build
 make -C cxxscandir run ROOT=/tmp
 ```
 
-The Cargo crate produces a static library under `target/release/`. The bridge
-generates its C++ headers under Cargo's build output directory; the Makefile
-locates them and links the example. Override `CARGO`, `CXX`, `TARGET_DIR`,
-`PROFILE`, or `CXXFLAGS` as needed.
+All crate examples are C++ sources in `examples/*.cc`: `scandir`, `count`,
+`walk`, `cifs_ctime_check`, and `benchmark`. The Cargo crate produces a static
+library under `target/release/`. The bridge generates its C++ headers under
+Cargo's build output directory; the Makefile locates them and links every
+example. Run the additional examples directly, for example:
+
+```bash
+cxxscandir/bin/count /tmp --ext
+cxxscandir/bin/walk /usr
+cxxscandir/bin/cifs_ctime_check /mnt/smb
+cxxscandir/bin/benchmark /usr 20
+```
+
+The benchmark's `collect-drop` case measures the wrapper returning and then
+immediately discarding its entry vector; unlike the C binding's no-output mode,
+the C++ wrapper still materializes that vector. Override `CARGO`, `CXX`,
+`TARGET_DIR`, `PROFILE`, or `CXXFLAGS` as needed.
 
 ## API
 
@@ -44,8 +57,11 @@ other extended accounting is needed. Count excludes the root directory.
 ## Validation
 
 ```bash
-cargo test -p cxxscandir
 cargo clippy -p cxxscandir --all-targets -- -D warnings
 make -C cxxscandir build
 make -C cxxscandir run ROOT=/tmp
+make -C cxxscandir test
 ```
+
+The API regression tests are C++ sources under `tests/*.cc`; run them with
+`make -C cxxscandir test`.

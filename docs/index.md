@@ -20,7 +20,7 @@ installation and platform-specific native dependencies.
 | C | C ABI | [C](c.html) |
 | C++ | Rust API through the `cxx` bridge | [C++](cpp.html) |
 | Go | cgo wrapper over the C ABI | [Go](go.html) |
-| Java | JNI wrapper over the C ABI; Java 17+ | [Java JNI](java-jni.html) |
+| Java | JNI wrapper over the C ABI; Java 25+ | [Java JNI](java-jni.html) |
 | Java | Foreign Function & Memory (FFM) wrapper; Java 25+ | [Java FFM](java-ffm.html) |
 | C# | .NET P/Invoke wrapper over the C ABI | [C#](csharp.html) |
 

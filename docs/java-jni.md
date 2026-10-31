@@ -3,7 +3,7 @@ title: Java (JNI)
 ---
 
 The `jscandir-jni` module provides a Java API using JNI to call the C ABI. It
-requires Java 17+, Maven, a C++ compiler, and the `cscandir` native library.
+requires Java 25+, Maven, a C++ compiler, and the `cscandir` native library.
 The JNI bridge build in this repository currently targets Linux.
 
 ## Build and test

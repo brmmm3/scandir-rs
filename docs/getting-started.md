@@ -11,7 +11,7 @@ title: Getting started
 | A C interface for a native application | C | Synchronous `collect` and `count` functions. |
 | C++ calling Rust without a C ABI wrapper | C++ | Uses the `cxx` bridge and the Rust scanner directly. |
 | Go | Go | cgo wrapper around the synchronous C ABI; requires a native library. |
-| Java 17 projects using established native interop | Java JNI | Builds a JNI bridge and the C ABI library. |
+| Java 25 projects using established native interop | Java JNI | Builds a JNI bridge and the C ABI library. |
 | Java 25 projects using the stable FFM API | Java FFM | Calls the C ABI directly, without a JNI bridge. |
 | .NET applications | C# | Managed wrapper using P/Invoke and a native C ABI library. |
 

@@ -3,7 +3,7 @@ title: Java (FFM)
 ---
 
 The `jscandir-ffm` module calls the C ABI using Java's Foreign Function &
-Memory API, without a JNI bridge. The module is compiled for Java 25 and
+Memory API, without a JNI bridge. The module targets Java 25 LTS and
 requires a Java 25+ toolchain, Maven, and a built `cscandir` library.
 
 ## Build and test

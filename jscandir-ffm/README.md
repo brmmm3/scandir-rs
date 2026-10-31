@@ -2,7 +2,7 @@
 
 Java FFM (Foreign Function & Memory API) wrapper for the `scandir-rs` directory scanner.
 
-Requires Java 25+. The FFM API was standardized in Java 22; this module targets Java 25.
+Requires Java 25 LTS+. The FFM API was standardized in Java 22; this module targets Java 25.
 
 ## Usage
 

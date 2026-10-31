@@ -2,7 +2,7 @@
 
 Java JNI wrapper for the `scandir-rs` directory scanner.
 
-Uses the Java Native Interface (JNI) for C interop. Requires Java 17+.
+Uses the Java Native Interface (JNI) for C interop. Requires Java 25+.
 
 ## Usage
 
@@ -45,7 +45,7 @@ mvn test
 
 ## Requirements
 
-- Java 17+
+- Java 25+
 - `libcscandir.so` (or `cscandir.dll` on Windows) and `libjscandir.so` (or `jscandir.dll`)
   - Set `jscandir.lib.path` to the JNI bridge file or its containing directory
   - Maven creates the bridge at `target/native/libjscandir.so` on Linux

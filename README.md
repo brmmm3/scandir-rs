@@ -37,7 +37,7 @@ README for build requirements, API details, and runnable examples.
 | C | C ABI with collect and count operations | [C guide](cscandir/README.md) |
 | C++ | Rust bindings through the `cxx` bridge | [C++ guide](cxxscandir/README.md) |
 | Go | cgo wrapper around the C ABI | [Go guide](goscandir/README.md) |
-| Java | JNI (Java 17+) and Foreign Function & Memory API (Java 25+) wrappers around the C ABI | [JNI guide](jscandir-jni/README.md), [FFM guide](jscandir-ffm/README.md) |
+| Java | JNI and Foreign Function & Memory API wrappers targeting Java 25 LTS around the C ABI | [JNI guide](jscandir-jni/README.md), [FFM guide](jscandir-ffm/README.md) |
 | C# | .NET P/Invoke wrapper around the C ABI | [C# guide](csharpscandir/README.md) |
 
 The C ABI provides synchronous `collect` and `count` calls, not a native

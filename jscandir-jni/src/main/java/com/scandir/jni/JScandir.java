@@ -8,13 +8,16 @@ import com.scandir.result.Toc;
 import com.scandir.result.WalkEntry;
 import com.scandir.result.WalkResult;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
-import java.util.Map;
-import java.io.IOException;
 
 /** Java API over cscandir using a JNI bridge. */
 public final class JScandir {
@@ -30,9 +33,42 @@ public final class JScandir {
             System.load(configuredPath.toAbsolutePath().toString());
         } else if (java.nio.file.Files.isRegularFile(builtLibrary)) {
             System.load(builtLibrary.toAbsolutePath().toString());
-        } else {
+        } else if (!loadBundledLibraries(library)) {
             System.loadLibrary("jscandir");
         }
+    }
+
+    private static boolean loadBundledLibraries(String bridgeName) {
+        String platform = platformKey();
+        Path extractionDirectory;
+        try {
+            extractionDirectory = Files.createTempDirectory("scandir-" + platform + "-");
+            extractionDirectory.toFile().deleteOnExit();
+            for (String library : List.of(System.mapLibraryName("cscandir"), bridgeName)) {
+                String resource = "/native/" + platform + "/" + library;
+                try (InputStream input = JScandir.class.getResourceAsStream(resource)) {
+                    if (input == null) return false;
+                    Path extracted = extractionDirectory.resolve(library);
+                    Files.copy(input, extracted, StandardCopyOption.REPLACE_EXISTING);
+                    extracted.toFile().deleteOnExit();
+                }
+            }
+            Path nativeDirectory = extractionDirectory;
+            System.load(nativeDirectory.resolve(System.mapLibraryName("cscandir")).toAbsolutePath().toString());
+            System.load(nativeDirectory.resolve(bridgeName).toAbsolutePath().toString());
+            return true;
+        } catch (IOException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    private static String platformKey() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        String platform = os.contains("win") ? "windows" : os.contains("mac") || os.contains("darwin")
+                ? "macos" : "linux";
+        String architecture = arch.equals("aarch64") || arch.equals("arm64") ? "arm64" : "x64";
+        return platform + "-" + architecture;
     }
 
     private JScandir() { }

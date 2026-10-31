@@ -1,0 +1,111 @@
+name: C# NuGet packages
+
+permissions: { }
+
+on:
+  push:
+    branches: [master]
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-native:
+    name: Native ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, os: windows, runner: windows-2025, rust: x86_64-pc-windows-msvc, rid: win-x64, library: cscandir.dll }
+          - { arch: arm64, os: windows, runner: windows-11-arm, rust: aarch64-pc-windows-msvc, rid: win-arm64, library: cscandir.dll }
+          - { arch: x64, os: linux, runner: ubuntu-24.04, rust: x86_64-unknown-linux-gnu, rid: linux-x64, library: libcscandir.so }
+          - { arch: arm64, os: linux, runner: ubuntu-24.04-arm, rust: aarch64-unknown-linux-gnu, rid: linux-arm64, library: libcscandir.so }
+          - { arch: x64, os: macos, runner: macos-15-intel, rust: x86_64-apple-darwin, rid: osx-x64, library: libcscandir.dylib }
+          - { arch: arm64, os: macos, runner: macos-15, rust: aarch64-apple-darwin, rid: osx-arm64, library: libcscandir.dylib }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # zizmor: ignore[unpinned-uses]
+        with:
+          toolchain: stable
+          targets: ${{ matrix.rust }}
+
+      - name: Build native library
+        run: cargo build -p cscandir --release --target ${{ matrix.rust }}
+
+      - name: Stage runtime asset
+        shell: bash
+        run: |
+          native_dir="runtimes/${{ matrix.rid }}/native"
+          mkdir -p "$native_dir"
+          cp "target/${{ matrix.rust }}/release/${{ matrix.library }}" "$native_dir/"
+
+      - name: Upload native runtime asset
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
+        with:
+          name: csharpscandir-${{ matrix.arch }}-${{ matrix.rid }}
+          path: runtimes/${{ matrix.rid }}/native/*
+          if-no-files-found: error
+          retention-days: 14
+
+  pack:
+    name: NuGet ${{ matrix.arch }}
+    needs: build-native
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download native runtime assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # 8.0.1
+        with:
+          pattern: csharpscandir-${{ matrix.arch }}-*
+          path: native-artifacts
+
+      - name: Assemble runtime assets
+        shell: bash
+        run: |
+          for artifact_dir in native-artifacts/csharpscandir-${{ matrix.arch }}-*; do
+            artifact_name="${artifact_dir##*/}"
+            rid="${artifact_name#csharpscandir-${{ matrix.arch }}-}"
+            destination="csharpscandir/runtimes/$rid/native"
+            mkdir -p "$destination"
+            cp "$artifact_dir"/* "$destination/"
+          done
+          for runtime_dir in csharpscandir/runtimes/*; do
+            rid="${runtime_dir##*/}"
+            case "$rid" in
+              *-${{ matrix.arch }}) ;;
+              *) rm -rf "$runtime_dir" ;;
+            esac
+          done
+
+      - name: Pack architecture-specific NuGet
+        run: dotnet pack csharpscandir/csharpscandir.csproj --configuration Release --output artifacts -p:ScandirPackageArchitecture=${{ matrix.arch }}
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
+        with:
+          name: csharpscandir-${{ matrix.arch }}-nuget
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+          retention-days: 14

@@ -19,6 +19,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>25</java.version>
         <maven.compiler.release>25</maven.compiler.release>
+        <skip.native.build>false</skip.native.build>
+        <native.platform>linux</native.platform>
+        <native.extension>so</native.extension>
+        <native.prefix>lib</native.prefix>
     </properties>
 
     <dependencies>
@@ -81,6 +85,7 @@
                         <phase>process-resources</phase>
                         <goals><goal>exec</goal></goals>
                         <configuration>
+                            <skip>${skip.native.build}</skip>
                             <executable>mkdir</executable>
                             <arguments>
                                 <argument>-p</argument>
@@ -94,20 +99,21 @@
                         <goals><goal>exec</goal></goals>
                         <configuration>
                             <workingDirectory>${project.basedir}/..</workingDirectory>
+                            <skip>${skip.native.build}</skip>
                             <executable>g++</executable>
                             <arguments>
                                 <argument>-std=c++17</argument>
                                 <argument>-Wall</argument><argument>-Wextra</argument><argument>-Werror</argument>
                                 <argument>-fPIC</argument><argument>-shared</argument>
                                 <argument>-I${java.home}/include</argument>
-                                <argument>-I${java.home}/include/linux</argument>
+                                <argument>-I${java.home}/include/${native.platform}</argument>
                                 <argument>-I${project.basedir}/../cscandir/include</argument>
                                 <argument>${project.basedir}/src/main/cpp/jscandir_jni.cpp</argument>
                                 <argument>-L${project.basedir}/../target/release</argument>
                                 <argument>-Wl,-rpath,${project.basedir}/../target/release</argument>
                                 <argument>-lcscandir</argument>
                                 <argument>-o</argument>
-                                <argument>${project.build.directory}/native/libjscandir.so</argument>
+                                <argument>${project.build.directory}/native/${native.prefix}jscandir.${native.extension}</argument>
                             </arguments>
                         </configuration>
                     </execution>

@@ -10,8 +10,11 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -126,8 +129,28 @@ public final class ScandirLinker {
                 return SymbolLookup.libraryLookup(path.toAbsolutePath().toString(), Arena.global());
             }
         }
+        String resource = "/native/" + platformKey() + "/" + libraryName;
+        try (InputStream bundled = ScandirLinker.class.getResourceAsStream(resource)) {
+            if (bundled != null) {
+                Path extracted = Files.createTempFile("scandir-", libraryName);
+                extracted.toFile().deleteOnExit();
+                Files.copy(bundled, extracted, StandardCopyOption.REPLACE_EXISTING);
+                return SymbolLookup.libraryLookup(extracted.toAbsolutePath().toString(), Arena.global());
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to load bundled native library " + resource, exception);
+        }
         System.loadLibrary("cscandir");
         return SymbolLookup.loaderLookup();
+    }
+
+    private static String platformKey() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        String platform = os.contains("win") ? "windows" : os.contains("mac") || os.contains("darwin")
+                ? "macos" : "linux";
+        String architecture = arch.equals("aarch64") || arch.equals("arm64") ? "arm64" : "x64";
+        return platform + "-" + architecture;
     }
 
     public static long offset(MemoryLayout layout, String field) {

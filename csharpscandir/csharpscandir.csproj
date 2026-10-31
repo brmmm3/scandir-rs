@@ -5,8 +5,18 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <PackageId Condition="'$(ScandirPackageArchitecture)' != ''">Scandir.CSharp.$(ScandirPackageArchitecture)</PackageId>
+    <PackageId Condition="'$(ScandirPackageArchitecture)' == ''">Scandir.CSharp</PackageId>
+    <Version>3.0.0</Version>
+    <Authors>brmmm3</Authors>
+    <Description>Managed C# wrapper for scandir-rs with architecture-specific native assets.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT OR Apache-2.0</PackageLicenseExpression>
+    <IncludeContentInPack>true</IncludeContentInPack>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="examples/**/*.cs;tests/**/*.cs" />
+    <None Update="runtimes/**/native/*" Pack="true" PackagePath="%(Identity)" />
+    <None Update="README.md" Pack="true" PackagePath="README.md" />
   </ItemGroup>
 </Project>

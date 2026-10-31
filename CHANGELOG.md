@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add GitHub Actions workflows to build platform-specific Java JARs and
+  x64/ARM64 C# NuGet packages with native libraries for Windows, Linux, and macOS.
 - Add C++ bindings through the `cxx` bridge, plus Go, Java (JNI and Foreign
   Function & Memory API), and C# bindings. Add examples and API regression
   tests for the language wrappers.

@@ -10,7 +10,7 @@ cancellation, and timeout-bounded collection.
 
 ```toml
 [dependencies]
-scandir = "3.0.0"
+scandir = "3.1.0"
 ```
 
 Cargo downloads the released crate for your target platform.

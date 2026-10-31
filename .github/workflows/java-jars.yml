@@ -1,0 +1,113 @@
+name: Java platform JARs
+
+permissions: { }
+
+on:
+  push:
+    branches: [master]
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows, arch: x64, runner: windows-2025, rust: x86_64-pc-windows-msvc, native: cscandir.dll, jni: jscandir.dll }
+          - { os: windows, arch: arm64, runner: windows-11-arm, rust: aarch64-pc-windows-msvc, native: cscandir.dll, jni: jscandir.dll }
+          - { os: linux, arch: x64, runner: ubuntu-24.04, rust: x86_64-unknown-linux-gnu, native: libcscandir.so, jni: libjscandir.so }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm, rust: aarch64-unknown-linux-gnu, native: libcscandir.so, jni: libjscandir.so }
+          - { os: macos, arch: x64, runner: macos-15-intel, rust: x86_64-apple-darwin, native: libcscandir.dylib, jni: libjscandir.dylib }
+          - { os: macos, arch: arm64, runner: macos-15, rust: aarch64-apple-darwin, native: libcscandir.dylib, jni: libjscandir.dylib }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 25
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # zizmor: ignore[unpinned-uses]
+        with:
+          toolchain: stable
+          targets: ${{ matrix.rust }}
+
+      - name: Build C ABI library
+        run: cargo build -p cscandir --release --target ${{ matrix.rust }}
+
+      - name: Stage FFM native library
+        shell: bash
+        run: |
+          mkdir -p jscandir-ffm/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}
+          cp target/${{ matrix.rust }}/release/${{ matrix.native }} jscandir-ffm/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}/
+
+      - name: Package FFM JAR
+        working-directory: jscandir-ffm
+        run: mvn --batch-mode --no-transfer-progress package -DskipTests
+
+      - name: Build JNI bridge (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        run: |
+          mkdir -p jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}
+          c++ -std=c++17 -Wall -Wextra -Werror -fPIC -shared \
+            -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -Icscandir/include \
+            jscandir-jni/src/main/cpp/jscandir_jni.cpp \
+            -Ltarget/${{ matrix.rust }}/release -Wl,-rpath,'$ORIGIN' -lcscandir \
+            -o jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}/${{ matrix.jni }}
+          cp target/${{ matrix.rust }}/release/${{ matrix.native }} jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}/
+
+      - name: Build JNI bridge (macOS)
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          mkdir -p jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}
+          install_name_tool -id @rpath/${{ matrix.native }} target/${{ matrix.rust }}/release/${{ matrix.native }}
+          c++ -std=c++17 -Wall -Wextra -Werror -dynamiclib \
+            -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/darwin" -Icscandir/include \
+            jscandir-jni/src/main/cpp/jscandir_jni.cpp \
+            -Ltarget/${{ matrix.rust }}/release -Wl,-rpath,@loader_path -Wl,-reexport_library,target/${{ matrix.rust }}/release/${{ matrix.native }} \
+            -o jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}/${{ matrix.jni }}
+          cp target/${{ matrix.rust }}/release/${{ matrix.native }} jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}/
+
+      - name: Build JNI bridge (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $nativeDir = "jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force $nativeDir | Out-Null
+          $jniInclude = Join-Path $env:JAVA_HOME 'include'
+          $jniPlatform = Join-Path $jniInclude 'win32'
+          $importLib = "target/${{ matrix.rust }}/release/cscandir.dll.lib"
+          if (!(Test-Path $importLib)) { $importLib = "target/${{ matrix.rust }}/release/cscandir.lib" }
+          cl.exe /nologo /std:c++17 /EHsc /W4 /WX /LD `
+            /I"$jniInclude" /I"$jniPlatform" /Icscandir/include `
+            jscandir-jni/src/main/cpp/jscandir_jni.cpp `
+            /link /LIBPATH:"target/${{ matrix.rust }}/release" $importLib /OUT:"$nativeDir/${{ matrix.jni }}"
+          Copy-Item "target/${{ matrix.rust }}/release/${{ matrix.native }}" $nativeDir
+
+      - name: Package JNI JAR
+        working-directory: jscandir-jni
+        run: mvn --batch-mode --no-transfer-progress package -DskipTests -Dskip.native.build=true -Dnative.platform=${{ matrix.os == 'windows' && 'win32' || matrix.os == 'macos' && 'darwin' || 'linux' }} -Dnative.extension=${{ matrix.os == 'windows' && 'dll' || matrix.os == 'macos' && 'dylib' || 'so' }} -Dnative.prefix=${{ matrix.os == 'windows' && '' || 'lib' }}
+
+      - name: Upload platform JARs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
+        with:
+          name: java-jars-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            jscandir-ffm/target/jscandir-ffm-*.jar
+            jscandir-jni/target/jscandir-jni-*.jar
+          if-no-files-found: error
+          retention-days: 14

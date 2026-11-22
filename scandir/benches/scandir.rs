@@ -6,11 +6,8 @@ use std::io::Read;
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
-
-#[cfg(windows)]
-use std::path::PathBuf;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
@@ -64,7 +61,7 @@ pub fn get_metadata_ext(metadata: &fs::Metadata) -> MetaDataExt {
     }
 }
 
-fn create_test_data() -> String {
+fn create_test_data() -> PathBuf {
     let temp_dir;
     let linux_dir;
     let kernel_path;
@@ -122,12 +119,12 @@ fn create_test_data() -> String {
         let mut archive = tar::Archive::new(limited);
         archive.unpack(&linux_dir).unwrap();
     }
-    linux_dir.to_str().unwrap().to_string()
+    linux_dir
 }
 
-fn benchmark_dir(c: &mut Criterion, path: &str) {
-    println!("Running benchmarks for {path}...");
-    let dir = Path::new(path).file_name().unwrap().to_str().unwrap();
+fn benchmark_dir(c: &mut Criterion, path: &Path) {
+    println!("Running benchmarks for {}...", path.display());
+    let dir = path.file_name().unwrap().to_string_lossy();
     let mut group = c.benchmark_group(format!("Scandir {dir}"));
     group.measurement_time(Duration::from_secs(60));
     group.sample_size(20);
@@ -159,14 +156,14 @@ fn benchmark_dir(c: &mut Criterion, path: &str) {
     group.bench_function("scandir.Scandir (collect)", |b| {
         b.iter(|| {
             let mut instance = scandir::Scandir::new(path, Some(true))
-                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path}"));
+                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path:?}"));
             instance.collect().unwrap();
         })
     });
     group.bench_function("scandir.Scandir(Ext) (collect)", |b| {
         b.iter(|| {
             let mut instance = scandir::Scandir::new(path, Some(true))
-                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path}"))
+                .unwrap_or_else(|_| panic!("Failed to create Scandir instance for {path:?}"))
                 .return_type(scandir::ReturnType::Ext);
             instance.collect().unwrap();
         })
@@ -180,7 +177,7 @@ fn benchmarks(c: &mut Criterion) {
     let path = "/usr";
     #[cfg(windows)]
     let path = "C:/Windows";
-    benchmark_dir(c, path);
+    benchmark_dir(c, Path::new(path));
 }
 
 criterion_group!(benches, benchmarks);

@@ -1,16 +1,18 @@
+use std::ffi::OsStr;
 use std::io::Error;
+use std::path::PathBuf;
 use std::time::Duration;
 use std::{env, time::Instant};
 
 use scandir::{ReturnType, Scandir};
 
 fn main() -> Result<(), Error> {
-    let args: Vec<String> = env::args().collect();
-    let default_dir = "/usr".to_string();
+    let args: Vec<_> = env::args_os().collect();
+    let default_dir = PathBuf::from("/usr").into_os_string();
     let root_dir = &args.get(1).unwrap_or(&default_dir);
     let mut instance = Scandir::new(root_dir, Some(true))?;
     //instance = instance.max_file_cnt(100);
-    if args.contains(&"--ext".to_string()) {
+    if args.iter().any(|arg| arg == OsStr::new("--ext")) {
         instance = instance.return_type(ReturnType::Ext);
     }
     println!("options {:#?}", instance.options());
@@ -33,7 +35,7 @@ fn main() -> Result<(), Error> {
     let result_str = format!("{result:#?}");
     println!(
         "result {}",
-        &result_str[..std::cmp::min(result_str.len(), 500)]
+        result_str.chars().take(500).collect::<String>()
     );
     println!("finished {:?}", instance.finished());
     println!("has more entries {:?}", instance.has_entries(true));

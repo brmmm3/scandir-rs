@@ -13,9 +13,9 @@ use scandir::{ReturnType, Scandir, ScandirResult};
 use std::time::UNIX_EPOCH;
 
 fn main() {
-    let path = std::env::args()
+    let path = std::env::args_os()
         .nth(1)
-        .unwrap_or_else(|| "/mnt/smb".to_string());
+        .unwrap_or_else(|| "/mnt/smb".into());
 
     let entries = Scandir::new(&path, Some(true))
         .expect("open dir")
@@ -27,7 +27,7 @@ fn main() {
         "scanned {} entries, {} errors from {}",
         entries.results.len(),
         entries.errors.len(),
-        path
+        std::path::Path::new(&path).display()
     );
 
     let mut ctime_none = 0usize;

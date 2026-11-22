@@ -1,11 +1,12 @@
 use std::env;
 use std::io::Error;
+use std::path::PathBuf;
 
 use scandir::Count;
 
 fn main() -> Result<(), Error> {
-    let args: Vec<String> = env::args().collect();
-    let default_dir = "/tmp".to_string();
+    let args: Vec<_> = env::args_os().collect();
+    let default_dir = PathBuf::from("/tmp").into_os_string();
     let root_dir = &args.get(1).unwrap_or(&default_dir);
     let mut instance = Count::new(root_dir)?;
     instance = instance.dir_exclude(Some(vec!["dir0".to_owned(), "dir1".to_owned()]));

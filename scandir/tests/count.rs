@@ -129,9 +129,9 @@ fn test_count_extended_dir_include() -> Result<(), Error> {
     assert_eq!(0, count.devices);
     #[cfg(windows)]
     {
-        assert_eq!(40, count.files);
-        assert_eq!(13, count.dirs);
-        assert_eq!(27, count.slinks);
+        assert_eq!(12, count.files);
+        assert_eq!(4, count.dirs);
+        assert_eq!(9, count.slinks);
     }
     #[cfg(unix)]
     {
@@ -162,9 +162,9 @@ fn test_count_extended_dir_exclude() -> Result<(), Error> {
     assert_eq!(0, count.devices);
     #[cfg(windows)]
     {
-        assert_eq!(40, count.files);
-        assert_eq!(13, count.dirs);
-        assert_eq!(27, count.slinks);
+        assert_eq!(28, count.files);
+        assert_eq!(9, count.dirs);
+        assert_eq!(18, count.slinks);
     }
     #[cfg(unix)]
     {

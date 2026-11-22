@@ -1,5 +1,3 @@
-#![cfg_attr(windows, feature(junction_point))]
-
 use std::cmp::min;
 use std::fs::{File, create_dir_all, hard_link};
 use std::io::{Error, Write};

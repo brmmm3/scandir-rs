@@ -100,7 +100,7 @@ jobs:
 
       - name: Package JNI JAR
         working-directory: jscandir-jni
-        run: mvn --batch-mode --no-transfer-progress package -DskipTests -Dskip.native.build=true -Dnative.platform=${{ matrix.os == 'windows' && 'win32' || matrix.os == 'macos' && 'darwin' || 'linux' }} -Dnative.extension=${{ matrix.os == 'windows' && 'dll' || matrix.os == 'macos' && 'dylib' || 'so' }} -Dnative.prefix=${{ matrix.os == 'windows' && ('' || 'lib') }}
+        run: mvn --batch-mode --no-transfer-progress package -DskipTests -Dskip.native.build=true -Dnative.platform=${{ matrix.os == 'windows' && 'win32' || matrix.os == 'macos' && 'darwin' || 'linux' }} -Dnative.extension=${{ matrix.os == 'windows' && 'dll' || matrix.os == 'macos' && 'dylib' || 'so' }}
 
       - name: Upload platform JARs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1

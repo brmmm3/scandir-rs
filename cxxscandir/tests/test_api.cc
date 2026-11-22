@@ -159,11 +159,33 @@ void test_invalid_root_returns_error() {
   ensure(threw, "invalid root raises an exception");
 }
 
+#ifndef _WIN32
+void test_non_utf8_output_returns_error() {
+  TemporaryDirectory root;
+  const std::string file_path = join_path(root.path(), std::string("bad-\xff", 5));
+  FILE* file = std::fopen(file_path.c_str(), "wb");
+  ensure(file != nullptr, "create non-UTF-8 file");
+  ensure(std::fclose(file) == 0, "close non-UTF-8 file");
+  bool threw = false;
+  try {
+    (void)cxxscandir::scan(options_for(root.path()));
+  } catch (const std::exception&) {
+    threw = true;
+  }
+  ensure(threw, "non-UTF-8 output raises an exception");
+  ensure(cxxscandir::count(options_for(root.path())).files == 1, "count handles non-UTF-8 names");
+  ensure(std::remove(file_path.c_str()) == 0, "remove non-UTF-8 file");
+}
+#endif
+
 }  // namespace
 
 int main() {
   test_scan_and_count_with_extended_metadata();
   test_invalid_root_returns_error();
+#ifndef _WIN32
+  test_non_utf8_output_returns_error();
+#endif
   std::puts("cxxscandir C++ tests passed");
   return 0;
 }

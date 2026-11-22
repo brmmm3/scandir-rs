@@ -1,5 +1,6 @@
 package com.scandir.ffm;
 
+import com.scandir.error.JScandirError;
 import java.lang.foreign.AddressLayout;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -15,6 +16,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,6 +93,12 @@ public final class ScandirLinker {
     }
 
     private ScandirLinker() { }
+
+    public static void validateUtf8(String value) {
+        if (!StandardCharsets.UTF_8.newEncoder().canEncode(value)) {
+            throw JScandirError.invalidArgument("string contains an invalid surrogate");
+        }
+    }
 
     private static GroupLayout struct(MemoryLayout... fields) {
         List<MemoryLayout> aligned = new ArrayList<>(fields.length * 2 + 1);

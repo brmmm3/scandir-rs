@@ -3,6 +3,9 @@
 Managed C# wrapper for the `cscandir` C ABI and `scandir` Rust crate. The wrapper
 uses .NET P/Invoke and converts native results into managed records. Native
 result buffers are always released through the ABI's matching free functions.
+The C ABI requires UTF-8 paths; unpaired surrogates in inputs and non-UTF-8
+output names are rejected.
+Returned paths use native separators.
 
 ## Build and test
 

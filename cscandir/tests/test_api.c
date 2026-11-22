@@ -191,6 +191,28 @@ static void test_filters(const char *root) {
     cscandir_free_entry_list(&entries);
 }
 
+static void test_non_utf8_output(const char *root) {
+    const char name[] = {'b', 'a', 'd', '-', (char)0xff, '\0'};
+    char path[1024];
+    create_file(root, name);
+    cscandir_entry_list entries;
+    cscandir_string_list errors;
+    cscandir_error error;
+    assert(cscandir_collect(root, NULL, &entries, &errors, &error) == CSCANDIR_ERR_INVALID_UTF8);
+    assert(error.code == CSCANDIR_ERR_INVALID_UTF8 && error.message);
+    assert(entries.len == 0 && errors.len == 0);
+    cscandir_free_entry_list(&entries);
+    cscandir_free_string_list(&errors);
+    cscandir_free_error(&error);
+    cscandir_statistics stats;
+    assert(cscandir_count(root, NULL, &stats, &errors, &error) == CSCANDIR_OK);
+    assert(stats.files == 6);
+    cscandir_free_string_list(&errors);
+    cscandir_free_error(&error);
+    path_join(path, sizeof(path), root, name);
+    assert(unlink(path) == 0);
+}
+
 int main(void) {
     cscandir_options_init(NULL);
     cscandir_free_entry_list(NULL);
@@ -210,6 +232,7 @@ int main(void) {
     test_invalid_inputs(root);
     test_collect_and_count(root);
     test_filters(root);
+    test_non_utf8_output(root);
     for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); ++i) {
         path_join(path, sizeof(path), root, files[i]);
         assert(unlink(path) == 0);

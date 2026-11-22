@@ -71,6 +71,9 @@ Options opts = Options.defaultOptions()
 Uses the stable Java Foreign Function & Memory API to call the supported `cscandir_collect` and `cscandir_count` functions.
 Output pointers are decoded in place into Java result objects and C-owned output allocations are freed in `finally` blocks.
 FFM avoids the extra JNI bridge but collecting still materializes Java entry objects and copies UTF-8 names into Java strings.
+The C API requires UTF-8 paths; unpaired surrogates in inputs and non-UTF-8
+output names are rejected.
+Returned paths use native separators.
 The C ABI is synchronous and does not export `walk`; `JScandir.walk` groups the single collect result in Java (it is not a streaming walk).
 
 ## License

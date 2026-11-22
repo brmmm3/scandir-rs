@@ -10,6 +10,7 @@ import com.scandir.result.WalkResult;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -95,7 +96,7 @@ public final class JScandir {
         for (int i = firstCounted; i < entries.size(); i++) {
             var entry = entries.get(i);
             String path = entry.getPath();
-            int separator = path.lastIndexOf('/');
+            int separator = path.lastIndexOf(File.separatorChar);
             String parent = separator < 0 ? "" : path.substring(0, separator);
             String name = separator < 0 ? path : path.substring(separator + 1);
             TocParts part = grouped.computeIfAbsent(parent, ignored -> new TocParts());

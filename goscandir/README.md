@@ -41,3 +41,7 @@ such as file counts, hardlinks, and disk usage. Set `Options.ReturnType` to
 `ReturnTypeExt` to request the metadata needed for accurate extended counting.
 The C API has no walk endpoint, so `Walk` groups a materialized `Collect`
 result in Go and is not streaming.
+
+The C ABI requires UTF-8 input and output paths; `Collect` and `Walk` return
+`ErrInvalidUTF8` for non-UTF-8 output paths. Returned paths use native
+separators.

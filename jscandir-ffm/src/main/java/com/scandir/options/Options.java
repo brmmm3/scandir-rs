@@ -165,6 +165,7 @@ public final class Options {
             for (int i = 0; i < patterns.size(); i++) {
                 String pattern = Objects.requireNonNull(patterns.get(i), "filter pattern");
                 if (pattern.indexOf('\0') >= 0) throw new IllegalArgumentException("filter pattern contains NUL");
+                ScandirLinker.validateUtf8(pattern);
                 values.setAtIndex(ValueLayout.ADDRESS, i, arena.allocateFrom(pattern, StandardCharsets.UTF_8));
             }
         }

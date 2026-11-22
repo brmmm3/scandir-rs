@@ -116,7 +116,7 @@ func TestFiltersAndMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, entry := range result.Entries {
-		if entry.Path == "sub/deep" || entry.Path == "sub/deep/d.txt" {
+		if entry.Path == filepath.Join("sub", "deep") || entry.Path == filepath.Join("sub", "deep", "d.txt") {
 			t.Errorf("excluded path returned: %q", entry.Path)
 		}
 		if entry.IsFile && !strings.HasSuffix(entry.Path, ".txt") {
@@ -140,7 +140,7 @@ func TestWalkGroupsEntries(t *testing.T) {
 	if len(result.Roots) != 3 {
 		t.Fatalf("Walk returned %d directory groups, want 3", len(result.Roots))
 	}
-	want := map[string]bool{"": true, "sub": true, "sub/deep": true}
+	want := map[string]bool{"": true, "sub": true, filepath.Join("sub", "deep"): true}
 	for _, dir := range result.Roots {
 		if !want[dir.Dir] {
 			t.Errorf("unexpected directory group %q", dir.Dir)
@@ -152,7 +152,7 @@ func TestWalkGroupsEntries(t *testing.T) {
 	}
 	for _, dir := range result.Roots {
 		for _, name := range dir.Toc.Files {
-			if strings.Contains(name, "/") {
+			if filepath.Base(name) != name {
 				t.Errorf("Walk local file name should be basename, got %q", name)
 			}
 		}
@@ -173,12 +173,63 @@ func TestUnicodeFilenames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"unicode-目录": true, "子目录": true, "雪だるま-☃.txt": true, "子目录/файл.txt": true}
+	want := map[string]bool{"unicode-目录": true, "子目录": true, "雪だるま-☃.txt": true, filepath.Join("子目录", "файл.txt"): true}
 	for _, entry := range result.Entries {
 		delete(want, entry.Path)
 	}
 	if len(want) != 0 {
 		t.Errorf("missing Unicode paths: %v", want)
+	}
+}
+
+func TestWalkUsesNativeSeparators(t *testing.T) {
+	root := tree(t)
+	if runtime.GOOS != "windows" {
+		if err := os.WriteFile(filepath.Join(root, "sub", `literal\name.txt`), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := Walk(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := filepath.Join("sub", "deep")
+	foundNested := false
+	foundLiteral := runtime.GOOS == "windows"
+	for _, group := range result.Roots {
+		if group.Dir == parent {
+			if len(group.Toc.Files) != 1 || group.Toc.Files[0] != "d.txt" {
+				t.Fatalf("nested files = %v, want [d.txt]", group.Toc.Files)
+			}
+			foundNested = true
+		}
+		if group.Dir == "sub" {
+			for _, name := range group.Toc.Files {
+				if name == `literal\name.txt` {
+					foundLiteral = true
+				}
+			}
+		}
+	}
+	if !foundNested || !foundLiteral {
+		t.Fatalf("missing nested group or literal backslash name: %+v", result.Roots)
+	}
+}
+
+func TestCollectRejectsNonUTF8Output(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("non-UTF-8 byte names require a POSIX filesystem")
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "bad-\xff"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Collect(root, nil); !errors.Is(err, ErrInvalidUTF8) {
+		t.Fatalf("Collect error = %v, want ErrInvalidUTF8", err)
+	}
+	stats, err := Count(root, nil)
+	if err != nil || stats.Files != 1 {
+		t.Fatalf("Count = %+v, %v; want one file and no error", stats, err)
 	}
 }
 

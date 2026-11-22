@@ -1,11 +1,13 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace CSharpScandir;
 
 internal static class NativeMethods
 {
     private const string LibraryName = "cscandir";
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     static NativeMethods()
     {
@@ -117,6 +119,7 @@ internal static class NativeMethods
         {
             throw new ArgumentException("Native strings cannot contain a NUL character.", nameof(value));
         }
+        _ = StrictUtf8.GetByteCount(value);
         return Marshal.StringToCoTaskMemUTF8(value);
     }
 

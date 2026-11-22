@@ -19,7 +19,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -446,14 +445,11 @@ func Walk(root string, options *Options) (*WalkResult, error) {
 			byDir[""] = &WalkEntry{}
 			continue
 		}
-		parent, name := path.Dir(entry.Path), path.Base(entry.Path)
+		parent, name := filepath.Dir(entry.Path), filepath.Base(entry.Path)
 		if parent == "." {
 			parent = ""
 		}
-		joined := name
-		if parent != "" {
-			joined = parent + "/" + name
-		}
+		joined := entry.Path
 		walkEntry := byDir[parent]
 		if walkEntry == nil {
 			walkEntry = &WalkEntry{Dir: parent}

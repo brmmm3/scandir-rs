@@ -16,6 +16,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.file.Path;
 import java.io.IOException;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ public final class JScandir {
     public static CollectResult collect(String root, Options options) {
         Objects.requireNonNull(root, "root");
         if (root.indexOf('\0') >= 0) throw JScandirError.invalidArgument("root path contains NUL");
+        ScandirLinker.validateUtf8(root);
         long started = System.nanoTime();
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment cOptions = options == null ? MemorySegment.NULL : options.toNative(arena);
@@ -74,6 +76,7 @@ public final class JScandir {
     public static Statistics count(String root, Options options) {
         Objects.requireNonNull(root, "root");
         if (root.indexOf('\0') >= 0) throw JScandirError.invalidArgument("root path contains NUL");
+        ScandirLinker.validateUtf8(root);
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment cOptions = options == null ? MemorySegment.NULL : options.toNative(arena);
             MemorySegment cRoot = arena.allocateFrom(root);
@@ -118,7 +121,7 @@ public final class JScandir {
         for (int i = firstCounted; i < entries.size(); i++) {
             Entry entry = entries.get(i);
             String path = entry.getPath();
-            int separator = path.lastIndexOf('/');
+            int separator = path.lastIndexOf(File.separatorChar);
             String parent = separator < 0 ? "" : path.substring(0, separator);
             String name = separator < 0 ? path : path.substring(separator + 1);
             TocParts part = grouped.computeIfAbsent(parent, ignored -> new TocParts());

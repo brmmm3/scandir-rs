@@ -44,7 +44,7 @@ class JScandirTest {
         assertEquals(2, result.getStatistics().getDirs());
         assertTrue(result.getErrors().isEmpty());
         assertTrue(result.getEntries().stream().anyMatch(entry -> entry.getPath().equals("test_tree")));
-        assertTrue(result.getEntries().stream().anyMatch(entry -> entry.getPath().equals("sub/deep/d.txt")));
+        assertTrue(result.getEntries().stream().anyMatch(entry -> entry.getPath().equals(Path.of("sub", "deep", "d.txt").toString())));
         assertTrue(result.getEntries().stream().anyMatch(entry -> entry.getPath().equals("café-雪.txt")));
         assertTrue(result.getStatistics().getDuration() >= 0.0);
     }
@@ -58,7 +58,18 @@ class JScandirTest {
         assertEquals(2, JScandir.count(root.toRealPath().toString(), Options.defaultOptions()).getDirs());
         WalkResult walk = JScandir.walk(root, Options.defaultOptions());
         assertEquals(5, walk.getToc().getFiles().size());
-        assertTrue(walk.getRoots().stream().anyMatch(entry -> entry.getDir().equals("sub/deep")));
+        assertTrue(walk.getRoots().stream().anyMatch(entry ->
+                entry.getDir().equals(Path.of("sub", "deep").toString())
+                && entry.getToc().getFiles().contains("d.txt")));
+    }
+
+    @Test
+    void walkPreservesLiteralBackslashesOnUnix() throws Exception {
+        if (java.io.File.separatorChar == '\\') return;
+        Files.writeString(tempDir.resolve("literal\\name.txt"), "x");
+        WalkResult walk = JScandir.walk(tempDir, null);
+        assertTrue(walk.getRoots().stream().anyMatch(entry ->
+                entry.getDir().isEmpty() && entry.getToc().getFiles().contains("literal\\name.txt")));
     }
 
     @Test
@@ -67,6 +78,16 @@ class JScandirTest {
                 () -> JScandir.collect(tempDir.resolve("missing").toString(), null));
         assertEquals(3, error.getCode());
         assertNotNull(error.getMessage());
+    }
+
+    @Test
+    void invalidSurrogatesAreRejected() {
+        assertEquals(1, assertThrows(JScandirError.class,
+                () -> JScandir.collect(tempDir + "\ud800", null)).getCode());
+        assertEquals(1, assertThrows(JScandirError.class,
+                () -> JScandir.count(tempDir + "\ud800", null)).getCode());
+        assertEquals(1, assertThrows(JScandirError.class,
+                () -> JScandir.collect(tempDir, Options.defaultOptions().fileInclude("bad\ud800"))).getCode());
     }
 
     @Test

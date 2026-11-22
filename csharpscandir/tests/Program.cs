@@ -24,6 +24,7 @@ static class TestSuite
             TestInvalidInputs(root);
             TestCollectAndCount(root);
             TestFilters(root);
+            TestUnicodePaths(root);
             Console.WriteLine($"C# API regression tests passed ({_assertions} assertions)");
             return 0;
         }
@@ -49,6 +50,10 @@ static class TestSuite
         Throws<ArgumentException>(() => Scandir.Collect("root\0suffix"));
         Throws<ArgumentException>(() => Scandir.Collect(root,
             new ScandirOptions { FileInclude = ["bad\0filter"] }));
+        Throws<ArgumentException>(() => Scandir.Collect(root + "\ud800"));
+        Throws<ArgumentException>(() => Scandir.Count(root + "\ud800"));
+        Throws<ArgumentException>(() => Scandir.Collect(root,
+            new ScandirOptions { FileInclude = ["bad\ud800"] }));
         Throws<ArgumentNullException>(() => Scandir.Collect(root,
             new ScandirOptions { FileInclude = null! }));
     }
@@ -59,14 +64,14 @@ static class TestSuite
         Equal(8, basic.Entries.Count);
         Equal(0, basic.Errors.Count);
         True(basic.Entries.Any(entry => entry.Path == ".hidden"));
-        True(basic.Entries.Any(entry => entry.Path == "included/kept.txt"));
+        True(basic.Entries.Any(entry => entry.Path == Path.Combine("included", "kept.txt")));
         True(basic.Entries.All(entry => !entry.HasExtendedMetadata));
 
         var extendedOptions = new ScandirOptions { Sorted = true, Metadata = MetadataKind.Extended };
         ScanResult extended = Scandir.Collect(root, extendedOptions);
         Equal(8, extended.Entries.Count);
         Equal(Path.GetFileName(root), extended.Entries[0].Path);
-        string[] expected = [".hidden", "a.txt", "b.TXT", "excluded", "excluded/omitted.txt", "included", "included/kept.txt"];
+        string[] expected = [".hidden", "a.txt", "b.TXT", "excluded", Path.Combine("excluded", "omitted.txt"), "included", Path.Combine("included", "kept.txt")];
         SequenceEqual(expected, extended.Entries.Skip(1).Select(entry => entry.Path));
         foreach (ScandirEntry entry in extended.Entries.Skip(1))
         {
@@ -110,13 +115,13 @@ static class TestSuite
         Equal(4, filtered.Entries.Count);
         Contains(filtered.Entries, "a.txt");
         Contains(filtered.Entries, "included");
-        Contains(filtered.Entries, "included/kept.txt");
+        Contains(filtered.Entries, Path.Combine("included", "kept.txt"));
         True(!filtered.Entries.Any(entry => entry.Path == ".hidden"));
 
         options.FileExclude = ["kept*"];
         filtered = Scandir.Collect(root, options);
         Equal(3, filtered.Entries.Count);
-        True(!filtered.Entries.Any(entry => entry.Path == "included/kept.txt"));
+        True(!filtered.Entries.Any(entry => entry.Path == Path.Combine("included", "kept.txt")));
 
         options = new ScandirOptions { MaxDepth = 1 };
         Equal(6, Scandir.Collect(root, options).Entries.Count);
@@ -124,6 +129,21 @@ static class TestSuite
         options.MaxFileCount = 1;
         int limitedCount = Scandir.Collect(root, options).Entries.Count;
         True(limitedCount > 0 && limitedCount < 8);
+    }
+
+    private static void TestUnicodePaths(string root)
+    {
+        const string name = "unicode-雪-🦀.txt";
+        string path = Path.Combine(root, name);
+        File.WriteAllText(path, "x");
+        try
+        {
+            Contains(Scandir.Collect(root).Entries, name);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     private static void Contains(IReadOnlyList<ScandirEntry> entries, string path)

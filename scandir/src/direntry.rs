@@ -1,9 +1,10 @@
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[cfg(feature = "bincode")]
 use bincode_next::error::EncodeError;
 #[cfg(feature = "speedy")]
-use speedy::{Readable, Writable};
+use speedy::Writable;
 
 // Shared conversion for all ctime/mtime/atime variants.
 #[inline]
@@ -15,14 +16,13 @@ fn system_time_to_f64(t: Option<SystemTime>) -> f64 {
     (duration.as_secs() as f64) + (duration.subsec_nanos() as f64) * 1e-9
 }
 
-#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[cfg_attr(
     any(feature = "bincode", feature = "json"),
     derive(Deserialize, Serialize)
 )]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DirEntry {
-    pub path: String,
+    pub path: PathBuf,
     pub is_symlink: bool,
     pub is_dir: bool,
     pub is_file: bool,
@@ -31,6 +31,11 @@ pub struct DirEntry {
     pub st_atime: Option<SystemTime>,
     pub st_size: u64,
 }
+
+#[cfg(feature = "speedy")]
+crate::speedy_path::impl_speedy_path_struct!(
+    DirEntry, path, is_symlink, is_dir, is_file, st_ctime, st_mtime, st_atime, st_size
+);
 
 impl DirEntry {
     #[inline]
@@ -64,14 +69,13 @@ impl DirEntry {
     }
 }
 
-#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[cfg_attr(
     any(feature = "bincode", feature = "json"),
     derive(Deserialize, Serialize)
 )]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DirEntryExt {
-    pub path: String,
+    pub path: PathBuf,
     pub is_symlink: bool,
     pub is_dir: bool,
     pub is_file: bool,
@@ -106,6 +110,29 @@ pub struct DirEntryExt {
     /// Device number (for character and block devices on Unix).
     pub st_rdev: u64,
 }
+
+#[cfg(feature = "speedy")]
+crate::speedy_path::impl_speedy_path_struct!(
+    DirEntryExt,
+    path,
+    is_symlink,
+    is_dir,
+    is_file,
+    st_ctime,
+    st_mtime,
+    st_atime,
+    st_btime,
+    st_size,
+    st_blksize,
+    st_blocks,
+    st_mode,
+    st_nlink,
+    st_uid,
+    st_gid,
+    st_ino,
+    st_dev,
+    st_rdev
+);
 
 impl DirEntryExt {
     #[inline]

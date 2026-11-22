@@ -1,121 +1,78 @@
 # scandir
 
-The Rust crate is called `scandir` and installable via `cargo`. On Linux it is
-**1.5 - 2.9 times faster** and on Windows **1.5 - 5.4 time faster** (see
-[benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)).
+`scandir` scans directory trees in parallel. Use `Count` for statistics,
+`Walk` for paths grouped by type, and `Scandir` for file metadata. See the
+[benchmarks](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/benchmarks.md)
+and the API guides for
+[Count](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/count.md),
+[Walk](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/walk.md), and
+[Scandir](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/scandir.md).
 
-If you are just interested in directory statistics you can use the `Count`.
+## Count
 
-`scandir_rs` contains following classes:
-
-- `Count` for determining statistics of a directory.
-- `Walk` for getting names of directory entries.
-- `Scandir` for getting detailed stats of directory entries.
-
-For the API see:
-
-- Class [Count](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/count.md)
-- Class [Walk](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/walk.md)
-- Class [Scandir](https://github.com/brmmm3/scandir-rs/blob/master/scandir/doc/scandir.md)
-
-## Examples
-
-`Collect` examples:
-
-```rust
+```rust,no_run
 use scandir::Count;
 
-// collect() starts the worker thread and waits until it has finished. The line below is blocking.
-println!(Count::new("/usr")?.collect()?);
-// Get extended statistics
-println!(Count::new("/usr", return_type=ReturnType.Ext)?.collect()?);
-```
-
-The same, but asynchronously in background using a class instance:
-
-```rust
-use scandir::Count;
-
-let mut instance = Count::new("/usr", return_type=ReturnType.Ext);
-instance.start();  // Start scanning the directory
-...
-let values = instance.results();  // Returns the current statistics. Can be read at any time
-...
-if instance.busy() {  // Check if the task is still running.
-...
-instance.stop();  // If you want to cancel the task
-...
-instance.join();  // Wait for the instance to finish.
-```
-
-```rust
-let mut instance = Count::new(&path)?;
-instance.start()?;
-loop {
-    if !instance.busy() {
-        break;
-    }
-    // Do something
-    thread::sleep(Duration::from_millis(10));
+fn main() -> std::io::Result<()> {
+    let statistics = Count::new(".")?.extended(true).collect()?;
+    println!("{statistics:?}");
+    Ok(())
 }
-// collect() immediately returns because the worker thread has already finished.
-let statistics = instance.collect()?;
 ```
 
-`Walk` example:
+## Walk
 
-```rust
+```rust,no_run
 use scandir::Walk;
 
-// Get basic file tree
-println!(Walk::new("/usr")?.collect()?);
-// Get file tree with extended file type identification. This is slower.
-println!(Walk::new("/usr", return_type=ReturnType.Ext)?.collect()?);
-```
-
-If you want to have intermediate results, e.g. you want to show the progress to the user,
-the use the example below.
-
-```rust
-let mut instance = Walk::new(&path, None)?;
-instance.start()?;
-loop {
-    if !instance.busy() {
-        break;
-    }
-    let new_results = instance.results(true);
-    // Do something
-    thread::sleep(Duration::from_millis(10));
+fn main() -> std::io::Result<()> {
+    let paths = Walk::new(".", None)?.collect()?;
+    println!("{:?}", paths.files);
+    Ok(())
 }
-// collect() immediately returns because the worker thread has already finished.
-let results = instance.collect()?;
 ```
 
-`Scandir` example:
+## Scandir
 
-```rust
+```rust,no_run
 use scandir::Scandir;
 
-// Get basic file metadata
-println!(Scandir::new("/usr")?.collect()?);
-// Get extended file metadata
-println!(Scandir::new("/usr", return_type=ReturnType.Ext, None)?.collect()?);
-```
-
-If you want to have intermediate results, e.g. you want to show the progress to the user,
-the use the example below.
-
-```rust
-let mut instance = Scandir::new(&path, None)?;
-instance.start()?;
-loop {
-    if !instance.busy() {
-        break;
+fn main() -> std::io::Result<()> {
+    let entries = Scandir::new(".", None)?.extended(true).collect()?;
+    for entry in &entries.results {
+        println!("{entry:?}");
     }
-    let new_results = instance.results(true);
-    // Do something
-    thread::sleep(Duration::from_millis(10));
+    Ok(())
 }
-// collect() immediately returns because the worker thread has already finished.
-let results = instance.collect()?;
 ```
+
+For incremental results, start a worker and retrieve results while it runs:
+
+```rust,no_run
+use scandir::Scandir;
+use std::time::Duration;
+
+fn main() -> std::io::Result<()> {
+    let mut scanner = Scandir::new(".", None)?;
+    scanner.start()?;
+    while scanner.busy() {
+        let results = scanner.results_timeout(Duration::from_millis(100));
+        println!("{} entries", results.results.len());
+    }
+    let remaining = scanner.results(true);
+    println!("{} remaining entries", remaining.results.len());
+    scanner.join();
+    Ok(())
+}
+```
+
+`max_file_cnt` limits non-directory entries, including symbolic links and
+special files; `0` disables the limit. `Count` and `Scandir` include hidden
+entries by default; `Walk` skips them by default.
+
+Paths in `DirEntry`, `Toc`, walk results and scan errors use `PathBuf`, so
+non-Unicode names and roots are preserved. This changes the earlier `String`
+result API. Glob patterns are Unicode strings: when an active filter cannot
+match a non-Unicode name, that entry is skipped and an error is reported.
+Speedy, bincode and JSON retain their string-based formats and return an error
+when a path is not Unicode.

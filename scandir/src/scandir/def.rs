@@ -1,14 +1,15 @@
+use std::path::{Path, PathBuf};
+
 #[cfg(feature = "bincode")]
 use bincode_next::error::EncodeError;
 #[cfg(feature = "speedy")]
-use speedy::{Readable, Writable};
+use speedy::Writable;
 
 use crate::{
     ErrorsType,
     direntry::{DirEntry, DirEntryExt},
 };
 
-#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[cfg_attr(
     any(feature = "bincode", feature = "json"),
     derive(Deserialize, Serialize)
@@ -17,12 +18,48 @@ use crate::{
 pub enum ScandirResult {
     DirEntry(DirEntry),
     DirEntryExt(DirEntryExt),
-    Error((String, String)),
+    Error((PathBuf, String)),
+}
+
+#[cfg(feature = "speedy")]
+impl<C: speedy::Context> speedy::Writable<C> for ScandirResult {
+    fn write_to<W: speedy::Writer<C> + ?Sized>(&self, writer: &mut W) -> Result<(), C::Error> {
+        match self {
+            Self::DirEntry(entry) => {
+                writer.write_u32(0)?;
+                writer.write_value(entry)
+            }
+            Self::DirEntryExt(entry) => {
+                writer.write_u32(1)?;
+                writer.write_value(entry)
+            }
+            Self::Error((path, message)) => {
+                writer.write_u32(2)?;
+                crate::speedy_path::write_path(path, writer)?;
+                writer.write_value(message)
+            }
+        }
+    }
+}
+
+#[cfg(feature = "speedy")]
+impl<'a, C: speedy::Context> speedy::Readable<'a, C> for ScandirResult {
+    fn read_from<R: speedy::Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        match reader.read_u32()? {
+            0 => Ok(Self::DirEntry(reader.read_value()?)),
+            1 => Ok(Self::DirEntryExt(reader.read_value()?)),
+            2 => Ok(Self::Error((
+                crate::speedy_path::read_path(reader)?,
+                reader.read_value()?,
+            ))),
+            tag => Err(speedy::Error::custom(format!("Invalid ScandirResult tag: {tag}")).into()),
+        }
+    }
 }
 
 impl ScandirResult {
     #[inline]
-    pub fn path(&self) -> &String {
+    pub fn path(&self) -> &Path {
         match self {
             Self::DirEntry(e) => &e.path,
             Self::DirEntryExt(e) => &e.path,
@@ -31,7 +68,7 @@ impl ScandirResult {
     }
 
     #[inline]
-    pub fn error(&self) -> Option<&(String, String)> {
+    pub fn error(&self) -> Option<&(PathBuf, String)> {
         match self {
             Self::Error(e) => Some(e),
             _ => None,
@@ -125,7 +162,6 @@ impl ScandirResult {
     }
 }
 
-#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[cfg_attr(
     any(feature = "bincode", feature = "json"),
     derive(Deserialize, Serialize)
@@ -134,6 +170,34 @@ impl ScandirResult {
 pub struct ScandirResults {
     pub results: Vec<ScandirResult>,
     pub errors: ErrorsType,
+}
+
+#[cfg(feature = "speedy")]
+impl<C: speedy::Context> speedy::Writable<C> for ScandirResults {
+    fn write_to<W: speedy::Writer<C> + ?Sized>(&self, writer: &mut W) -> Result<(), C::Error> {
+        writer.write_value(&self.results)?;
+        let errors = self
+            .errors
+            .iter()
+            .map(|(path, message)| Ok((crate::speedy_path::path_str::<C>(path)?, message)))
+            .collect::<Result<Vec<_>, C::Error>>()?;
+        writer.write_value(&errors)
+    }
+}
+
+#[cfg(feature = "speedy")]
+impl<'a, C: speedy::Context> speedy::Readable<'a, C> for ScandirResults {
+    fn read_from<R: speedy::Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        let results = reader.read_value()?;
+        let errors: Vec<(String, String)> = reader.read_value()?;
+        Ok(Self {
+            results,
+            errors: errors
+                .into_iter()
+                .map(|(path, message)| (path.into(), message))
+                .collect(),
+        })
+    }
 }
 
 impl ScandirResults {

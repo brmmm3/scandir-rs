@@ -1,20 +1,45 @@
+use std::path::{Path, PathBuf};
+
 #[cfg(feature = "bincode")]
 use bincode_next::error::EncodeError;
 #[cfg(feature = "speedy")]
-use speedy::{Readable, Writable};
+use speedy::Writable;
 
-#[cfg_attr(feature = "speedy", derive(Readable, Writable))]
 #[cfg_attr(
     any(feature = "bincode", feature = "json"),
     derive(Deserialize, Serialize)
 )]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Toc {
-    pub dirs: Vec<String>,
-    pub files: Vec<String>,
-    pub symlinks: Vec<String>,
-    pub other: Vec<String>,
+    pub dirs: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
+    pub symlinks: Vec<PathBuf>,
+    pub other: Vec<PathBuf>,
     pub errors: Vec<String>,
+}
+
+#[cfg(feature = "speedy")]
+impl<C: speedy::Context> speedy::Writable<C> for Toc {
+    fn write_to<W: speedy::Writer<C> + ?Sized>(&self, writer: &mut W) -> Result<(), C::Error> {
+        crate::speedy_path::write_paths(&self.dirs, writer)?;
+        crate::speedy_path::write_paths(&self.files, writer)?;
+        crate::speedy_path::write_paths(&self.symlinks, writer)?;
+        crate::speedy_path::write_paths(&self.other, writer)?;
+        writer.write_value(&self.errors)
+    }
+}
+
+#[cfg(feature = "speedy")]
+impl<'a, C: speedy::Context> speedy::Readable<'a, C> for Toc {
+    fn read_from<R: speedy::Reader<'a, C>>(reader: &mut R) -> Result<Self, C::Error> {
+        Ok(Self {
+            dirs: crate::speedy_path::read_paths(reader)?,
+            files: crate::speedy_path::read_paths(reader)?,
+            symlinks: crate::speedy_path::read_paths(reader)?,
+            other: crate::speedy_path::read_paths(reader)?,
+            errors: reader.read_value()?,
+        })
+    }
 }
 
 impl Toc {
@@ -41,19 +66,19 @@ impl Toc {
         self.errors.clear();
     }
 
-    pub fn dirs(&self) -> Vec<String> {
+    pub fn dirs(&self) -> Vec<PathBuf> {
         self.dirs.clone()
     }
 
-    pub fn files(&self) -> Vec<String> {
+    pub fn files(&self) -> Vec<PathBuf> {
         self.files.clone()
     }
 
-    pub fn symlinks(&self) -> Vec<String> {
+    pub fn symlinks(&self) -> Vec<PathBuf> {
         self.symlinks.clone()
     }
 
-    pub fn other(&self) -> Vec<String> {
+    pub fn other(&self) -> Vec<PathBuf> {
         self.other.clone()
     }
 
@@ -69,9 +94,9 @@ impl Toc {
             && self.errors.is_empty()
     }
 
-    pub fn extend(&mut self, root_dir: &str, other: &Toc) {
+    pub fn extend(&mut self, root_dir: &Path, other: &Toc) {
         // When the prefix is empty, skip the unnecessary string concatenation and clone directly.
-        if root_dir.is_empty() {
+        if root_dir.as_os_str().is_empty() {
             self.dirs.extend(other.dirs.iter().cloned());
             self.files.extend(other.files.iter().cloned());
             self.symlinks.extend(other.symlinks.iter().cloned());
@@ -79,26 +104,26 @@ impl Toc {
             self.errors.extend(other.errors.iter().cloned());
             return;
         }
-        let root_len = root_dir.len();
-        let join_path = |x: &str| -> String {
-            let mut path = String::with_capacity(root_len + 1 + x.len());
-            path.push_str(root_dir);
-            path.push('/');
-            path.push_str(x);
-            path
-        };
         self.dirs.reserve(other.dirs.len());
-        self.dirs.extend(other.dirs.iter().map(|x| join_path(x)));
+        self.dirs
+            .extend(other.dirs.iter().map(|x| root_dir.join(x)));
         self.files.reserve(other.files.len());
-        self.files.extend(other.files.iter().map(|x| join_path(x)));
+        self.files
+            .extend(other.files.iter().map(|x| root_dir.join(x)));
         self.symlinks.reserve(other.symlinks.len());
         self.symlinks
-            .extend(other.symlinks.iter().map(|x| join_path(x)));
+            .extend(other.symlinks.iter().map(|x| root_dir.join(x)));
         self.other.reserve(other.other.len());
-        self.other.extend(other.other.iter().map(|x| join_path(x)));
+        self.other
+            .extend(other.other.iter().map(|x| root_dir.join(x)));
         self.errors.reserve(other.errors.len());
-        self.errors
-            .extend(other.errors.iter().map(|x| join_path(x)));
+        self.errors.extend(other.errors.iter().map(|error| {
+            if let Some(root) = root_dir.to_str() {
+                format!("{root}/{error}")
+            } else {
+                format!("{root_dir:?}/{error}")
+            }
+        }));
     }
 
     #[cfg(feature = "speedy")]

@@ -34,7 +34,7 @@ impl Count {
     #[new]
     #[pyo3(signature = (root_path, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, follow_links=None, return_type=None))]
     fn new(
-        root_path: &str,
+        root_path: &Bound<'_, PyAny>,
         skip_hidden: Option<bool>,
         max_depth: Option<usize>,
         max_file_cnt: Option<usize>,
@@ -46,6 +46,7 @@ impl Count {
         follow_links: Option<bool>,
         return_type: Option<ReturnType>,
     ) -> PyResult<Self> {
+        let root_path = crate::common::root_path(root_path)?;
         Ok(Count {
             instance: match scandir::Count::new(root_path) {
                 Ok(c) => c

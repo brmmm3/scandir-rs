@@ -1,8 +1,9 @@
 use std::fs::Metadata;
+use std::path::PathBuf;
 
 use glob_sl::{MatchOptions, Pattern};
 
-pub type ErrorsType = Vec<(String, String)>; // Tuple with file path and error message
+pub type ErrorsType = Vec<(PathBuf, String)>; // Tuple with file path and error message
 
 pub type DirEntryType = jwalk_meta::DirEntry<((), Option<Result<Metadata, std::io::Error>>)>;
 

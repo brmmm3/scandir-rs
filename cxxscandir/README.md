@@ -39,6 +39,8 @@ Include the generated header `cxxscandir/src/lib.rs.h` and call
 (invalid/unavailable root, invalid glob, or other fatal setup/scan error)
 throws `std::exception`; per-entry traversal issues are available separately
 in `ScanResult::errors` and `Statistics::errors`.
+The bridge uses UTF-8 strings; `scan()` fails if an output path is not UTF-8.
+Returned paths use native separators, including backslashes on Windows.
 
 `ScanOptions` contains:
 

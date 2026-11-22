@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 //! `scandir` is a directory iteration module like `walk`, but with more features and higher speed. Depending on the function call
 //! it yields a list of paths, tuple of lists grouped by their entry type or ``DirEntry`` objects that include file type and stat information along
 //! with the name.
@@ -23,6 +24,8 @@ mod direntry;
 pub use direntry::{DirEntry, DirEntryExt};
 mod options;
 pub use options::Options;
+#[cfg(feature = "speedy")]
+mod speedy_path;
 pub mod toc;
 pub use toc::Toc;
 pub mod count;

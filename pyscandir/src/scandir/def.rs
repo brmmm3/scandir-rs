@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyDict;
 
+use crate::common::errors_to_os_strings;
 use crate::direntry::DirEntryExt;
 use std::sync::Arc;
 
@@ -15,13 +16,15 @@ pub struct ScandirResult(scandir::ScandirResult);
 #[pymethods]
 impl ScandirResult {
     #[getter]
-    fn path(&self) -> &str {
-        self.0.path()
+    fn path(&self) -> &std::ffi::OsStr {
+        self.0.path().as_os_str()
     }
 
     #[getter]
-    fn error(&self) -> Option<&(String, String)> {
-        self.0.error()
+    fn error(&self) -> Option<(std::ffi::OsString, String)> {
+        self.0
+            .error()
+            .map(|(path, error)| (path.as_os_str().to_os_string(), error.clone()))
     }
 
     #[getter]
@@ -130,7 +133,7 @@ fn result2py_inner(result: &scandir::ScandirResult, py: Python) -> PyResult<Opti
     }
 }
 
-#[pyclass(skip_from_py_object)]
+#[pyclass]
 #[derive(Debug, Clone)]
 pub struct ScandirResults {
     inner: Arc<scandir::ScandirResults>,
@@ -190,8 +193,8 @@ impl ScandirResults {
     }
 
     #[getter]
-    fn errors(&self) -> Vec<(String, String)> {
-        self.inner.errors.clone()
+    fn errors(&self) -> Vec<(std::ffi::OsString, String)> {
+        errors_to_os_strings(self.inner.errors.clone())
     }
 
     fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
@@ -199,24 +202,24 @@ impl ScandirResults {
         for entry in &self.inner.results {
             match entry {
                 scandir::ScandirResult::DirEntry(e) => {
-                    let path = e.path.clone();
+                    let path = e.path.as_os_str().to_os_string();
                     pydict.set_item(
                         path,
                         Py::new(py, crate::direntry::DirEntry::from_owned(e.clone()))?.into_any(),
                     )?
                 }
                 scandir::ScandirResult::DirEntryExt(e) => {
-                    let path = e.path.clone();
+                    let path = e.path.as_os_str().to_os_string();
                     pydict.set_item(
                         path,
                         Py::new(py, DirEntryExt::from_owned(e.clone()))?.into_any(),
                     )?
                 }
-                scandir::ScandirResult::Error((path, e)) => pydict.set_item(path, e)?,
+                scandir::ScandirResult::Error((path, e)) => pydict.set_item(path.as_os_str(), e)?,
             }
         }
         for error in &self.inner.errors {
-            pydict.set_item(error.0.clone(), error.1.clone())?;
+            pydict.set_item(error.0.as_os_str(), error.1.clone())?;
         }
         Ok(pydict.into_any().unbind())
     }

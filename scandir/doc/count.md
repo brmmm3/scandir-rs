@@ -28,7 +28,7 @@ To start the scan either the method `start` or the method `collect` has to be ca
 - `root_path` is directory to scan. `~` is allowed on Unix systems.
 - `skip_hidden` if `true` then ignore all hidden files and directories.
 - `max_depth` is maximum depth of iteration. If `0` then depth limit is disabled.
-- `max_file_cnt` is maximum number of files to collect. If `0` then limit is disabled.
+- `max_file_cnt` limits non-directory entries, including links and special files. If `0` the limit is disabled.
 - `dir_include` list of patterns for directories to include.
 - `dir_exclude` list of patterns for directories to exclude.
 - `file_include` list of patterns for files to include.
@@ -54,7 +54,7 @@ Set the maximum depth of entries yield by the iterator.
 
 ### `max_file_cnt(mut self, max_file_cnt: usize) -> Self`
 
-Set maximum number of files to collect.
+Limit non-directory entries, including links and special files. Zero disables the limit.
 
 ### `dir_include(mut self, dir_include: Option<Vec<String>>) -> Self`
 

@@ -52,7 +52,7 @@ fn main() {
                 Some(_) => ctime_ok += 1,
                 None => {
                     ctime_none += 1;
-                    println!("  CTIME-NONE {:<30} <<< REGRESSION", d.path);
+                    println!("  CTIME-NONE {:<30} <<< REGRESSION", d.path.display());
                 }
             }
             match d.st_btime {
@@ -72,7 +72,7 @@ fn main() {
 
             println!(
                 "  {:<30} ctime={:.6} btime={}",
-                d.path,
+                d.path.display(),
                 ctime_secs,
                 match d.st_btime {
                     Some(_) => format!("{:.6}", btime_secs),

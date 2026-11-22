@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use std::io::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -14,20 +14,21 @@ use parking_lot::Mutex;
 #[cfg(feature = "speedy")]
 use speedy::Writable;
 
+use crate::common::claim_file_slot;
 use crate::count::Statistics;
 use crate::{
     DirEntryType, ErrorsType, Filter, Options, ReturnType, Toc, check_and_expand_path,
-    create_filter, filter_children, get_root_path_len, start,
+    create_filter, filter_children, start,
 };
 
 /// Accumulated (entries, filter_errors) shared across rayon workers.
 /// Wrapped in Arc<Mutex<..>> to halve contention vs separate locks.
-type WalkResults = Arc<Mutex<(Vec<(String, Toc)>, Vec<String>)>>;
+type WalkResults = Arc<Mutex<(Vec<(PathBuf, Toc)>, Vec<String>)>>;
 
 #[inline]
 fn update_toc(dir_entry: &DirEntryType, toc: &mut Toc) {
     let file_type = dir_entry.file_type;
-    let key = dir_entry.file_name.to_string_lossy().into_owned();
+    let key = PathBuf::from(&dir_entry.file_name);
     // is_file first — most common case, reduces branch misprediction
     if file_type.is_file() {
         toc.files.push(key);
@@ -45,23 +46,23 @@ fn worker_thread(
     dir_entry: DirEntryType,
     options: Options,
     filter: Option<Filter>,
-    tx: Sender<(String, Toc)>,
+    tx: Sender<(PathBuf, Toc)>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), Error> {
-    let root_path_len = get_root_path_len(&options.root_path)?;
+    let root_path = options.root_path.clone();
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
         let mut toc = Toc::new();
 
         update_toc(&dir_entry, &mut toc);
-        if tx.send(("".to_owned(), toc)).is_err() {
+        if tx.send((PathBuf::new(), toc)).is_err() {
             stop.store(true, Ordering::Relaxed);
         }
         return Ok(());
     }
 
     let max_file_cnt = options.max_file_cnt;
-    let mut file_cnt = 0;
+    let file_cnt = AtomicUsize::new(0);
     let stop_cb = stop.clone();
     let tx_outer = tx.clone(); // H3: outer for-loop needs Sender; process_read_dir closure still moves original `tx`
     for result in WalkDirGeneric::new(&options.root_path)
@@ -73,17 +74,17 @@ fn worker_thread(
             if stop_cb.load(Ordering::Relaxed) {
                 return;
             }
-            let root_dir = root_dir.to_str();
-            if root_dir.is_none() {
+            let Ok(relative_dir) = root_dir.strip_prefix(&root_path) else {
                 return;
-            }
-            let root_dir = root_dir.unwrap();
-            if root_dir.len() + 1 < root_path_len {
-                return;
-            }
+            };
             let mut toc = Toc::new();
             toc.errors
-                .extend(filter_children(children, &filter, root_path_len));
+                .extend(filter_children(children, &filter, &root_path));
+            children.retain(|entry| {
+                entry.as_ref().map_or(true, |entry| {
+                    entry.file_type.is_dir() || claim_file_slot(&file_cnt, max_file_cnt)
+                })
+            });
             children
                 .iter_mut()
                 .for_each(|dir_entry_result| match dir_entry_result {
@@ -94,11 +95,7 @@ fn worker_thread(
                         }
                     }
                 });
-            let msg = if root_dir.len() > root_path_len {
-                (root_dir[root_path_len..].to_owned(), toc)
-            } else {
-                (String::new(), toc)
-            };
+            let msg = (relative_dir.to_path_buf(), toc);
             if tx.send(msg).is_err() {
                 stop_cb.store(true, Ordering::Relaxed);
             }
@@ -108,21 +105,14 @@ fn worker_thread(
             break;
         }
         match result {
-            Ok(dir_entry) => {
-                if !dir_entry.file_type.is_dir() {
-                    file_cnt += 1;
-                    if max_file_cnt > 0 && file_cnt > max_file_cnt {
-                        break;
-                    }
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 // H3: outer iterator yielded I/O error (root path / boundary).
                 // process_read_dir callback handles per-entry errors; forward
                 // this rare outer error as an errors-only Toc.
                 let mut err_toc = Toc::new();
                 err_toc.errors.push(e.to_string());
-                if tx_outer.send((String::new(), err_toc)).is_err() {
+                if tx_outer.send((PathBuf::new(), err_toc)).is_err() {
                     break;
                 }
             }
@@ -140,17 +130,17 @@ fn worker_thread_direct(
     options: Options,
     filter: Option<Filter>,
     stop: Arc<AtomicBool>,
-) -> Result<Vec<(String, Toc)>, Error> {
-    let root_path_len = get_root_path_len(&options.root_path)?;
+) -> Result<Vec<(PathBuf, Toc)>, Error> {
+    let root_path = options.root_path.clone();
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
         let mut toc = Toc::new();
         update_toc(&dir_entry, &mut toc);
-        return Ok(vec![("".to_owned(), toc)]);
+        return Ok(vec![(PathBuf::new(), toc)]);
     }
 
     let max_file_cnt = options.max_file_cnt;
-    let mut file_cnt = 0;
+    let file_cnt = AtomicUsize::new(0);
 
     // Entries + filter errors share one lock to halve contention on the
     // rayon-parallel process_read_dir callback. parking_lot::Mutex has no
@@ -168,15 +158,15 @@ fn worker_thread_direct(
             if stop_cb.load(Ordering::Relaxed) {
                 return;
             }
-            let root_dir_str = root_dir.to_str();
-            if root_dir_str.is_none() {
+            let Ok(relative_dir) = root_dir.strip_prefix(&root_path) else {
                 return;
-            }
-            let root_dir_str = root_dir_str.unwrap();
-            if root_dir_str.len() + 1 < root_path_len {
-                return;
-            }
-            let errs = filter_children(children, &filter, root_path_len);
+            };
+            let errs = filter_children(children, &filter, &root_path);
+            children.retain(|entry| {
+                entry.as_ref().map_or(true, |entry| {
+                    entry.file_type.is_dir() || claim_file_slot(&file_cnt, max_file_cnt)
+                })
+            });
             let mut toc = Toc::new();
             children
                 .iter_mut()
@@ -188,11 +178,7 @@ fn worker_thread_direct(
                         }
                     }
                 });
-            let key = if root_dir_str.len() > root_path_len {
-                root_dir_str[root_path_len..].to_owned()
-            } else {
-                String::new()
-            };
+            let key = relative_dir.to_path_buf();
             // Single lock — push entries and filter errors together
             let mut guard = results_clone.lock();
             if !errs.is_empty() && guard.1.len() < 1000 {
@@ -205,14 +191,7 @@ fn worker_thread_direct(
             break;
         }
         match result {
-            Ok(dir_entry) => {
-                if !dir_entry.file_type.is_dir() {
-                    file_cnt += 1;
-                    if max_file_cnt > 0 && file_cnt > max_file_cnt {
-                        break;
-                    }
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 // H3: forward outer iterator error into filter_errors (capped at 1000).
                 let mut guard = results.lock();
@@ -234,7 +213,7 @@ fn worker_thread_direct(
         } else {
             let mut toc = Toc::new();
             toc.errors.extend(errs);
-            guard.0.push((String::new(), toc));
+            guard.0.push((PathBuf::new(), toc));
         }
     }
     Ok(std::mem::take(&mut guard.0))
@@ -246,14 +225,14 @@ pub struct Walk {
     options: Options,
     store: bool,
     // Results
-    entries: Vec<(String, Toc)>,
+    entries: Vec<(PathBuf, Toc)>,
     duration: Arc<Mutex<f64>>,
     finished: Arc<AtomicBool>,
     has_errors: bool,
     // Internal
     thr: Option<thread::JoinHandle<()>>,
     stop: Arc<AtomicBool>,
-    rx: Option<Receiver<(String, Toc)>>,
+    rx: Option<Receiver<(PathBuf, Toc)>>,
 }
 
 impl Walk {
@@ -316,7 +295,7 @@ impl Walk {
         self
     }
 
-    /// Set maximum number of files to collect
+    /// Limit non-directory entries, including links and special files. Zero disables the limit.
     pub fn max_file_cnt(mut self, max_file_cnt: usize) -> Self {
         self.options.max_file_cnt = match max_file_cnt {
             0 => usize::MAX,
@@ -429,7 +408,7 @@ impl Walk {
         false
     }
 
-    fn receive_all(&mut self) -> Vec<(String, Toc)> {
+    fn receive_all(&mut self) -> Vec<(PathBuf, Toc)> {
         let mut entries = Vec::new();
         if let Some(ref rx) = self.rx {
             entries.reserve(rx.len());
@@ -446,7 +425,7 @@ impl Walk {
     /// Receive results with a timeout. Waits up to `timeout` for the first result,
     /// then drains all available results from the channel.
     /// Returns an empty Vec if timeout expires before any data arrives.
-    fn receive_all_timeout(&mut self, timeout: Duration) -> Vec<(String, Toc)> {
+    fn receive_all_timeout(&mut self, timeout: Duration) -> Vec<(PathBuf, Toc)> {
         // Fast path: drain any immediately-available results.
         let mut entries = self.receive_all();
         if !entries.is_empty() {
@@ -548,7 +527,7 @@ impl Walk {
         }
     }
 
-    pub fn results(&mut self, only_new: bool) -> Vec<(String, Toc)> {
+    pub fn results(&mut self, only_new: bool) -> Vec<(PathBuf, Toc)> {
         let entries = self.receive_all();
         if self.store {
             self.entries.extend_from_slice(&entries);
@@ -562,7 +541,7 @@ impl Walk {
     /// Retrieve results with a timeout for event-driven consumption.
     /// Waits up to `timeout` for results to arrive when channel is empty.
     /// Returns new results only (always only_new=true behavior).
-    pub fn results_timeout(&mut self, timeout: Duration) -> Vec<(String, Toc)> {
+    pub fn results_timeout(&mut self, timeout: Duration) -> Vec<(PathBuf, Toc)> {
         let entries = self.receive_all_timeout(timeout);
         if self.store {
             self.entries.extend_from_slice(&entries);
@@ -630,7 +609,17 @@ impl Walk {
 
     #[cfg(feature = "speedy")]
     pub fn to_speedy(&self) -> Result<Vec<u8>, speedy::Error> {
-        self.entries.write_to_vec()
+        let entries = self
+            .entries
+            .iter()
+            .map(|(path, toc)| {
+                Ok((
+                    crate::speedy_path::path_str::<speedy::LittleEndian>(path)?,
+                    toc,
+                ))
+            })
+            .collect::<Result<Vec<_>, speedy::Error>>()?;
+        entries.write_to_vec()
     }
 
     #[cfg(feature = "bincode")]

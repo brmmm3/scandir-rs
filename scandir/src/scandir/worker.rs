@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -13,16 +13,17 @@ use flume::{Receiver, RecvTimeoutError, Sender};
 use jwalk_meta::WalkDirGeneric;
 use parking_lot::Mutex;
 
+use crate::common::claim_file_slot;
 use crate::count::Statistics;
 use crate::scandir::{ScandirResult, ScandirResults};
 use crate::{
     DirEntry, DirEntryExt, DirEntryType, ErrorsType, Filter, Options, ReturnType,
-    check_and_expand_path, create_filter, filter_children, get_root_path_len, start,
+    check_and_expand_path, create_filter, filter_children, start,
 };
 
 #[inline]
 fn create_entry(
-    root_path_len: usize,
+    root_path: &Path,
     return_type: &ReturnType,
     dir_entry: &DirEntryType,
 ) -> ScandirResult {
@@ -95,19 +96,18 @@ fn create_entry(
         }
     }
     let is_file = file_type.is_file();
-    let path_str = dir_entry.parent_path.to_string_lossy();
-    let file_name = dir_entry.file_name.to_string_lossy();
-    let path_str: &str = &path_str;
-    let file_name: &str = &file_name;
-    let path = if path_str.len() > root_path_len {
-        let relative = &path_str[root_path_len..];
-        let mut p = String::with_capacity(relative.len() + 1 + file_name.len());
-        p.push_str(relative);
-        p.push('/');
-        p.push_str(file_name);
-        p
+    let path = if dir_entry.depth == 0 {
+        PathBuf::from(&dir_entry.file_name)
     } else {
-        file_name.to_owned()
+        match dir_entry.parent_path.strip_prefix(root_path) {
+            Ok(parent) => parent.join(&dir_entry.file_name),
+            Err(_) => {
+                return ScandirResult::Error((
+                    dir_entry.path().to_path_buf(),
+                    "Entry is outside the scan root".to_owned(),
+                ));
+            }
+        }
     };
     let entry: ScandirResult = match return_type {
         ReturnType::Base => ScandirResult::DirEntry(DirEntry {
@@ -152,16 +152,16 @@ fn worker_thread(
     tx: Sender<ScandirResult>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), Error> {
-    let root_path_len = get_root_path_len(&options.root_path)?;
+    let root_path = options.root_path.clone();
     let return_type = options.return_type;
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
-        let _ = tx.send(create_entry(root_path_len, &return_type, &dir_entry));
+        let _ = tx.send(create_entry(&root_path, &return_type, &dir_entry));
         return Ok(());
     }
 
     let max_file_cnt = options.max_file_cnt;
-    let mut file_cnt = 0;
+    let callback_file_cnt = AtomicUsize::new(0);
     let stop_cb = stop.clone();
     let tx_outer = tx.clone(); // H3: outer for-loop needs Sender; process_read_dir closure still moves original `tx`
 
@@ -177,15 +177,11 @@ fn worker_thread(
             if stop_cb.load(Ordering::Relaxed) {
                 return;
             }
-            if let Some(root_dir) = root_dir.to_str() {
-                if root_dir.len() + 1 < root_path_len {
-                    return;
-                }
-            } else {
+            if !root_dir.starts_with(&root_path) {
                 return;
             }
-            for e in filter_children(children, &filter, root_path_len) {
-                if tx.send(ScandirResult::Error((String::new(), e))).is_err() {
+            for e in filter_children(children, &filter, &root_path) {
+                if tx.send(ScandirResult::Error((PathBuf::new(), e))).is_err() {
                     stop_cb.store(true, Ordering::Relaxed);
                     return;
                 }
@@ -195,8 +191,13 @@ fn worker_thread(
                 .iter_mut()
                 .for_each(|dir_entry_result| match dir_entry_result {
                     Ok(dir_entry) => {
+                        if !dir_entry.file_type.is_dir()
+                            && !claim_file_slot(&callback_file_cnt, max_file_cnt)
+                        {
+                            return;
+                        }
                         if tx
-                            .send(create_entry(root_path_len, &return_type, dir_entry))
+                            .send(create_entry(&root_path, &return_type, dir_entry))
                             .is_err()
                         {
                             stop_cb.store(true, Ordering::Relaxed);
@@ -205,7 +206,7 @@ fn worker_thread(
                     }
                     Err(e) => {
                         if tx
-                            .send(ScandirResult::Error((String::new(), e.to_string())))
+                            .send(ScandirResult::Error((PathBuf::new(), e.to_string())))
                             .is_err()
                         {
                             stop_cb.store(true, Ordering::Relaxed);
@@ -219,19 +220,12 @@ fn worker_thread(
             break;
         }
         match result {
-            Ok(dir_entry) => {
-                if !dir_entry.file_type.is_dir() {
-                    file_cnt += 1;
-                    if max_file_cnt > 0 && file_cnt > max_file_cnt {
-                        break;
-                    }
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 // H3: outer iterator yielded I/O error — forward as ScandirResult::Error
                 // (same pattern as process_read_dir callback at line 195).
                 if tx_outer
-                    .send(ScandirResult::Error((String::new(), e.to_string())))
+                    .send(ScandirResult::Error((PathBuf::new(), e.to_string())))
                     .is_err()
                 {
                     break;
@@ -250,13 +244,14 @@ fn worker_thread_direct(
     filter: Option<Filter>,
     stop: Arc<AtomicBool>,
 ) -> Result<ScandirResults, Error> {
-    let root_path_len = get_root_path_len(&options.root_path)?;
+    let root_path = options.root_path.clone();
+    let filter_root_path = root_path.clone();
     let return_type = options.return_type;
 
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
         let mut results = ScandirResults::new();
-        results.push_entry(create_entry(root_path_len, &return_type, &dir_entry));
+        results.push_entry(create_entry(&root_path, &return_type, &dir_entry));
         return Ok(results);
     }
 
@@ -278,14 +273,10 @@ fn worker_thread_direct(
         .read_metadata_ext(return_type == ReturnType::Ext)
         .read_hardlink_info(return_type == ReturnType::Ext)
         .process_read_dir(move |_, root_dir, _, children| {
-            if let Some(root_dir) = root_dir.to_str() {
-                if root_dir.len() + 1 < root_path_len {
-                    return;
-                }
-            } else {
+            if !root_dir.starts_with(&filter_root_path) {
                 return;
             }
-            let errs = filter_children(children, &filter, root_path_len);
+            let errs = filter_children(children, &filter, &filter_root_path);
             if !errs.is_empty() {
                 filter_errors_clone.lock().extend(errs);
             }
@@ -298,17 +289,20 @@ fn worker_thread_direct(
         }
         match result {
             Ok(dir_entry) => {
-                entries.push_entry(create_entry(root_path_len, &return_type, &dir_entry));
                 if !dir_entry.file_type.is_dir() {
-                    file_cnt += 1;
-                    if max_file_cnt > 0 && file_cnt > max_file_cnt {
+                    if file_cnt >= max_file_cnt {
                         break;
                     }
+                    file_cnt += 1;
+                }
+                match create_entry(&root_path, &return_type, &dir_entry) {
+                    ScandirResult::Error(error) => entries.errors.push(error),
+                    entry => entries.push_entry(entry),
                 }
             }
             Err(e) => {
                 if entries.errors.len() < 1000 {
-                    entries.errors.push((String::new(), e.to_string()));
+                    entries.errors.push((PathBuf::new(), e.to_string()));
                 }
             }
         }
@@ -321,7 +315,7 @@ fn worker_thread_direct(
         entries.errors.extend(
             errs.into_iter()
                 .take(1000 - entries.errors.len())
-                .map(|e| (String::new(), e)),
+                .map(|e| (PathBuf::new(), e)),
         );
     }
 
@@ -380,7 +374,7 @@ impl Scandir {
         self
     }
 
-    /// Skip hidden entries. Enabled by default.
+    /// Skip hidden entries. Disabled by default.
     pub fn skip_hidden(mut self, skip_hidden: bool) -> Self {
         self.options.skip_hidden = skip_hidden;
         self
@@ -403,7 +397,7 @@ impl Scandir {
         self
     }
 
-    /// Set maximum number of files to collect
+    /// Limit non-directory entries, including links and special files. Zero disables the limit.
     pub fn max_file_cnt(mut self, max_file_cnt: usize) -> Self {
         self.options.max_file_cnt = match max_file_cnt {
             0 => usize::MAX,

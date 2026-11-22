@@ -145,8 +145,8 @@ fn scan(options: ffi::ScanOptions) -> Result<ffi::ScanResult, String> {
                 let ctime = entry.ctime();
                 let mtime = entry.mtime();
                 let atime = entry.atime();
-                ffi::Entry {
-                    path: entry.path,
+                Ok(ffi::Entry {
+                    path: path_to_string(entry.path)?,
                     is_symlink: entry.is_symlink,
                     is_dir: entry.is_dir,
                     is_file: entry.is_file,
@@ -155,15 +155,15 @@ fn scan(options: ffi::ScanOptions) -> Result<ffi::ScanResult, String> {
                     atime,
                     size: entry.st_size,
                     ..Default::default()
-                }
+                })
             }
             scandir::ScandirResult::DirEntryExt(entry) => {
                 let ctime = entry.ctime();
                 let mtime = entry.mtime();
                 let atime = entry.atime();
                 let btime = entry.btime();
-                ffi::Entry {
-                    path: entry.path,
+                Ok(ffi::Entry {
+                    path: path_to_string(entry.path)?,
                     is_symlink: entry.is_symlink,
                     is_dir: entry.is_dir,
                     is_file: entry.is_file,
@@ -181,30 +181,48 @@ fn scan(options: ffi::ScanOptions) -> Result<ffi::ScanResult, String> {
                     inode: entry.st_ino,
                     device: entry.st_dev,
                     rdevice: entry.st_rdev,
-                }
+                })
             }
             scandir::ScandirResult::Error(_) => {
                 unreachable!("Scandir::collect stores traversal errors separately from results")
             }
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
 
     let errors = results
         .errors
         .into_iter()
         .map(|(path, message)| {
-            if path.is_empty() {
-                message
+            if path.as_os_str().is_empty() {
+                Ok(message)
             } else {
-                format!("{path}: {message}")
+                Ok(format!("{}: {message}", path_to_string(path)?))
             }
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
     Ok(ffi::ScanResult {
         entries,
         errors,
         duration,
     })
+}
+
+fn path_to_string(path: std::path::PathBuf) -> Result<String, String> {
+    path.into_os_string()
+        .into_string()
+        .map_err(|path| format!("Output path is not valid UTF-8: {path:?}"))
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    #[test]
+    fn non_unicode_output_is_reported() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = OsString::from_vec(b"bad-\xff".to_vec());
+        assert!(super::path_to_string(path.into()).is_err());
+    }
 }
 
 fn count(options: ffi::ScanOptions) -> Result<ffi::Statistics, String> {

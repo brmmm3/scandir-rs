@@ -1,6 +1,6 @@
 [package]
 name = "scandir_rs"
-version = "3.1.0"
+version = "4.0.0"
 authors = ["Martin Bammer <mrbm74@gmail.com>"]
 description = "A fast file tree scanner written in Rust"
 edition = "2024"
@@ -24,20 +24,20 @@ name = "scandir_rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.29", features = [
+pyo3 = { version = "0.30", features = [
     "extension-module",
     "generate-import-lib",
 ] }
 speedy = { version = "0.8", optional = true }
-bincode-next = { version = "3.1", features = [
+bincode-next = { version = "3.2", features = [
     "derive",
     "serde",
 ], optional = true }
 serde = { version = "1.0", optional = true }
 serde_derive = { version = "1.0", optional = true }
 serde_json = { version = "1.0", optional = true }
-#scandir = { version = "3.1.0" }
-scandir = { path = "../scandir", version = "3.1.0" }
+#scandir = { version = "4.0.0" }
+scandir = { path = "../scandir", version = "4.0.0" }
 
 [features]
 default = ["speedy", "bincode", "json"]

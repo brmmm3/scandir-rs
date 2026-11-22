@@ -1,5 +1,6 @@
 
 import time
+from pathlib import Path
 
 import pytest
 
@@ -100,8 +101,8 @@ def test_walk_relative_directory_include_matches_root_child(tmp_path):
     toc = Walk(str(tmp_path), dir_include=["included/**"]).collect()
 
     assert toc is not None
-    assert set(toc.dirs) == {"included", "included/nested"}
-    assert toc.files == ["included/nested/kept.txt"]
+    assert {Path(path) for path in toc.dirs} == {Path("included"), Path("included/nested")}
+    assert [Path(path) for path in toc.files] == [Path("included/nested/kept.txt")]
 
 
 def test_walk_context_manager_does_not_suppress_value_error(tmp_path):

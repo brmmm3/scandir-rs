@@ -6,10 +6,10 @@ The `Toc` class is the return value of class method `results` and `collect` of c
 
 ### `Toc` has following class members
 
-- `dirs` list of directory names.
-- `files` list of filenames.
-- `symlinks` list of symlink names.
-- `other` list of names of all other entry types.
+- `dirs` list of directory paths (`PathBuf`).
+- `files` list of file paths (`PathBuf`).
+- `symlinks` list of symlink paths (`PathBuf`).
+- `other` list of paths for all other entry types (`PathBuf`).
 - `errors` list of access errors (list of strings).
 
 ## `Walk::new<P: AsRef<Path>>(root_path: P, store: Option<bool>) -> Result<Self, Error>`
@@ -56,7 +56,7 @@ Set the maximum depth of entries yield by the iterator.
 
 ### `max_file_cnt(mut self, max_file_cnt: usize) -> Self`
 
-Set maximum number of files to collect.
+Limit non-directory entries, including links and special files. Zero disables the limit.
 
 ### `dir_include(mut self, dir_include: Option<Vec<String>>) -> Self`
 

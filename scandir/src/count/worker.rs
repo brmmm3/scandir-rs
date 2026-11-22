@@ -11,7 +11,7 @@ use flume::{Receiver, RecvTimeoutError, Sender};
 use jwalk_meta::WalkDirGeneric;
 use parking_lot::Mutex;
 
-use crate::common::{check_and_expand_path, filter_children, get_root_path_len};
+use crate::common::{check_and_expand_path, filter_children};
 use crate::count::Statistics;
 use crate::{DirEntryType, Filter, Options, ReturnType, start};
 
@@ -73,8 +73,9 @@ fn count_thread(
     let start_time = Instant::now();
     let mut update_time = start_time;
     let mut file_indexes: HashSet<u64> = HashSet::new();
-    let root_path_len = get_root_path_len(&options.root_path)?;
-    let max_file_cnt = options.max_file_cnt as i32;
+    let root_path = options.root_path.clone();
+    let max_file_cnt = options.max_file_cnt;
+    let mut file_cnt = 0usize;
     let filter_errors: std::sync::Arc<parking_lot::Mutex<Vec<String>>> =
         std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
     let filter_errors_clone = filter_errors.clone();
@@ -86,15 +87,11 @@ fn count_thread(
         .read_metadata_ext(options.return_type == ReturnType::Ext)
         .read_hardlink_info(options.return_type == ReturnType::Ext)
         .process_read_dir(move |_, root_dir, _, children| {
-            if let Some(root_dir) = root_dir.to_str() {
-                if root_dir.len() + 1 < root_path_len {
-                    return;
-                }
-            } else {
+            if !root_dir.starts_with(&root_path) {
                 return;
             }
             // Filter outside the lock, only acquire when we have errors to push
-            let errs = filter_children(children, &filter, root_path_len);
+            let errs = filter_children(children, &filter, &root_path);
             if !errs.is_empty() {
                 filter_errors_clone.lock().extend(errs);
             }
@@ -109,6 +106,12 @@ fn count_thread(
                     continue;
                 }
                 let file_type = v.file_type;
+                if !file_type.is_dir() {
+                    if file_cnt >= max_file_cnt {
+                        break;
+                    }
+                    file_cnt += 1;
+                }
                 if file_type.is_file() {
                     files += 1;
                     if let Some(ref metadata) = v.metadata {
@@ -187,9 +190,6 @@ fn count_thread(
                     cnt = 0;
                     update_time = Instant::now();
                 }
-                if !file_type.is_dir() && max_file_cnt > 0 && files > max_file_cnt {
-                    break;
-                }
             }
             Err(e) => {
                 if statistics.errors.len() < 1000 {
@@ -262,7 +262,7 @@ impl Count {
         })
     }
 
-    /// Skip hidden entries. Enabled by default.
+    /// Skip hidden entries. Disabled by default.
     pub fn skip_hidden(mut self, skip_hidden: bool) -> Self {
         self.options.skip_hidden = skip_hidden;
         self
@@ -285,7 +285,7 @@ impl Count {
         self
     }
 
-    /// Set maximum number of files to collect
+    /// Limit non-directory entries, including links and special files. Zero disables the limit.
     pub fn max_file_cnt(mut self, max_file_cnt: usize) -> Self {
         self.options.max_file_cnt = match max_file_cnt {
             0 => usize::MAX,

@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::time::SystemTime;
 
 #[cfg(any(feature = "speedy", feature = "bincode", feature = "json"))]
@@ -27,8 +28,8 @@ impl DirEntry {
 #[pymethods]
 impl DirEntry {
     #[getter]
-    fn path(&self) -> &str {
-        &self.0.path
+    fn path(&self) -> &OsStr {
+        self.0.path.as_os_str()
     }
 
     #[getter]
@@ -83,7 +84,7 @@ impl DirEntry {
 
     fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
-        pydict.set_item("path", &self.0.path)?;
+        pydict.set_item("path", self.0.path.as_os_str())?;
         pydict.set_item("is_symlink", self.0.is_symlink)?;
         pydict.set_item("is_dir", self.0.is_dir)?;
         pydict.set_item("is_file", self.0.is_file)?;
@@ -151,8 +152,8 @@ impl DirEntryExt {
 #[pymethods]
 impl DirEntryExt {
     #[getter]
-    fn path(&self) -> &str {
-        &self.0.path
+    fn path(&self) -> &OsStr {
+        self.0.path.as_os_str()
     }
 
     #[getter]
@@ -252,7 +253,7 @@ impl DirEntryExt {
 
     fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
-        pydict.set_item("path", &self.0.path)?;
+        pydict.set_item("path", self.0.path.as_os_str())?;
         pydict.set_item("is_symlink", self.0.is_symlink)?;
         pydict.set_item("is_dir", self.0.is_dir)?;
         pydict.set_item("is_file", self.0.is_file)?;

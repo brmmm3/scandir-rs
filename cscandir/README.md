@@ -31,6 +31,9 @@ Public header is in `include/cscandir.h`.
 - Inputs must be valid NUL-terminated UTF-8 strings. A nonzero filter length
   requires a non-NULL array containing no NULL elements. Invalid options and
   glob syntax return `CSCANDIR_ERR_INVALID_ARGUMENT`.
+- Output paths must also be UTF-8; collecting a non-UTF-8 path fails with
+  `CSCANDIR_ERR_INVALID_UTF8` rather than changing the name. Paths use native
+  separators, including backslashes on Windows.
 - Every output pointer is optional. Outputs may initially be uninitialized;
   the API only writes them. **Free previous outputs before reusing their storage**:
   scan calls overwrite output structs and never free their old contents.

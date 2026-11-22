@@ -7,6 +7,13 @@ The Python module is called `scandir_rs` and installable via `pip`. It is an alt
 It releases the GIL and the scanning is done in a background thread.
 With different methods intermediate results can be read.
 
+Root paths accept strings, bytes, and path-like objects. Returned paths are
+strings and preserve non-Unicode filesystem names using Python's filesystem
+encoding and surrogate escapes. Unicode glob filters report an error and skip
+names they cannot represent. Speedy, bincode, and JSON serialization raises
+an error for non-Unicode paths. Returned paths use native separators, including
+backslashes on Windows.
+
 If you are just interested in directory statistics you can use the `Count`.
 
 `scandir_rs` contains following classes:

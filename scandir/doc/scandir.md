@@ -9,7 +9,7 @@ Is an enum which can be:
 
 ## DirEntry
 
-- `path` relative path
+- `path` relative `PathBuf`, preserving native filesystem names.
 - `is_symlink` `True` is entry is a symbolic link.
 - `is_dir` `True` is entry is a directory.
 - `is_file` `True` is entry is a file.
@@ -80,7 +80,7 @@ Set the maximum depth of entries yield by the iterator.
 
 ### `max_file_cnt(mut self, max_file_cnt: usize) -> Self`
 
-Set maximum number of files to collect.
+Limit non-directory entries, including links and special files. Zero disables the limit.
 
 ### `dir_include(mut self, dir_include: Option<Vec<String>>) -> Self`
 

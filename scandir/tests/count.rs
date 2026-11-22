@@ -92,7 +92,7 @@ fn test_count_follow_links() -> Result<(), Error> {
     #[cfg(unix)]
     let temp_dir = tests_common::create_temp_file_tree(3, 3, 4, 5, 6, 7)?;
     #[cfg(windows)]
-    let temp_dir = common::create_temp_file_tree(3, 3, 4, 5, 3)?;
+    let temp_dir = tests_common::create_temp_file_tree(3, 3, 4, 5, 3)?;
     let count = Count::new(temp_dir.path())?.follow_links(true).collect()?;
     assert!(count.errors.is_empty());
     //assert!(count.duration > 0.0); --> Fails on MAC

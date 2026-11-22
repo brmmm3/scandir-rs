@@ -5,12 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.1.0] - Unreleased
+## [Unreleased]
+
+## [4.0.0] - 2026-11-22
 
 ### Changed
 
+- **Breaking:** Rust scan and walk results now use `PathBuf` for paths, preserving
+  non-Unicode names.
+- Python accepts bytes and path-like roots and preserves filesystem names in
+  returned strings. C and C++ scans report an error for non-UTF-8 output paths.
+- String-based serializers reject non-Unicode paths. Unicode glob filters
+  report and skip names they cannot represent.
+- Update jwalk-meta to 1.3.0.
 - Update jwalk-meta, which does not neet nightly anymore.
 - Upgrade the Java JNI module target from Java 17 to Java 25 LTS.
+
+### Fixed
+
+- Remove a deprecated PyO3 option that caused a build warning.
 
 ## [3.0.0] - 2026-10-26
 

@@ -1,3 +1,4 @@
+from pathlib import Path
 
 import pytest
 
@@ -43,7 +44,7 @@ def test_scandir_preserves_sorted_batch_order(tmp_path):
         (tmp_path / name).touch()
 
     scanner = Scandir(str(tmp_path), sorted=True)
-    actual = [entry.path.rsplit("/", 1)[-1] for entry in scanner]
+    actual = [Path(entry.path).name for entry in scanner]
 
     assert actual == expected
 
@@ -55,12 +56,9 @@ def test_scandir_relative_directory_include_matches_root_child(tmp_path):
     (tmp_path / "excluded" / "omitted.txt").touch()
 
     scanner = Scandir(str(tmp_path), dir_include=["included/**"])
-    paths = {
-        entry.path.removeprefix(f"{tmp_path}/")
-        for entry in scanner
-    }
+    paths = {Path(entry.path) for entry in scanner}
 
-    assert paths == {"included", "included/nested", "included/nested/kept.txt"}
+    assert paths == {Path("included"), Path("included/nested"), Path("included/nested/kept.txt")}
 
 
 def test_scandir_context_manager_does_not_suppress_value_error(tmp_path):
@@ -89,7 +87,7 @@ def test_scandir_collect_timeout_returns_results(tmp_path, store):
     results = Scandir(str(tmp_path), store=store).collect(timeout=10.0)
 
     assert results is not None
-    assert [entry.path.rsplit("/", 1)[-1] for entry in results.results] == ["entry.txt"]
+    assert [Path(entry.path).name for entry in results.results] == ["entry.txt"]
 
 
 @pytest.mark.parametrize("store", [False, True])

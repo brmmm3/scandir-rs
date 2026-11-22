@@ -61,13 +61,13 @@ fn collect_outputs(
                 .errors
                 .into_iter()
                 .map(|(path, error)| {
-                    if path.is_empty() {
-                        error
+                    if path.as_os_str().is_empty() {
+                        Ok(error)
                     } else {
-                        format!("{path}: {error}")
+                        Ok(format!("{}: {error}", path_to_string(path)?))
                     }
                 })
-                .collect(),
+                .collect::<Result<Vec<_>, FfiError>>()?,
         )?
     } else {
         CScandirStringList::default()
@@ -206,5 +206,21 @@ mod tests {
             ])
             .is_err()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_unicode_output_is_reported() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let entry = ScandirResult::DirEntry(scandir::DirEntry {
+            path: OsString::from_vec(b"bad-\xff".to_vec()).into(),
+            ..Default::default()
+        });
+        assert!(matches!(
+            entries_to_ffi(vec![entry]),
+            Err(FfiError(CSCANDIR_ERR_INVALID_UTF8, _))
+        ));
     }
 }

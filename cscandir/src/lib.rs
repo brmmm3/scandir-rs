@@ -288,7 +288,7 @@ fn entry_to_ffi(entry: ScandirResult) -> Result<CScandirEntry, FfiError> {
         ScandirResult::DirEntryExt(e) => e.path,
         ScandirResult::Error(_) => unreachable!("errors are separated before conversion"),
     };
-    out.path = c_string(path)?.into_raw();
+    out.path = c_string(path_to_string(path)?)?.into_raw();
 
     Ok(out)
 }
@@ -316,6 +316,15 @@ fn c_string(value: String) -> Result<CString, FfiError> {
         FfiError(
             CSCANDIR_ERR_NUL_BYTE,
             "Output contains a NUL byte".to_string(),
+        )
+    })
+}
+
+fn path_to_string(path: std::path::PathBuf) -> Result<String, FfiError> {
+    path.into_os_string().into_string().map_err(|path| {
+        FfiError(
+            CSCANDIR_ERR_INVALID_UTF8,
+            format!("Output path is not valid UTF-8: {path:?}"),
         )
     })
 }

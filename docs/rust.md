@@ -10,7 +10,7 @@ cancellation, and timeout-bounded collection.
 
 ```toml
 [dependencies]
-scandir = "3.1.0"
+scandir = "4.0.0"
 ```
 
 Cargo downloads the released crate for your target platform.
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{item:?}");
     }
     for (path, error) in &results.errors {
-        eprintln!("{path}: {error}");
+        eprintln!("{}: {error}", path.display());
     }
     Ok(())
 }
@@ -61,6 +61,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 The first result may represent the root directory; descendant paths are
 root-relative. `ReturnType::Base` is the default; `ReturnType::Ext` requests
 additional platform metadata.
+
+Result paths are `PathBuf` values, including walk paths and error paths.
+Non-Unicode names are preserved. String-based Speedy, bincode and JSON
+serialization returns an error for paths that cannot be represented as Unicode.
+When an active Unicode glob cannot match a name, the entry is skipped and a
+filter error is reported.
 
 ## Walk a tree
 

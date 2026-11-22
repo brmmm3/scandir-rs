@@ -5,6 +5,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyDict;
 
+use crate::common::paths_to_os_strings;
+
 #[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub struct Toc(scandir::Toc);
@@ -22,23 +24,23 @@ impl Toc {
 #[pymethods]
 impl Toc {
     #[getter]
-    fn dirs(&self) -> Vec<String> {
-        self.0.dirs()
+    fn dirs(&self) -> Vec<std::ffi::OsString> {
+        paths_to_os_strings(self.0.dirs())
     }
 
     #[getter]
-    fn files(&self) -> Vec<String> {
-        self.0.files()
+    fn files(&self) -> Vec<std::ffi::OsString> {
+        paths_to_os_strings(self.0.files())
     }
 
     #[getter]
-    fn symlinks(&self) -> Vec<String> {
-        self.0.symlinks()
+    fn symlinks(&self) -> Vec<std::ffi::OsString> {
+        paths_to_os_strings(self.0.symlinks())
     }
 
     #[getter]
-    fn other(&self) -> Vec<String> {
-        self.0.other()
+    fn other(&self) -> Vec<std::ffi::OsString> {
+        paths_to_os_strings(self.0.other())
     }
 
     #[getter]
@@ -48,10 +50,10 @@ impl Toc {
 
     fn as_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pydict = PyDict::new(py);
-        pydict.set_item("dirs", self.0.dirs.clone())?;
-        pydict.set_item("files", self.0.files.clone())?;
-        pydict.set_item("symlinks", self.0.symlinks.clone())?;
-        pydict.set_item("other", self.0.other.clone())?;
+        pydict.set_item("dirs", self.dirs())?;
+        pydict.set_item("files", self.files())?;
+        pydict.set_item("symlinks", self.symlinks())?;
+        pydict.set_item("other", self.other())?;
         pydict.set_item("errors", self.0.errors.clone())?;
         Ok(pydict.into_any().unbind())
     }

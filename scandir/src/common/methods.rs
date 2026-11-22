@@ -1,7 +1,7 @@
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 use std::{fs, thread};
 
@@ -14,35 +14,44 @@ use parking_lot::Mutex;
 
 use crate::{DirEntryType, Filter, Options};
 
+pub(crate) fn claim_file_slot(count: &AtomicUsize, limit: usize) -> bool {
+    if limit == usize::MAX {
+        return true;
+    }
+    let mut current = count.load(Ordering::Relaxed);
+    while current < limit {
+        match count.compare_exchange_weak(
+            current,
+            current + 1,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return true,
+            Err(actual) => current = actual,
+        }
+    }
+    false
+}
+
 pub fn check_and_expand_path<P>(path_str: P) -> Result<PathBuf, Error>
 where
     P: AsRef<Path> + std::fmt::Debug,
 {
-    let path_str = match path_str.as_ref().to_str() {
-        Some(v) => v,
-        None => return Err(Error::other(format!("Invalid path: {path_str:?}"))),
-    };
+    let path = path_str.as_ref();
     #[cfg(unix)]
-    let path = match expanduser(path_str) {
-        Ok(v) => v,
-        Err(e) => return Err(Error::other(format!("Invalid path {path_str:?}: {e:?}"))),
+    let path = if let Some(first) = path
+        .components()
+        .next()
+        .and_then(|c| c.as_os_str().to_str())
+        && first.starts_with('~')
+    {
+        let expanded =
+            expanduser(first).map_err(|e| Error::other(format!("Invalid path {path:?}: {e:?}")))?;
+        expanded.join(path.strip_prefix(first).map_err(Error::other)?)
+    } else {
+        path.to_path_buf()
     };
-    #[cfg(unix)]
-    let path_result = fs::canonicalize(path);
-    #[cfg(not(unix))]
-    let path_result = fs::canonicalize(&path_str);
-    let path = match path_result {
-        Ok(p) => {
-            if !p.exists() {
-                return Err(Error::new(ErrorKind::NotFound, path_str.to_string()));
-            }
-            p
-        }
-        Err(e) => {
-            return Err(Error::other(e.to_string()));
-        }
-    };
-    Ok(path)
+    fs::canonicalize(path)
 }
 
 pub fn get_root_path_len(root_path: &Path) -> Result<usize, Error> {
@@ -196,36 +205,35 @@ pub fn filter_direntry(
 }
 
 #[inline]
-pub fn filter_dir(root_path_len: usize, dir_entry: &DirEntryType, filter_ref: &Filter) -> bool {
-    // Skip key construction entirely when no directory filter is configured
+pub fn filter_dir(
+    root_path: &Path,
+    dir_entry: &DirEntryType,
+    filter_ref: &Filter,
+) -> Result<bool, String> {
     if filter_ref.dir_include.is_empty() && filter_ref.dir_exclude.is_empty() {
-        return true;
+        return Ok(true);
     }
-    let file_name = match dir_entry.file_name.to_str() {
-        Some(s) => s,
-        None => return true,
-    };
-    let parent_str = match dir_entry.parent_path.to_str() {
-        Some(s) => s,
-        None => return true,
-    };
-    // Only the suffix past root_path_len is used; allocate just that.
-    let parent_suffix = parent_str.get(root_path_len..).unwrap_or("");
-    let mut key = String::with_capacity(parent_suffix.len() + 1 + file_name.len());
-    key.push_str(parent_suffix);
-    if !parent_suffix.is_empty() {
-        key.push('/');
-    }
-    key.push_str(file_name);
-    !(filter_direntry(&key, &filter_ref.dir_exclude, filter_ref.options, false)
-        || !filter_direntry(&key, &filter_ref.dir_include, filter_ref.options, true))
+    let parent = dir_entry
+        .parent_path
+        .strip_prefix(root_path)
+        .map_err(|_| format!("Directory outside scan root: {:?}", dir_entry.parent_path))?;
+    let path = parent.join(&dir_entry.file_name);
+    let key = path
+        .to_str()
+        .ok_or_else(|| format!("Cannot apply Unicode directory filter to {path:?}"))?;
+    #[cfg(windows)]
+    let key = &key.replace('\\', "/");
+    Ok(
+        !(filter_direntry(key, &filter_ref.dir_exclude, filter_ref.options, false)
+            || !filter_direntry(key, &filter_ref.dir_include, filter_ref.options, true)),
+    )
 }
 
 #[inline]
 pub fn filter_children(
     children: &mut Vec<Result<DirEntryType, jwalk_meta::Error>>,
     filter: &Option<Filter>,
-    root_path_len: usize,
+    root_path: &Path,
 ) -> Vec<String> {
     let mut errors = Vec::new();
     if let Some(filter_ref) = &filter {
@@ -234,12 +242,26 @@ pub fn filter_children(
                 .as_ref()
                 .map(|dir_entry| {
                     if dir_entry.file_type.is_dir() {
-                        return filter_dir(root_path_len, dir_entry, filter_ref);
+                        return match filter_dir(root_path, dir_entry, filter_ref) {
+                            Ok(include) => include,
+                            Err(error) => {
+                                errors.push(error);
+                                false
+                            }
+                        };
                     } else {
+                        if filter_ref.file_include.is_empty() && filter_ref.file_exclude.is_empty()
+                        {
+                            return true;
+                        }
                         let options = filter_ref.options;
                         let key = match dir_entry.file_name.to_str() {
                             Some(s) => s,
                             None => {
+                                errors.push(format!(
+                                    "Cannot apply Unicode file filter to {:?}",
+                                    dir_entry.file_name
+                                ));
                                 return false;
                             }
                         };

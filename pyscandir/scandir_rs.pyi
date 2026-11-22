@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 from datetime import datetime
 from enum import Enum
+from os import PathLike
 from typing import Any, Self, TypeAlias
 
 __version__: str
@@ -136,7 +137,7 @@ class Scandir:
 
     def __init__(
         self,
-        root_path: str,
+        root_path: str | bytes | PathLike[str] | PathLike[bytes],
         sorted: bool | None = None,
         skip_hidden: bool | None = None,
         max_depth: int | None = None,
@@ -192,7 +193,7 @@ class Walk:
 
     def __init__(
         self,
-        root_path: str,
+        root_path: str | bytes | PathLike[str] | PathLike[bytes],
         sorted: bool | None = None,
         skip_hidden: bool | None = None,
         max_depth: int | None = None,
@@ -244,7 +245,7 @@ class Count:
 
     def __init__(
         self,
-        root_path: str,
+        root_path: str | bytes | PathLike[str] | PathLike[bytes],
         skip_hidden: bool | None = None,
         max_depth: int | None = None,
         max_file_cnt: int | None = None,

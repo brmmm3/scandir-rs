@@ -2,14 +2,12 @@ use std::collections::VecDeque;
 use std::io::ErrorKind;
 use std::time::Duration;
 
+use crate::common::{ReturnType, errors_to_os_strings, paths_to_os_strings, timeout_from_secs};
+use crate::count::Statistics;
+use crate::toc::Toc;
 use pyo3::exceptions::{PyException, PyFileNotFoundError, PyRuntimeError};
 use pyo3::types::PyBytes;
 use pyo3::{IntoPyObjectExt, prelude::*};
-use scandir::ErrorsType;
-
-use crate::common::{ReturnType, timeout_from_secs};
-use crate::count::Statistics;
-use crate::toc::Toc;
 
 #[pyclass]
 #[derive(Debug)]
@@ -17,7 +15,7 @@ pub struct Walk {
     instance: scandir::Walk,
     return_type: ReturnType,
     // For iterator
-    entries: VecDeque<(String, scandir::Toc)>,
+    entries: VecDeque<(std::path::PathBuf, scandir::Toc)>,
     iterating: bool,
 }
 
@@ -33,7 +31,7 @@ impl Walk {
     #[new]
     #[pyo3(signature = (root_path, sorted=None, skip_hidden=None, max_depth=None, max_file_cnt=None, dir_include=None, dir_exclude=None, file_include=None, file_exclude=None, case_sensitive=None, follow_links=None, return_type=None, store=None))]
     fn new(
-        root_path: &str,
+        root_path: &Bound<'_, PyAny>,
         sorted: Option<bool>,
         skip_hidden: Option<bool>,
         max_depth: Option<usize>,
@@ -47,6 +45,7 @@ impl Walk {
         return_type: Option<ReturnType>,
         store: Option<bool>,
     ) -> PyResult<Self> {
+        let root_path = crate::common::root_path(root_path)?;
         let return_type = return_type.unwrap_or(ReturnType::Base);
         Ok(Walk {
             instance: match scandir::Walk::new(root_path, store) {
@@ -140,11 +139,11 @@ impl Walk {
         &mut self,
         only_new: Option<bool>,
         py: Python,
-    ) -> PyResult<Vec<(String, Py<PyAny>)>> {
+    ) -> PyResult<Vec<(std::ffi::OsString, Py<PyAny>)>> {
         let mut results = Vec::new();
         for result in self.instance.results(only_new.unwrap_or(false)) {
             results.push((
-                result.0,
+                result.0.into_os_string(),
                 Py::new(py, Toc::from_owned(result.1))?.into_py_any(py)?,
             ));
         }
@@ -165,8 +164,8 @@ impl Walk {
     }
 
     #[pyo3(signature = (only_new=None))]
-    pub fn errors(&mut self, only_new: Option<bool>) -> ErrorsType {
-        self.instance.errors(only_new.unwrap_or(true))
+    pub fn errors(&mut self, only_new: Option<bool>) -> Vec<(std::ffi::OsString, String)> {
+        errors_to_os_strings(self.instance.errors(only_new.unwrap_or(true)))
     }
 
     #[cfg(feature = "speedy")]
@@ -257,15 +256,22 @@ impl Walk {
         loop {
             if let Some((root_dir, toc)) = self.entries.pop_front() {
                 if self.return_type == ReturnType::Base {
-                    return Ok(Some((root_dir, toc.dirs, toc.files).into_py_any(py)?));
+                    return Ok(Some(
+                        (
+                            root_dir.into_os_string(),
+                            paths_to_os_strings(toc.dirs),
+                            paths_to_os_strings(toc.files),
+                        )
+                            .into_py_any(py)?,
+                    ));
                 } else {
                     return Ok(Some(
                         (
-                            root_dir,
-                            toc.dirs,
-                            toc.files,
-                            toc.symlinks,
-                            toc.other,
+                            root_dir.into_os_string(),
+                            paths_to_os_strings(toc.dirs),
+                            paths_to_os_strings(toc.files),
+                            paths_to_os_strings(toc.symlinks),
+                            paths_to_os_strings(toc.other),
                             toc.errors,
                         )
                             .into_py_any(py)?,

@@ -10,7 +10,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 cxx = "1.0"
-scandir = { path = "../scandir" }
+scandir = { version = "4.0.0", path = "../scandir" }
 
 [build-dependencies]
 cxx-build = "1.0"

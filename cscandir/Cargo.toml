@@ -10,4 +10,4 @@ name = "cscandir"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-scandir = { path = "../scandir" }
+scandir = { version = "4.0.0", path = "../scandir" }

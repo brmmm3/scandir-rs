@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   returned strings. C and C++ scans report an error for non-UTF-8 output paths.
 - String-based serializers reject non-Unicode paths. Unicode glob filters
   report and skip names they cannot represent.
-- Update jwalk-meta to 1.3.0.
+- Update jwalk-meta to 1.3.1.
 - Update jwalk-meta, which does not neet nightly anymore.
 - Upgrade the Java JNI module target from Java 17 to Java 25 LTS.
 

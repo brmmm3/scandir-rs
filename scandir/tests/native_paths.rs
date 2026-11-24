@@ -5,6 +5,47 @@ use std::time::Duration;
 use scandir::{Count, Scandir, Walk};
 
 #[test]
+fn scandir_preserves_paths_across_parent_changes() -> io::Result<()> {
+    use std::collections::BTreeSet;
+
+    let temp = tempfile::tempdir()?;
+    let root = temp.path();
+    let expected: BTreeSet<PathBuf> = [
+        "first/one.txt",
+        "first/two.txt",
+        "first/nested/one.txt",
+        "second/one.txt",
+        "second/two.txt",
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .collect();
+    for path in &expected {
+        std::fs::create_dir_all(root.join(path).parent().unwrap())?;
+        std::fs::write(root.join(path), b"x")?;
+    }
+
+    for extended in [false, true] {
+        for timed in [false, true] {
+            let mut scan = Scandir::new(root, None)?.sorted(true).extended(extended);
+            let entries = if timed {
+                scan.collect_timeout(Duration::from_secs(30))?
+                    .expect("scan timed out")
+            } else {
+                (*scan.collect()?).clone()
+            };
+            assert!(entries.errors.is_empty(), "{:?}", entries.errors);
+            let actual: BTreeSet<PathBuf> = entries
+                .files()
+                .map(|entry| entry.path().to_owned())
+                .collect();
+            assert_eq!(actual, expected);
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn unicode_paths_are_relative_and_filters_work() -> io::Result<()> {
     let temp = tempfile::tempdir()?;
     let root = temp.path().join("røøt");

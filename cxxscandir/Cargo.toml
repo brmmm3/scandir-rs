@@ -1,6 +1,6 @@
 [package]
 name = "cxxscandir"
-version = "4.0.0"
+version = "4.0.1"
 edition = "2024"
 description = "C++ wrapper for scandir-rs using the cxx bridge"
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 cxx = "1.0"
-scandir = { version = "4.0.0", path = "../scandir" }
+scandir = { version = "4.0.1", path = "../scandir" }
 
 [build-dependencies]
 cxx-build = "1.0"

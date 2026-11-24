@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-11-24
+
+### Performance
+
+- Reduce Scandir path construction overhead while preserving native paths.
+
 ## [4.0.0] - 2026-11-22
 
 ### Changed

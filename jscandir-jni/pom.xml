@@ -6,7 +6,7 @@
 
     <groupId>com.github.brmmm3</groupId>
     <artifactId>jscandir-jni</artifactId>
-    <version>2.10.1</version>
+    <version>4.0.1</version>
     <packaging>jar</packaging>
 
     <name>jscandir-jni</name>
@@ -26,17 +26,17 @@
     </properties>
 
     <dependencies>
-        <!-- JUnit 5 for testing -->
+        <!-- JUnit Jupiter for testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.10.2</version>
+            <version>6.1.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-params</artifactId>
-            <version>5.10.2</version>
+            <version>6.1.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -46,7 +46,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>3.16.0</version>
                 <configuration>
                     <release>25</release>
                 </configuration>
@@ -54,7 +54,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>3.6.1</version>
                 <configuration>
                     <argLine>--enable-native-access=ALL-UNNAMED</argLine>
                     <systemPropertyVariables>
@@ -65,7 +65,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.4.2</version>
+                <version>3.5.1</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -78,12 +78,14 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>4.0.0</version>
+                <version>3.7.0</version>
                 <executions>
                     <execution>
                         <id>create-native-output-directory</id>
                         <phase>process-resources</phase>
-                        <goals><goal>exec</goal></goals>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
                             <skip>${skip.native.build}</skip>
                             <executable>mkdir</executable>
@@ -96,15 +98,20 @@
                     <execution>
                         <id>build-jni-library</id>
                         <phase>process-classes</phase>
-                        <goals><goal>exec</goal></goals>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
                             <workingDirectory>${project.basedir}/..</workingDirectory>
                             <skip>${skip.native.build}</skip>
                             <executable>g++</executable>
                             <arguments>
                                 <argument>-std=c++17</argument>
-                                <argument>-Wall</argument><argument>-Wextra</argument><argument>-Werror</argument>
-                                <argument>-fPIC</argument><argument>-shared</argument>
+                                <argument>-Wall</argument>
+                                <argument>-Wextra</argument>
+                                <argument>-Werror</argument>
+                                <argument>-fPIC</argument>
+                                <argument>-shared</argument>
                                 <argument>-I${java.home}/include</argument>
                                 <argument>-I${java.home}/include/${native.platform}</argument>
                                 <argument>-I${project.basedir}/../cscandir/include</argument>
@@ -113,7 +120,8 @@
                                 <argument>-Wl,-rpath,${project.basedir}/../target/release</argument>
                                 <argument>-lcscandir</argument>
                                 <argument>-o</argument>
-                                <argument>${project.build.directory}/native/${native.prefix}jscandir.${native.extension}</argument>
+                                <argument>
+                                    ${project.build.directory}/native/${native.prefix}jscandir.${native.extension}</argument>
                             </arguments>
                         </configuration>
                     </execution>

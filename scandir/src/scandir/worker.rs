@@ -21,11 +21,59 @@ use crate::{
     check_and_expand_path, create_filter, filter_children, start,
 };
 
+#[derive(Default)]
+struct ParentCache {
+    parent: Option<(Arc<Path>, Option<PathBuf>)>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parent_cache_keeps_prefix_errors_and_changes() -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let root = temp.path().join("root");
+        let outside = temp.path().join("root-other");
+        std::fs::create_dir(&root)?;
+        std::fs::create_dir(&outside)?;
+        for path in [root.join("one"), root.join("two"), outside.join("one")] {
+            std::fs::write(path, b"x")?;
+        }
+        let make_entry = |path: &Path| DirEntryType::from_path(1, path, false, false, false, None);
+        let first = make_entry(&root.join("one"))?;
+        let mut second = make_entry(&root.join("two"))?;
+        second.parent_path = Arc::clone(&first.parent_path);
+        let external = make_entry(&outside.join("one"))?;
+        let mut cache = ParentCache::default();
+        assert_eq!(
+            create_entry(&root, &ReturnType::Base, &first, &mut cache).path(),
+            Path::new("one")
+        );
+        assert_eq!(
+            create_entry(&root, &ReturnType::Base, &second, &mut cache).path(),
+            Path::new("two")
+        );
+        for _ in 0..2 {
+            let entry = create_entry(&root, &ReturnType::Base, &external, &mut cache);
+            let (path, message) = entry.error().expect("outside path should be rejected");
+            assert_eq!(path, &outside.join("one"));
+            assert_eq!(message, "Entry is outside the scan root");
+        }
+        assert_eq!(
+            create_entry(&root, &ReturnType::Base, &first, &mut cache).path(),
+            Path::new("one")
+        );
+        Ok(())
+    }
+}
+
 #[inline]
 fn create_entry(
     root_path: &Path,
     return_type: &ReturnType,
     dir_entry: &DirEntryType,
+    cache: &mut ParentCache,
 ) -> ScandirResult {
     let file_type = dir_entry.file_type;
     let mut st_ctime: Option<SystemTime> = None;
@@ -99,15 +147,32 @@ fn create_entry(
     let path = if dir_entry.depth == 0 {
         PathBuf::from(&dir_entry.file_name)
     } else {
-        match dir_entry.parent_path.strip_prefix(root_path) {
-            Ok(parent) => parent.join(&dir_entry.file_name),
-            Err(_) => {
-                return ScandirResult::Error((
-                    dir_entry.path().to_path_buf(),
-                    "Entry is outside the scan root".to_owned(),
-                ));
-            }
+        // Entries from the same directory share an immutable parent path.
+        if !cache
+            .parent
+            .as_ref()
+            .is_some_and(|(parent, _)| Arc::ptr_eq(parent, &dir_entry.parent_path))
+        {
+            cache.parent = Some((
+                Arc::clone(&dir_entry.parent_path),
+                dir_entry
+                    .parent_path
+                    .strip_prefix(root_path)
+                    .ok()
+                    .map(Path::to_path_buf),
+            ));
         }
+        let Some((_, Some(parent))) = &cache.parent else {
+            return ScandirResult::Error((
+                dir_entry.path().to_path_buf(),
+                "Entry is outside the scan root".to_owned(),
+            ));
+        };
+        let mut path =
+            PathBuf::with_capacity(parent.as_os_str().len() + 1 + dir_entry.file_name.len());
+        path.push(parent);
+        path.push(&dir_entry.file_name);
+        path
     };
     let entry: ScandirResult = match return_type {
         ReturnType::Base => ScandirResult::DirEntry(DirEntry {
@@ -156,7 +221,12 @@ fn worker_thread(
     let return_type = options.return_type;
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
-        let _ = tx.send(create_entry(&root_path, &return_type, &dir_entry));
+        let _ = tx.send(create_entry(
+            &root_path,
+            &return_type,
+            &dir_entry,
+            &mut ParentCache::default(),
+        ));
         return Ok(());
     }
 
@@ -186,6 +256,7 @@ fn worker_thread(
                     return;
                 }
             }
+            let mut cache = ParentCache::default();
             #[allow(clippy::needless_return)]
             children
                 .iter_mut()
@@ -197,7 +268,12 @@ fn worker_thread(
                             return;
                         }
                         if tx
-                            .send(create_entry(&root_path, &return_type, dir_entry))
+                            .send(create_entry(
+                                &root_path,
+                                &return_type,
+                                dir_entry,
+                                &mut cache,
+                            ))
                             .is_err()
                         {
                             stop_cb.store(true, Ordering::Relaxed);
@@ -251,13 +327,19 @@ fn worker_thread_direct(
     // If root path points to a file then return just this one entry
     if !dir_entry.file_type.is_dir() {
         let mut results = ScandirResults::new();
-        results.push_entry(create_entry(&root_path, &return_type, &dir_entry));
+        results.push_entry(create_entry(
+            &root_path,
+            &return_type,
+            &dir_entry,
+            &mut ParentCache::default(),
+        ));
         return Ok(results);
     }
 
     let max_file_cnt = options.max_file_cnt;
     let mut file_cnt = 0;
     let mut entries = ScandirResults::new();
+    let mut cache = ParentCache::default();
 
     // Collect filter errors via Arc<parking_lot::Mutex> (no poisoning)
     let filter_errors: Arc<parking_lot::Mutex<Vec<String>>> =
@@ -295,7 +377,7 @@ fn worker_thread_direct(
                     }
                     file_cnt += 1;
                 }
-                match create_entry(&root_path, &return_type, &dir_entry) {
+                match create_entry(&root_path, &return_type, &dir_entry, &mut cache) {
                     ScandirResult::Error(error) => entries.errors.push(error),
                     entry => entries.push_entry(entry),
                 }

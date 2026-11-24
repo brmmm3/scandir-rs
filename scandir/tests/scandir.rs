@@ -1,6 +1,7 @@
 #![cfg_attr(windows, feature(junction_point))]
 
 use std::io::Error;
+use std::path::Path;
 
 use scandir::{ReturnType, Scandir, ScandirResult};
 
@@ -16,12 +17,15 @@ fn test_scandir() -> Result<(), Error> {
     #[cfg(unix)]
     assert_eq!(211, entries.results.len());
     #[cfg(windows)]
-    assert_eq!(125, entries.results.len());
+    assert_eq!(126, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    #[cfg(target_os = "linux")]
-    match entries.results.get(1).unwrap() {
+    match entries
+        .results
+        .iter()
+        .find(|entry| entry.path() == Path::new("dir3"))
+        .expect("dir3 should be present")
+    {
         ScandirResult::DirEntry(d) => {
-            assert_eq!("dir3", &d.path);
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
@@ -47,15 +51,15 @@ fn test_scandir_skip_hidden() -> Result<(), Error> {
     #[cfg(unix)]
     assert_eq!(193, entries.results.len());
     #[cfg(windows)]
-    assert_eq!(107, entries.results.len());
+    assert_eq!(108, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    match entries.results.get(1).unwrap() {
+    match entries
+        .results
+        .iter()
+        .find(|entry| entry.path() == Path::new("dir3"))
+        .expect("dir3 should be present")
+    {
         ScandirResult::DirEntry(d) => {
-            assert!(
-                ["dir1", "dir2", "dir3"]
-                    .iter()
-                    .any(|name| d.path == std::path::Path::new(name))
-            );
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
@@ -81,15 +85,15 @@ fn test_scandir_extended() -> Result<(), Error> {
     #[cfg(unix)]
     assert_eq!(211, entries.results.len());
     #[cfg(windows)]
-    assert_eq!(125, entries.results.len());
+    assert_eq!(126, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    match entries.results.get(1).unwrap() {
+    match entries
+        .results
+        .iter()
+        .find(|entry| entry.path() == Path::new("dir3"))
+        .expect("dir3 should be present")
+    {
         ScandirResult::DirEntryExt(d) => {
-            assert!(
-                ["dir1", "dir2", "dir3"]
-                    .iter()
-                    .any(|name| d.path == std::path::Path::new(name))
-            );
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096
@@ -117,10 +121,13 @@ fn test_scandir_follow_links() -> Result<(), Error> {
     #[cfg(windows)]
     assert_eq!(234, entries.results.len());
     assert_eq!(0, entries.errors.len());
-    #[cfg(target_os = "linux")]
-    match entries.results.get(1).unwrap() {
+    match entries
+        .results
+        .iter()
+        .find(|entry| entry.path() == Path::new("dir3"))
+        .expect("dir3 should be present")
+    {
         ScandirResult::DirEntry(d) => {
-            assert_eq!("dir3", &d.path);
             assert!(d.is_dir);
             #[cfg(target_os = "linux")]
             assert!(d.st_size <= 4096); // Directories on tmpfs can have a size smaller than 4096

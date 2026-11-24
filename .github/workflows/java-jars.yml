@@ -82,6 +82,13 @@ jobs:
             -o jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}/${{ matrix.jni }}
           cp target/${{ matrix.rust }}/release/${{ matrix.native }} jscandir-jni/target/classes/native/${{ matrix.os }}-${{ matrix.arch }}/
 
+      - name: Set up MSVC environment
+        if: matrix.os == 'windows' && matrix.arch == 'x64'
+        # v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+
       - name: Build JNI bridge (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
